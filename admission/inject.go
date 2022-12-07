@@ -39,7 +39,6 @@ const (
 var supportedLanguages = []language{java, js, python}
 
 func injectLib(rawPod []byte) ([]byte, error) {
-	l.Debugf("old Pod: %s", rawPod)
 	return mutatePod(rawPod, injectAutoInstrumentation)
 }
 

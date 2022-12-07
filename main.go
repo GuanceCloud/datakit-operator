@@ -12,7 +12,21 @@ var l = logger.DefaultSLogger("main")
 
 var (
 	flagServerPort = flag.Int("port", 9543, "Listen TLS server port")
+	flagLogLevel   = flag.String("level", "debug", "Output log level")
 )
+
+func initlogger() {
+	lopt := &logger.Option{
+		Flags: logger.OPT_DEFAULT | logger.OPT_STDOUT,
+		Level: *flagLogLevel,
+	}
+
+	if err := logger.InitRoot(lopt); err != nil {
+		l.Fatal(err)
+	}
+
+	l = logger.SLogger("main")
+}
 
 func main() {
 	flag.Parse()
@@ -28,17 +42,4 @@ func main() {
 		admission.Run(*flagServerPort)
 	}()
 	wg.Wait()
-}
-
-func initlogger() {
-	lopt := &logger.Option{
-		Flags: logger.OPT_DEFAULT | logger.OPT_STDOUT,
-		Level: logger.DEBUG,
-	}
-
-	if err := logger.InitRoot(lopt); err != nil {
-		l.Fatal(err)
-	}
-
-	l = logger.SLogger("main")
 }
