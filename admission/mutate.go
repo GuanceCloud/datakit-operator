@@ -6,7 +6,6 @@ import (
 
 	"github.com/mattbaird/jsonpatch"
 	admissionv1 "k8s.io/api/admission/v1"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -51,25 +50,6 @@ func mutationResponsev1(jsonPatch []byte, err error) *admissionv1.AdmissionRespo
 	l.Debugf("jsonpatch: %s", jsonPatch)
 	patchType := admissionv1.PatchTypeJSONPatch
 	return &admissionv1.AdmissionResponse{
-		Patch:     jsonPatch,
-		PatchType: &patchType,
-		Allowed:   true,
-	}
-}
-
-func mutationResponsev1beta1(jsonPatch []byte, err error) *admissionv1beta1.AdmissionResponse {
-	if err != nil {
-		l.Warnf("Failed to v1beta1.mutate: %v", err)
-		return &admissionv1beta1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: err.Error(),
-			},
-			Allowed: true,
-		}
-	}
-	l.Debugf("jsonpatch: %s", jsonPatch)
-	patchType := admissionv1beta1.PatchTypeJSONPatch
-	return &admissionv1beta1.AdmissionResponse{
 		Patch:     jsonPatch,
 		PatchType: &patchType,
 		Allowed:   true,

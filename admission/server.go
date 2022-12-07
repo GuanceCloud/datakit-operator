@@ -9,14 +9,13 @@ import (
 
 var l = logger.DefaultSLogger("admission")
 
+const (
+	tlsKeyFile  = "/usr/local/datakit-operator/certs/tls.key"
+	tlsCertFile = "/usr/local/datakit-operator/certs/tls.crt"
+)
+
 func Run(port int) {
 	l = logger.SLogger("admission")
-
-	if err := writeTLSFile(); err != nil {
-		l.Error(err)
-		return
-	}
-
 	l.Debugf("server running...")
 
 	http.HandleFunc("/v1/webhooks/injectlib", handleInjectLib)

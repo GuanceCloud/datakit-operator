@@ -23,7 +23,7 @@ spec:
         app: datakit-operator
     spec:
       containers:
-        - name: datakit-operator
+        - name: operator
           image: pubrepo.jiagouyun.com/datakit-operator/datakit-operator:{{VERSION}}
           imagePullPolicy: IfNotPresent
           ports:
@@ -47,7 +47,7 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: deployment-mutation
+  name: datakit-operator-mutation
 webhooks:
   - name: "dd-lib-mutation.datakit.svc"
     rules:
@@ -59,7 +59,7 @@ webhooks:
     clientConfig:
       service:
         namespace: datakit
-        name: webhook-service
+        name: datakit-operator
         path: "/v1/webhooks/injectlib"
       caBundle: {{CABUNDLE}}
     admissionReviewVersions: ["v1"]
