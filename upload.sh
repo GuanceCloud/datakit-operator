@@ -9,24 +9,19 @@ osshost=$bucket.$host
 echo $osshost
 
 # check input parameters
-if [host==""]
-then
+if [ -z "$host" ]; then
 	echo "invalid host parameter, exit"
 	exit 1
-elif [bucket==""]
-then
-	echo "invalid bucket parameter, exit"
-	exit 1
-elif [id==""]
-then
-	echo "invalid id parameter, exit"
-	exit 1
-elif [key==""]
-then
-	echo "invalid key parameter, exit"
-	exit 1
-elif [version==""]
-then
+elif [ -z "$bucket" ]; then
+         echo "invalid bucket parameter, exit"
+         exit 1
+elif [ -z "$id" ]; then
+         echo "invalid id parameter, exit"
+         exit 1
+elif [ -z "$key" ]; then
+         echo "invalid key parameter, exit"
+         exit 1
+elif [ -z "$version" ]; then
 	echo "invalid version parameter, exit"
 	exit 1
 fi
