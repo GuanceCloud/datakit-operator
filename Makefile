@@ -4,7 +4,8 @@ VERSION=v1.0.1
 
 BIN = datakit-operator
 ENTRY = main.go
-BUILD_DIR = build
+BUILD_DIR = dist
+CERT_DIR = self-certification
 ARCH_AMD64 = amd64
 ARCH_ARM64 = arm64
 IMAGE_ARCH_AMD64 = linux/amd64
@@ -13,7 +14,6 @@ IMAGE_ARCH_ARM64 = linux/arm64
 
 define build
 	@rm -rf $(BUILD_DIR)/*
-	@bash tls.sh
 
 	@echo "======= $(BIN) $(1) ======="
 	@GO111MODULE=off CGO_ENABLED=0 GOOS=linux GOARCH=$(1) go build -o $(BUILD_DIR)/$(1)/$(BIN) -pkgdir $(ENTRY)
@@ -25,7 +25,7 @@ define build
 	@echo "----"
 	@tree -Csh -L 3 $(BUILD_DIR)
 	
-	@sed -e "s/{{VERSION}}/$(VERSION)/g" -e "s/{{CABUNDLE}}/`cat $(BUILD_DIR)/certs/tls.crt | base64 | tr -d "\n"`/g" datakit-operator.yaml.template > datakit-operator.yaml 
+	@sed -e "s/{{VERSION}}/$(VERSION)/g" -e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" datakit-operator.yaml.template > datakit-operator.yaml 
 	
 endef
 

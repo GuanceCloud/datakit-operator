@@ -1,3 +1,2 @@
-certs/
-build/
+dist/*
 datakit-operator.yaml
