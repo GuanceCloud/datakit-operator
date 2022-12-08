@@ -25,7 +25,6 @@ build:
   script:
     - make clean
     - make
-    - make image
 
 test:
   stage: test

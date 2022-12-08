@@ -8,7 +8,7 @@ BUILD_DIR = build
 ARCH_AMD64 = amd64
 ARCH_ARM64 = arm64
 IMAGE_ARCH_AMD64 = linux/amd64
-IMAGE_ARCH_ARM64 = linux/amd64
+IMAGE_ARCH_ARM64 = linux/arm64
 #UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
 define build
