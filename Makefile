@@ -36,16 +36,22 @@ define image
 		-t $(2)/datakit-operator/datakit-operator:latest . --push
 endef
 
+define upload
+	@bash upload.sh $(1) $(2) $(3) $(4) $(5)
+endef
+
 local:
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
 	$(call image,$(IMAGE_ARCH_ARM64),pubrepo.jiagouyun.com)
 	$(call image,$(IMAGE_ARCH_AMD64),pubrepo.jiagouyun.com)
+	$(call upload,$(PRODU_OSS_HOST),$(PRODU_OSS_BUCKET),$(PRODU_OSS_ACCESS_KEY),$(PRODU_OSS_SECRET_KEY),$(VERSION))
 
 pub_testing_image:
 	$(call image,$(IMAGE_ARCH_ARM64),registry.jiagouyun.com)
 	$(call image,$(IMAGE_ARCH_AMD64),registry.jiagouyun.com)
+	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 lint:
 	#TODO

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-host="oss-cn-hangzhou.aliyuncs.com"
-bucket="df-storage-dev" # BucketName
-id="$1" # AccessKeyId
-key="$2" # AccessKeySecret
+host="$1"
+bucket="$2"
+id="$3"
+key="$4"
+version="$5"
 osshost=$bucket.$host
-version="$3"
 echo $osshost
 
 name="datakit-operator"
