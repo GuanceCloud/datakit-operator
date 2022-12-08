@@ -37,15 +37,15 @@ define image
 endef
 
 local:
-	$(call build, $(ARCH_ARM64), $(ARCH_AMD64))
+	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
-	$(call image, $(IMAGE_ARCH_ARM64), pubrepo.jiagouyun.com)
-	$(call image, $(IMAGE_ARCH_AMD64), pubrepo.jiagouyun.com)
+	$(call image,$(IMAGE_ARCH_ARM64),pubrepo.jiagouyun.com)
+	$(call image,$(IMAGE_ARCH_AMD64),pubrepo.jiagouyun.com)
 
 pub_testing_image:
-	$(call image, $(IMAGE_ARCH_ARM64), register.jiagouyun.com)
-	$(call image, $(IMAGE_ARCH_AMD64), register.jiagouyun.com)
+	$(call image,$(IMAGE_ARCH_ARM64),register.jiagouyun.com)
+	$(call image,$(IMAGE_ARCH_AMD64),register.jiagouyun.com)
 
 lint:
 	#TODO
