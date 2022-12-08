@@ -39,7 +39,7 @@ test:
 release-testing:
   stage: deploy
   resource_group: production
-  needs: [build, test]
+  needs: [test, build]
   only:
     - /^dev.*$/
   script:
@@ -48,7 +48,7 @@ release-testing:
 release-stable:
   stage: deploy
   resource_group: production
-  needs: [build, test]
+  needs: [test, build]
   only:
     - master
   script:
