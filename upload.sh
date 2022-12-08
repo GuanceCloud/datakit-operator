@@ -17,27 +17,27 @@ destV="${name}/${sourceWithVersion}"
 
 dateValue="`TZ=GMT env LANG=en_US.UTF-8 date +'%a, %d %b %Y %H:%M:%S GMT'`"
 
-# 1 upload no version jar file.
+
+# 1 upload no version file
 resource="/${bucket}/${dest}"
-contentType=`file -ib ${agentName} | awk -F ";" '{print $1}'`
+contentType=`file -ib ${source} | awk -F ";" '{print $3}'`
 stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
 signature=`echo -en $stringToSign | openssl sha1 -hmac ${key} -binary | base64`
 
-
 url=http://${osshost}/${dest}
-echo "upload ${agentName} to ${url}"
+echo "upload ${source} to ${url}"
 
-
-curl -i -q -X PUT -T "${agentName}" \
+curl -i -q -X PUT -T "${source}" \
     -H "Host: ${osshost}" \
     -H "Date: ${dateValue}" \
     -H "Content-Type: ${contentType}" \
     -H "Authorization: OSS ${id}:${signature}" \
     ${url}
 
-# 2 upload has version jar file.
+
+# 2 upload has version file
 resource="/${bucket}/${destV}"
-contentType=`file -ib ${sourceWithVersion} | awk -F ";" '{print $1}'`
+contentType=`file -ib ${sourceWithVersion} | awk -F ";" '{print $3}'`
 stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
 signature=`echo -en $stringToSign | openssl sha1 -hmac ${key} -binary | base64`
 
