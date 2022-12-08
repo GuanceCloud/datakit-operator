@@ -13,11 +13,12 @@ variables:
   TEST_VERSION: "1.999.0"
 
 stages:
-  - deploy
   - test
+  - build
+  - deploy
 
-build-datakit-operator:
-  stage: deploy
+build:
+  stage: build
   resource_group: production
   only:
     - /^.*$/
@@ -26,11 +27,11 @@ build-datakit-operator:
     - make
     - make image
 
-test-datakit-operator:
+test:
   stage: test
   resource_group: production
   only:
-    - /^dev-.*$/
+    - /^dev.*$/
   script:
     - make clean
     - make lint
@@ -39,17 +40,17 @@ test-datakit-operator:
 release-testing:
   stage: deploy
   resource_group: production
-  needs: [build-datakit-operator, test-datakit-operator]
+  needs: [build, test]
   only:
-    - /^dev-.*$/
+    - /^dev.*$/
   script:
     - make pub_testing_image
 
 release-stable:
   stage: deploy
   resource_group: production
-  needs: [build-datakit-operator, test-datakit-operator]
+  needs: [build, test]
   only:
     - master
   script:
-    - make pub_testing_image
+    - make pub_image
