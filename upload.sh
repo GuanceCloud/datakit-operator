@@ -27,6 +27,7 @@ elif [ -z "$version" ]; then
 fi
 
 name="datakit-operator"
+filename="datakit-operator.yaml"
 source="datakit-operator.yaml"
 sourceWithVersion="${name}-${version}.yaml"
 
@@ -38,14 +39,14 @@ dateValue="`TZ=GMT env LANG=en_US.UTF-8 date +'%a, %d %b %Y %H:%M:%S GMT'`"
 
 # 1 upload no version file
 resource="/${bucket}/${dest}"
-contentType=`file -ib ${source} | awk -F ";" '{print $3}'`
+contentType=`file -ib ${filename} | awk -F ";" '{print $3}'`
 stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
 signature=`echo -en $stringToSign | openssl sha1 -hmac ${key} -binary | base64`
 
 url=http://${osshost}/${dest}
-echo "upload ${source} to ${url}"
+echo "upload ${filename} to ${url}"
 
-curl -i -q -X PUT -T "${source}" \
+curl -i -q -X PUT -T "${filename}" \
     -H "Host: ${osshost}" \
     -H "Date: ${dateValue}" \
     -H "Content-Type: ${contentType}" \
@@ -55,16 +56,15 @@ curl -i -q -X PUT -T "${source}" \
 
 # 2 upload has version file
 resource="/${bucket}/${destV}"
-contentType=`file -ib ${sourceWithVersion} | awk -F ";" '{print $3}'`
+contentType=`file -ib ${filename} | awk -F ";" '{print $3}'`
 stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
 signature=`echo -en $stringToSign | openssl sha1 -hmac ${key} -binary | base64`
 
 
 url=http://${osshost}/${destV}
-echo "upload ${sourceWithVersion} to ${url}"
+echo "upload ${filename} to ${url}"
 
-
-curl -i -q -X PUT -T "${sourceWithVersion}" \
+curl -i -q -X PUT -T "${filename}" \
     -H "Host: ${osshost}" \
     -H "Date: ${dateValue}" \
     -H "Content-Type: ${contentType}" \
