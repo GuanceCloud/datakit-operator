@@ -6,26 +6,14 @@ before_script:
   - export PATH=/usr/local/go1.18.3/bin:$PATH
   - export GOROOT=/usr/local/go1.18.3
   - go version
-  - tree build
 
 variables:
   PROJECT: "datakit-operator"
   CI_VERSION: "1.0.1"
-  TEST_VERSION: "1.999.0"
 
 stages:
   - test
-  - build
   - deploy
-
-build:
-  stage: build
-  resource_group: production
-  only:
-    - /^.*$/
-  script:
-    - make clean
-    - make
 
 test:
   stage: test
@@ -33,24 +21,27 @@ test:
   only:
     - /^dev.*$/
   script:
-    - make clean
     - make lint
     - make all_test
 
 release-testing:
   stage: deploy
   resource_group: production
-  needs: [test, build]
+  needs: [test]
   only:
     - /^dev.*$/
   script:
+    - make clean
+    - make
     - make pub_testing_image
 
 release-stable:
   stage: deploy
   resource_group: production
-  needs: [test, build]
+  needs: [test]
   only:
     - master
   script:
+    - make clean
+    - make
     - make pub_image
