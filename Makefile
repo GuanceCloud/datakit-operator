@@ -5,9 +5,8 @@ VERSION=v1.0.1
 BIN = datakit-operator
 ENTRY = main.go
 BUILD_DIR = build
-BIN_ARCH_AMD = amd64
-BIN_ARCH_ARM = arm64
-IMAGE_ARCHS = "linux/arm64,linux/amd64"
+ARCH_AMD64 = amd64
+ARCH_ARM64 = arm64
 #UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
 define build
@@ -39,17 +38,16 @@ define pub_image
 endef
 
 local:
-	$(call build,$(BIN_ARCH_ARM),$(BIN_ARCH_AMD))
+	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 image:
-	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
+	$(call image,$(ARCH_ARM64),pubrepo.jiagouyun.com)
+	$(call image,$(ARCH_AMD64),pubrepo.jiagouyun.com)
 
 pub_image:
-	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
 	$(call pub_image,pubrepo.jiagouyun.com)
 
 pub_testing_image:
-	$(call image,$(IMAGE_ARCHS),register.jiagouyun.com)
 	$(call pub_image,register.jiagouyun.com)
 
 lint:
