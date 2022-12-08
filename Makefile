@@ -7,6 +7,8 @@ ENTRY = main.go
 BUILD_DIR = build
 ARCH_AMD64 = amd64
 ARCH_ARM64 = arm64
+IMAGE_ARCH_AMD64 = linux/amd64
+IMAGE_ARCH_ARM64 = linux/amd64
 #UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
 define build
@@ -28,29 +30,22 @@ define build
 endef
 
 define image
-	sudo docker buildx build --platform $(2) \
-		-t $(1)/datakit-operator/datakit-operator:$(VERSION) . 
-	sudo docker buildx build --platform $(3) \
-		-t $(1)/datakit-operator/datakit-operator:$(VERSION) . 
-endef
-
-define pub_image
-	sudo docker image tag $(1)/datakit-operator/datakit-operator:$(VERSION) $(1)/datakit-operator/datakit-operator:$(VERSION) 
-	sudo docker image tag $(1)/datakit-operator/datakit-operator:$(VERSION) $(1)/datakit-operator/datakit-operator:latest
+	sudo docker buildx build --platform $(1) \
+		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . --push
+	sudo docker buildx build --platform $(1) \
+		-t $(2)/datakit-operator/datakit-operator:latest . --push
 endef
 
 local:
-	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
-
-image:
-	$(call image,pubrepo.jiagouyun.com,$(ARCH_ARM64),$(ARCH_AMD64))
-	$(call image,register.jiagouyun.com,$(ARCH_ARM64),$(ARCH_AMD64))
+	$(call build, $(ARCH_ARM64), $(ARCH_AMD64))
 
 pub_image:
-	$(call pub_image,pubrepo.jiagouyun.com)
+	$(call image, $(IMAGE_ARCH_ARM64), pubrepo.jiagouyun.com)
+	$(call image, $(IMAGE_ARCH_AMD64), pubrepo.jiagouyun.com)
 
 pub_testing_image:
-	$(call pub_image,register.jiagouyun.com)
+	$(call image, $(IMAGE_ARCH_ARM64), register.jiagouyun.com)
+	$(call image, $(IMAGE_ARCH_AMD64), register.jiagouyun.com)
 
 lint:
 	#TODO
