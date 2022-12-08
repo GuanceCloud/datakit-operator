@@ -1,7 +1,6 @@
 package admission
 
 import (
-	"fmt"
 	"net/http"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
@@ -14,13 +13,13 @@ const (
 	tlsCertFile = "/usr/local/datakit-operator/certs/tls.crt"
 )
 
-func Run(port int) {
+func Run(addr string) {
 	l = logger.SLogger("admission")
 	l.Debugf("server running...")
 
 	http.HandleFunc("/v1/webhooks/injectlib", handleInjectLib)
 	server := &http.Server{
-		Addr: fmt.Sprintf(":%d", port),
+		Addr: addr,
 	}
 
 	err := server.ListenAndServeTLS(tlsCertFile, tlsKeyFile)
