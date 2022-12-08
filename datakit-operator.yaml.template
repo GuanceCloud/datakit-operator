@@ -26,6 +26,11 @@ spec:
         - name: operator
           image: pubrepo.jiagouyun.com/datakit-operator/datakit-operator:{{VERSION}}
           imagePullPolicy: IfNotPresent
+          env:
+          - name: DATAKIT_OPERATOR_LOG_LEVEL
+            value: info
+          - name: DATAKIT_OPERATOR_SERVER_LISTEN
+            value: 0.0.0.0:9543
           ports:
             - containerPort: 9543
 ---

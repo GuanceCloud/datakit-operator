@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"sync"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
@@ -11,14 +12,14 @@ import (
 var l = logger.DefaultSLogger("main")
 
 var (
-	flagServerPort = flag.Int("port", 9543, "Listen TLS server port")
-	flagLogLevel   = flag.String("level", "debug", "Output log level")
+	envServerListen = envString("DATAKIT_OPERATOR_SERVER_LISTEN", "0.0.0.0:9543")
+	envLogLevel     = envString("DATAKIT_OPERATOR_LOG_LEVEL", "debug")
 )
 
 func initlogger() {
 	lopt := &logger.Option{
 		Flags: logger.OPT_DEFAULT | logger.OPT_STDOUT,
-		Level: *flagLogLevel,
+		Level: envLogLevel,
 	}
 
 	if err := logger.InitRoot(lopt); err != nil {
@@ -38,8 +39,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		admission.Run(*flagServerPort)
+		admission.Run(envServerListen)
 	}()
 	wg.Wait()
+}
+
+func envString(name string, value string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return value
 }
