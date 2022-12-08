@@ -8,6 +8,25 @@ version="$5"
 osshost=$bucket.$host
 echo $osshost
 
+# check input parameters
+if [host==""]
+then
+	echo "invalid host parameter, exit"
+	exit 1
+elif [bucket==""]
+	echo "invalid bucket parameter, exit"
+	exit 1
+elif [id==""]
+	echo "invalid id parameter, exit"
+	exit 1
+elif [key==""]
+	echo "invalid key parameter, exit"
+	exit 1
+elif [version==""]
+	echo "invalid version parameter, exit"
+	exit 1
+fi
+
 name="datakit-operator"
 source="datakit-operator.yaml"
 sourceWithVersion="${name}-${version}.yaml"
