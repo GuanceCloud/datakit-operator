@@ -28,8 +28,10 @@ define build
 endef
 
 define image
-	sudo docker buildx build --platform $(1) \
-		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . 
+	sudo docker buildx build --platform $(2) \
+		-t $(1)/datakit-operator/datakit-operator:$(VERSION) . 
+	sudo docker buildx build --platform $(3) \
+		-t $(1)/datakit-operator/datakit-operator:$(VERSION) . 
 endef
 
 define pub_image
@@ -41,8 +43,8 @@ local:
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 image:
-	$(call image,$(ARCH_ARM64),pubrepo.jiagouyun.com)
-	$(call image,$(ARCH_AMD64),pubrepo.jiagouyun.com)
+	$(call image,pubrepo.jiagouyun.com,$(ARCH_ARM64),$(ARCH_AMD64))
+	$(call image,register.jiagouyun.com,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
 	$(call pub_image,pubrepo.jiagouyun.com)
