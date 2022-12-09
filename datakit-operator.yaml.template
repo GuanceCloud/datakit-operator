@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: datakit
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datakit-operator
+  namespace: datakit
+  labels:
+    app: datakit-operator
+spec:
+  replicas: 1
+  selector:
+     matchLabels:
+       app: datakit-operator
+  template:
+    metadata:
+      labels:
+        app: datakit-operator
+    spec:
+      containers:
+        - name: operator
+          image: pubrepo.jiagouyun.com/datakit-operator/datakit-operator:{{VERSION}}
+          imagePullPolicy: Always
+          env:
+          - name: DATAKIT_OPERATOR_LOG_LEVEL
+            value: info
+          - name: DATAKIT_OPERATOR_SERVER_LISTEN
+            value: 0.0.0.0:9543
+          ports:
+            - containerPort: 9543
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: datakit-operator
+  namespace: datakit
+spec:
+  selector:
+    app: datakit-operator
+  ports:
+    - port: 443
+      targetPort: 9543
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: datakit-operator-mutation
+webhooks:
+  - name: "dd-lib-mutation.datakit.svc"
+    rules:
+      - operations: [ "CREATE"]
+        apiGroups: [ "" ]
+        apiVersions: [ "v1" ]
+        resources: [ "pods" ]
+        scope: "Namespaced"
+    clientConfig:
+      service:
+        namespace: datakit
+        name: datakit-operator
+        path: "/v1/webhooks/injectlib"
+      caBundle: {{CABUNDLE}}
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
