@@ -40,7 +40,7 @@ release-stable:
   resource_group: production
   needs: [test]
   only:
-    - master
+    - main
   script:
     - make clean
     - make
