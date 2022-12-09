@@ -19,7 +19,7 @@ test:
   stage: test
   resource_group: production
   only:
-    - /^dev.*$/
+    - /^.*$/
   script:
     - make lint
     - make all_test
