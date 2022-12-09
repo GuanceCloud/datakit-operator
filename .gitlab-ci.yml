@@ -3,13 +3,13 @@ before_script:
   - mkdir -p /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
   - cp -r ./. /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
   - cd /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
+  - source ~/.ossenv
   - export PATH=/usr/local/go1.18.3/bin:$PATH
   - export GOROOT=/usr/local/go1.18.3
   - go version
 
 variables:
   PROJECT: "datakit-operator"
-  CI_VERSION: "1.0.1"
 
 stages:
   - test
