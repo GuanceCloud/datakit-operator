@@ -8,8 +8,7 @@ BUILD_DIR = dist
 CERT_DIR = self-certification
 ARCH_AMD64 = amd64
 ARCH_ARM64 = arm64
-IMAGE_ARCH_AMD64 = linux/amd64
-IMAGE_ARCH_ARM64 = linux/arm64
+IMAGE_ARCHS := "linux/arm64,linux/amd64"
 #UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
 define build
@@ -44,13 +43,11 @@ local:
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
-	$(call image,$(IMAGE_ARCH_ARM64),pubrepo.jiagouyun.com)
-	$(call image,$(IMAGE_ARCH_AMD64),pubrepo.jiagouyun.com)
+	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
 	$(call upload,$(PRODU_OSS_HOST),$(PRODU_OSS_BUCKET),$(PRODU_OSS_ACCESS_KEY),$(PRODU_OSS_SECRET_KEY),$(VERSION))
 
 pub_testing_image:
-	$(call image,$(IMAGE_ARCH_ARM64),registry.jiagouyun.com)
-	$(call image,$(IMAGE_ARCH_AMD64),registry.jiagouyun.com)
+	$(call image,$(IMAGE_ARCHS),registry.jiagouyun.com)
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 lint:
