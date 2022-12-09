@@ -1,0 +1,47 @@
+before_script:
+  - rm -rf /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
+  - mkdir -p /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
+  - cp -r ./. /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
+  - cd /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
+  - source ~/.ossenv
+  - export PATH=/usr/local/go1.18.3/bin:$PATH
+  - export GOROOT=/usr/local/go1.18.3
+  - go version
+
+variables:
+  PROJECT: "datakit-operator"
+
+stages:
+  - test
+  - deploy
+
+test:
+  stage: test
+  resource_group: production
+  only:
+    - /^dev.*$/
+  script:
+    - make lint
+    - make all_test
+
+release-testing:
+  stage: deploy
+  resource_group: production
+  needs: [test]
+  only:
+    - /^dev.*$/
+  script:
+    - make clean
+    - make
+    - make pub_testing_image
+
+release-stable:
+  stage: deploy
+  resource_group: production
+  needs: [test]
+  only:
+    - master
+  script:
+    - make clean
+    - make
+    - make pub_image
