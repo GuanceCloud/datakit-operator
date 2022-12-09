@@ -44,7 +44,7 @@ local:
 
 pub_image:
 	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
-	$(call upload,$(PRODU_OSS_HOST),$(PRODU_OSS_BUCKET),$(PRODU_OSS_ACCESS_KEY),$(PRODU_OSS_SECRET_KEY),$(VERSION))
+	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 
 pub_testing_image:
 	$(call image,$(IMAGE_ARCHS),registry.jiagouyun.com)
