@@ -36,7 +36,7 @@ NAME                               READY   STATUS    RESTARTS   AGE
 datakit-operator-f948897fb-5w5nm   1/1     Running   0          15s
 ```
 
-*如果出现 `InvalidImageName` 报错，可以手动 pull 镜像*
+*如果出现 `InvalidImageName` 报错，可以手动 pull 镜像。*
 
 2. 修改现有的应用 yaml，以 nginx deployment 为例
 
