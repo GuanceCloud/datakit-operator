@@ -8,11 +8,9 @@
 
 ---
 
-
 首先，根据 Kubenetes Admission Controller 的机制，这是可行的。
 
 **注意，这是侵入式行为，要修改用户原来的 yaml 文件，把所需数据注入进去，不是所有人都愿意自己的 yaml 被修改。**
-
 
 具体做法是：
 
@@ -26,17 +24,25 @@ datakit-operator 运行后会根据 Annotation 决定是否添加 dd-lib 文件�
 
 >  Value 是指定版本号，如果为空，就使用默认的稳定版，现在支持的版本有限，推荐使用默认值。
 
+Datakit-Operator v1.0.1 的 dd-lib stable 版本号：
+
+- java: v1.0.1-guance
+- python: v1.6.2
+- js: v3.9.3
+
 举例说明：
 
 1. 下载和安装 datakit-operator
 
 ```shell
-$ wget http://zhuyun-static-files-production.oss-cn-hangzhou-internal.aliyuncs.com/datakit-operator/datakit-operator.yaml
+$ wget https://static.guance.com/datakit-operator/datakit-operator.yaml
 $ kubectl apply -f datakit-operator.yaml
 $ kubectl get pod -n datakit
 NAME                               READY   STATUS    RESTARTS   AGE
 datakit-operator-f948897fb-5w5nm   1/1     Running   0          15s
 ```
+
+*如果出现 `InvalidImageName` 报错，可以手动 pull 镜像。*
 
 2. 修改现有的应用 yaml，以 nginx deployment 为例
 

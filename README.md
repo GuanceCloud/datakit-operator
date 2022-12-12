@@ -12,9 +12,9 @@ Datakit-Operator 是 Datakit 在 Kubernetes 编排的联动项目，旨在协助
 
 ## 安装
 
-需要 Kubernetes v1.24.1 及以上版本，且能够访问互联网（下载 yaml 文件和 Image）。
+推荐 Kubernetes v1.24.1 及以上版本，且能够访问互联网（下载 yaml 文件和 Image）。
 
 ```
-$ wget http://zhuyun-static-files-production.oss-cn-hangzhou.aliyuncs.com/datakit-operator/datakit-operator.yaml
+$ wget https://static.guance.com/datakit-operator/datakit-operator.yaml
 $ kubectl apply -f datakit-operator.yaml
 ```
