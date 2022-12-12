@@ -6,9 +6,9 @@ Datakit-Operator 是 Datakit 在 Kubernetes 编排的联动项目，旨在协助
 
 目前 Datakit-Operator 提供以下功能：
 
-- [ ] 针对特殊 Pod，提供注入 `dd-lib` 文件和 environment 的功能，[文档](docs/admission-mutate.md)
-- [x] 负责创建和更新 Datakit 即相关 Pod 的编排
-- [x] 验证 Datakit 的配置
+- [x] 针对特殊 Pod，提供注入 `dd-lib` 文件和 environment 的功能，[文档](docs/admission-mutate.md)
+- [ ] 负责创建和更新 Datakit 即相关 Pod 的编排
+- [ ] 验证 Datakit 的配置
 
 ## 安装
 
