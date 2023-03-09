@@ -2,7 +2,7 @@ package admission
 
 // stable release
 const (
-	javaLibVerion    = "v1.0.1-guance"
+	javaLibVerion    = "v1.8.4-guance"
 	pythonLibVersion = "v1.6.2"
 	jsLibVerion      = "v3.9.3"
 
