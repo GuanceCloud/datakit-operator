@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: operator
-          image: pubrepo.jiagouyun.com/datakit-operator/datakit-operator:{{VERSION}}
+          image: {{HUB}}/datakit-operator/datakit-operator:{{VERSION}}
           imagePullPolicy: Always
           env:
           - name: DATAKIT_OPERATOR_LOG_LEVEL
