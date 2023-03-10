@@ -29,6 +29,7 @@ define build
 endef
 
 define image
+	@sed -e "s/{{HUB}}/$(2)/g" datakit-operator.yaml.template > datakit-operator.yaml
 	sudo docker buildx build --platform $(1) \
 		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . --push
 	sudo docker buildx build --platform $(1) \
