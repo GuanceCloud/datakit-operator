@@ -1,10 +1,15 @@
 package admission
 
-// stable release
-const (
-	javaLibVerion    = "v1.0.1-guance"
-	pythonLibVersion = "v1.6.2"
-	jsLibVerion      = "v3.9.3"
+import "os"
 
-	imageRegistry = "pubrepo.jiagouyun.com/datakit-operator"
-)
+func javaAgentImage() string {
+	return os.Getenv("ENV_DD_JAVA_AGENT_IMAGE")
+}
+
+func pythonAgentImage() string {
+	return os.Getenv("ENV_DD_PYTHON_AGENT_IMAGE")
+}
+
+func jsAgentImage() string {
+	return os.Getenv("ENV_DD_JS_AGENT_IMAGE")
+}

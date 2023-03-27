@@ -1,10 +1,3 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: datakit
-
----
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,13 +17,19 @@ spec:
     spec:
       containers:
         - name: operator
-          image: pubrepo.jiagouyun.com/datakit-operator/datakit-operator:{{VERSION}}
+          image: {{HUB}}/datakit-operator/datakit-operator:{{VERSION}}
           imagePullPolicy: Always
           env:
-          - name: DATAKIT_OPERATOR_LOG_LEVEL
+          - name: ENV_LOG_LEVEL
             value: info
-          - name: DATAKIT_OPERATOR_SERVER_LISTEN
+          - name: ENV_SERVER_LISTEN
             value: 0.0.0.0:9543
+          - name: ENV_DD_JAVA_AGENT_IMAGE
+            value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-java-init:v1.8.4-guance
+          - name: ENV_DD_PYTHON_AGENT_IMAGE
+            value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-python-init:v1.6.2
+          - name: ENV_DD_JS_AGENT_IMAGE
+            value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-js-init:v3.9.2
           ports:
             - containerPort: 9543
 ---
@@ -70,3 +69,5 @@ webhooks:
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 5
+    reinvocationPolicy: Never
+    failurePolicy: Ignore

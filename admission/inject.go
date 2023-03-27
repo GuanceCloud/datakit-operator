@@ -65,13 +65,8 @@ func extractLibInfo(pod *corev1.Pod) (language, string, bool) {
 	for _, lang := range supportedLanguages {
 		libVersionAnnotation := strings.ToLower(fmt.Sprintf(libVersionAnnotationKeyFormat, lang))
 		if imageVersion, found := podAnnotations[libVersionAnnotation]; found {
-			var image string
-
-			if imageVersion != "" {
-				image = fmt.Sprintf("%s/dd-lib-%s-init:%s", imageRegistry, lang, imageVersion)
-			} else {
-				image = fmt.Sprintf("%s/dd-lib-%s-init:%s", imageRegistry, lang, libReleaseVerion(lang))
-			}
+			image := libReleaseImage(lang, imageVersion)
+			l.Infof("Use of %s-agent image %s to Pod %s", lang, image, pod.GetName())
 
 			return lang, image, true
 		}
@@ -188,15 +183,63 @@ func pythonEnvValFunc(predefinedVal string) string {
 	return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
 }
 
-func libReleaseVerion(lang language) string {
+func libReleaseImage(lang language, imageVersion string) string {
+	var image string
+
 	switch lang {
 	case java:
-		return javaLibVerion
+		image = javaAgentImage()
 	case python:
-		return pythonLibVersion
+		image = pythonAgentImage()
 	case js:
-		return jsLibVerion
+		image = jsAgentImage()
 	default:
-		return "latest"
+		return ""
 	}
+
+	if imageVersion == "" {
+		return image
+	}
+
+	imageName, _, _ := ParseImage(image)
+	return fmt.Sprintf("%s:%s", imageName, imageVersion)
+}
+
+// ParseImage adapts some of the logic from the actual Docker library's image parsing
+// routines:
+// https://github.com/docker/distribution/blob/release/2.7/reference/normalize.go
+func ParseImage(image string) (string, string, string) {
+	var domain, remainder string
+
+	i := strings.IndexRune(image, '/')
+
+	if i == -1 || (!strings.ContainsAny(image[:i], ".:") && image[:i] != "localhost") {
+		remainder = image
+	} else {
+		domain, remainder = image[:i], image[i+1:]
+	}
+
+	var imageName string
+	imageVersion := "unknown"
+
+	i = strings.LastIndex(remainder, ":")
+	if i > -1 {
+		imageVersion = remainder[i+1:]
+		imageName = remainder[:i]
+	} else {
+		imageName = remainder
+	}
+
+	if domain != "" {
+		imageName = domain + "/" + imageName
+	}
+
+	shortName := imageName
+	if imageBlock := strings.Split(imageName, "/"); len(imageBlock) > 0 {
+		// there is no need to do
+		// Split not return empty slice
+		shortName = imageBlock[len(imageBlock)-1]
+	}
+
+	return imageName, shortName, imageVersion
 }

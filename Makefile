@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.0.1
+VERSION=v1.0.3
 
 BIN = datakit-operator
 ENTRY = main.go
@@ -24,11 +24,13 @@ define build
 	@echo "----"
 	@tree -Csh -L 3 $(BUILD_DIR)
 	
-	@sed -e "s/{{VERSION}}/$(VERSION)/g" -e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" datakit-operator.yaml.template > datakit-operator.yaml 
-	
 endef
 
 define image
+	@sed -e "s/{{HUB}}/$(2)/g" \
+		-e "s/{{VERSION}}/$(VERSION)/g" \
+		-e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
+		datakit-operator.yaml.template > datakit-operator.yaml 
 	sudo docker buildx build --platform $(1) \
 		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . --push
 	sudo docker buildx build --platform $(1) \

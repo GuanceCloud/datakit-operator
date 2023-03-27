@@ -12,8 +12,8 @@ import (
 var l = logger.DefaultSLogger("main")
 
 var (
-	envServerListen = envString("DATAKIT_OPERATOR_SERVER_LISTEN", "0.0.0.0:9543")
-	envLogLevel     = envString("DATAKIT_OPERATOR_LOG_LEVEL", "debug")
+	envServerListen = envString("ENV_SERVER_LISTEN", "0.0.0.0:9543")
+	envLogLevel     = envString("ENV_LOG_LEVEL", "debug")
 )
 
 func initlogger() {
