@@ -66,6 +66,8 @@ func extractLibInfo(pod *corev1.Pod) (language, string, bool) {
 		libVersionAnnotation := strings.ToLower(fmt.Sprintf(libVersionAnnotationKeyFormat, lang))
 		if imageVersion, found := podAnnotations[libVersionAnnotation]; found {
 			image := libReleaseImage(lang, imageVersion)
+			l.Infof("Use of %s-agent image %s to Pod %s", lang, image, pod.GetName())
+
 			return lang, image, true
 		}
 	}
