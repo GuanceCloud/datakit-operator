@@ -1,3 +1,5 @@
+## Datakit-Operator {{VERSION}} Configuration YAML
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,12 +26,18 @@ spec:
             value: info
           - name: ENV_SERVER_LISTEN
             value: 0.0.0.0:9543
+          - name: ENV_DD_AGENT_HOST
+            value: datakit-service.datakit.svc
+          - name: ENV_DD_TRACE_AGENT_PORT
+            value: "9529"
           - name: ENV_DD_JAVA_AGENT_IMAGE
             value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-java-init:v1.8.4-guance
           - name: ENV_DD_PYTHON_AGENT_IMAGE
             value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-python-init:v1.6.2
           - name: ENV_DD_JS_AGENT_IMAGE
             value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-js-init:v3.9.2
+          - name: ENV_LOGFWD_IMAGE
+            value: pubrepo.jiagouyun.com/datakit/logfwd:1.5.8
           ports:
             - containerPort: 9543
 ---
@@ -53,18 +61,18 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: datakit-operator-mutation
 webhooks:
-  - name: "dd-lib-mutation.datakit.svc"
+  - name: "mutation.datakit.svc"
     rules:
-      - operations: [ "CREATE"]
-        apiGroups: [ "" ]
+      - operations: [ "CREATE", "UPDATE"]
+        apiGroups: [ "*" ]
         apiVersions: [ "v1" ]
-        resources: [ "pods" ]
+        resources: [ "deployments", "daemonsets", "cronjobs", "jobs", "statefulsets" ]
         scope: "Namespaced"
     clientConfig:
       service:
         namespace: datakit
         name: datakit-operator
-        path: "/v1/webhooks/injectlib"
+        path: "/v1/webhooks/inject"
       caBundle: {{CABUNDLE}}
     admissionReviewVersions: ["v1"]
     sideEffects: None
