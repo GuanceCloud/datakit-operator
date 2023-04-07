@@ -10,7 +10,7 @@
 ### Changed
 
 - 优化几个环境变量的命名
-- 修改 datakit.yaml 默认忽略 webhook 的报错
+- 修改 datakit.yaml，默认忽略 webhook 的报错 (#11)
 
 ## [1.0.2] - 2023-03-09
 
