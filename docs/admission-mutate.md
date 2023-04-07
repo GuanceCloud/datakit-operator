@@ -1,4 +1,4 @@
-# 使用 Datkait-Operator 注入 sidecar
+# 使用 Datakit-Operator 注入 sidecar
 
 在大型 Kubenertes 集群中，批量修改配置是比较麻烦的事情。Datakit-Operator 会根据 Annotation 配置，决定是否对其修改或注入。
 
