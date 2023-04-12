@@ -13,35 +13,35 @@ type jsonPatch []byte
 
 func mutateDeployment(deployment *appsv1.Deployment) error {
 	l.Debug("mutated deployment")
-	return mutatePodTemplate(&deployment.Spec.Template)
+	return mutatePodTemplate(deployment.GetName(), &deployment.Spec.Template)
 }
 
 func mutateDaemonSet(daemonset *appsv1.DaemonSet) error {
 	l.Debug("mutated daemonset")
-	return mutatePodTemplate(&daemonset.Spec.Template)
+	return mutatePodTemplate(daemonset.GetName(), &daemonset.Spec.Template)
 }
 
 func mutateCronJob(cronjob *batchv1.CronJob) error {
 	l.Debug("mutated cronjob")
-	return mutatePodTemplate(&cronjob.Spec.JobTemplate.Spec.Template)
+	return mutatePodTemplate(cronjob.GetName(), &cronjob.Spec.JobTemplate.Spec.Template)
 }
 
 func mutateJob(job *batchv1.Job) error {
 	l.Debug("mutated job")
-	return mutatePodTemplate(&job.Spec.Template)
+	return mutatePodTemplate(job.GetName(), &job.Spec.Template)
 }
 
 func mutateStatefulSet(statefulSet *appsv1.StatefulSet) error {
 	l.Debug("mutated statefulSet")
-	return mutatePodTemplate(&statefulSet.Spec.Template)
+	return mutatePodTemplate(statefulSet.GetName(), &statefulSet.Spec.Template)
 }
 
-func mutatePodTemplate(podTemplate *corev1.PodTemplateSpec) error {
+func mutatePodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
 	l.Debug("mutated podTemplate")
-	if err := injectLibToPodTemplate(podTemplate); err != nil {
+	if err := injectLibToPodTemplate(parent, podTemplate); err != nil {
 		return err
 	}
-	if err := injectLogfwdToPodTemplate(podTemplate); err != nil {
+	if err := injectLogfwdToPodTemplate(parent, podTemplate); err != nil {
 		return err
 	}
 	return nil

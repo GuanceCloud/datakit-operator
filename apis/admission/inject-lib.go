@@ -42,7 +42,7 @@ const (
 
 var supportedLanguages = []language{java, js, python}
 
-func injectLibToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
+func injectLibToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
 	if podTemplate == nil {
 		return fmt.Errorf("cannot inject lib into nil podTemplate")
 	}
@@ -51,7 +51,7 @@ func injectLibToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	lang, image, shouldInject := extractLibInfo(podTemplate)
+	lang, image, shouldInject := extractLibInfo(parent, podTemplate)
 	if !shouldInject {
 		return nil
 	}
@@ -59,7 +59,7 @@ func injectLibToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
 	return injectLibContainer(podTemplate, lang, image)
 }
 
-func extractLibInfo(podTemplate *corev1.PodTemplateSpec) (language, string, bool) {
+func extractLibInfo(parent string, podTemplate *corev1.PodTemplateSpec) (language, string, bool) {
 	annotations := podTemplate.GetAnnotations()
 
 	for _, lang := range supportedLanguages {
@@ -67,7 +67,7 @@ func extractLibInfo(podTemplate *corev1.PodTemplateSpec) (language, string, bool
 
 		if imageVersion, found := annotations[libVersionAnnotation]; found {
 			image := libReleaseImage(lang, imageVersion)
-			l.Infof("Use of %s-agent image %s to %s", lang, image, podTemplate.GetName())
+			l.Infof("Use of %s-agent image %s to %s", lang, image, parent)
 
 			return lang, image, true
 		}

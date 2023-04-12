@@ -34,7 +34,7 @@ type logfwdConfig struct {
 	} `json:"loggings"`
 }
 
-func injectLogfwdToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
+func injectLogfwdToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
 	if podTemplate == nil {
 		return fmt.Errorf("cannot inject logfwd into nil podTemplate")
 	}
@@ -43,7 +43,7 @@ func injectLogfwdToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
 		return nil
 	}
 
-	config, volumePaths, shouldInject := extractLogfwdInfo(podTemplate)
+	config, volumePaths, shouldInject := extractLogfwdInfo(parent, podTemplate)
 	if !shouldInject {
 		return nil
 	}
@@ -53,7 +53,7 @@ func injectLogfwdToPodTemplate(podTemplate *corev1.PodTemplateSpec) error {
 	return nil
 }
 
-func extractLogfwdInfo(podTemplate *corev1.PodTemplateSpec) (string, []string, bool) {
+func extractLogfwdInfo(parent string, podTemplate *corev1.PodTemplateSpec) (string, []string, bool) {
 	annotations := podTemplate.GetAnnotations()
 	instances, found := annotations[logfwdInstancesAnnotationKey]
 	if !found {
@@ -62,18 +62,18 @@ func extractLogfwdInfo(podTemplate *corev1.PodTemplateSpec) (string, []string, b
 
 	var configBuff bytes.Buffer
 	if err := json.Compact(&configBuff, []byte(instances)); err != nil {
-		l.Warnf("Failed to compact the logfwd instances %s, err: %s", instances, err)
+		l.Warnf("Logfwd of %s failed to compact config: %s, err: %s", parent, instances, err)
 		return "", nil, false
 	}
-
-	l.Infof("Found the logfwd instances, config: %s", configBuff.String())
 
 	var configs []*logfwdConfig
 
 	if err := json.Unmarshal(configBuff.Bytes(), &configs); err != nil {
-		l.Warnf("Failed to unmarshal the logfwd instances %s, err: %s", configBuff.String(), err)
+		l.Warnf("Logfwd of %s failed to unmarshal config: %s, err: %s", parent, instances, err)
 		return "", nil, false
 	}
+
+	l.Infof("Use of logfwd instances to %s, config: %s", parent, configBuff.String())
 
 	var paths []string
 	for _, cfg := range configs {
