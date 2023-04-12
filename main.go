@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
-	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/admission"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis"
 )
 
 var l = logger.DefaultSLogger("main")
@@ -39,7 +39,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		admission.Run(envServerListen)
+		apis.Run(envServerListen)
 	}()
 	wg.Wait()
 }
