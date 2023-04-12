@@ -1,12 +1,13 @@
-package admission
+package apis
 
 import (
 	"net/http"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/admission"
 )
 
-var l = logger.DefaultSLogger("admission")
+var l = logger.DefaultSLogger("apis")
 
 const (
 	tlsKeyFile  = "/usr/local/datakit-operator/certs/tls.key"
@@ -14,14 +15,15 @@ const (
 )
 
 func Run(addr string) {
-	l = logger.SLogger("admission")
-	l.Debugf("server running...")
+	l = logger.SLogger("apis")
+	admission.Steup()
 
-	http.HandleFunc("/v1/webhooks/injectlib", handleInjectLib)
+	http.HandleFunc("/v1/webhooks/inject", admission.HandleInject)
 	server := &http.Server{
 		Addr: addr,
 	}
 
+	l.Debugf("server running...")
 	err := server.ListenAndServeTLS(tlsCertFile, tlsKeyFile)
 	if err != nil {
 		l.Error(err)
