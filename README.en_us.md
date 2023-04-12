@@ -4,11 +4,13 @@
 
 Datakit-Operator is a collaborative project between Datakit and Kubernetes orchestration. Its purpose is to assist in deploying Datakit more conveniently, as well as other functions such as verification and injection.
 
+The details refer to [document](https://docs.guance.com/en/datakit/datakit-operator/).
+
 Currently, Datakit-Operator provides the following functions:
 
-- [x] Provide the ability to inject `dd-lib` files and environments for special Pods, refer to [document](./docs/admission-mutate.en_us.md).
-- [ ] Responsible for creating and updating Datakit-related Pod scheduling
-- [ ] Verify the configuration of Datakit
+- [x] Injection of `dd-lib` files and environment.
+- [x] Injection of `logfwd` program and enabling log collection.
+- [ ] Verify the configuration of Datakit.
 
 Prerequisites:
 
