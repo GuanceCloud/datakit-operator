@@ -3,6 +3,7 @@ module gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
 go 1.18
 
 require (
+	github.com/luci/go-render v0.0.0-20160219211803-9a04cc21af0f
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/stretchr/testify v1.8.2
 	gitlab.jiagouyun.com/cloudcare-tools/cliutils v0.0.0-20220928075050-6a94ccf938f8

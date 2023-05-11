@@ -45,3 +45,14 @@ release-stable:
     - make clean
     - make
     - make pub_image
+
+
+#release-helm-test:
+#  stage: deploy
+#  resource_group: production
+#  only:
+#    - helm
+#  script:
+#    - make clean
+#    - make
+#    - make pub_testing_image

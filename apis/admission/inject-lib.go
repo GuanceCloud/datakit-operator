@@ -25,7 +25,6 @@ const (
 	pythonPathKey   = "PYTHONPATH"
 	pythonPathValue = "/datadog-lib/"
 
-	admissionEnableAnnotationKey  = "admission.datakit"
 	libVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
 
 	ddAgentHostKey      = "DD_AGENT_HOST"

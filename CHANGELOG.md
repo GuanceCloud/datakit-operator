@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.5] - 2023-05-11
+
+- 添加新的 ping API (#18)
+- 添加 Datakit 选举专用 API，实现对 Datakit 采集器的任务分发 (#15)
+
 ## [1.0.4] - 2023-04-10
 
 - 支持以 Kubernetes Admission 方式注入 logfwd 程序 (#12)
