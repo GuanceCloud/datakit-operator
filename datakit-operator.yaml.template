@@ -1,5 +1,17 @@
 ## Datakit-Operator {{VERSION}} Configuration YAML
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datakit-operator
+  namespace: datakit
+spec:
+  selector:
+    app: datakit-operator
+  ports:
+    - port: 443
+      targetPort: 9543
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,7 +20,7 @@ metadata:
   labels:
     app: datakit-operator
 spec:
-  replicas: 1
+  replicas: 1  # Do not change the ReplicaSet number!
   selector:
      matchLabels:
        app: datakit-operator
@@ -41,21 +53,6 @@ spec:
           ports:
             - containerPort: 9543
 ---
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: datakit-operator
-  namespace: datakit
-spec:
-  selector:
-    app: datakit-operator
-  ports:
-    - port: 443
-      targetPort: 9543
-
----
-
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:

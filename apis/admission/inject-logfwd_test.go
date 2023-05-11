@@ -139,7 +139,7 @@ func TestInjectLogfwd(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := injectLogfwdToPodTemplate(&testCases[idx].in)
+		err := injectLogfwdToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
