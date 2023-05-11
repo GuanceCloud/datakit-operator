@@ -97,52 +97,62 @@ func handle(w http.ResponseWriter, r *http.Request) {
 func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 	var raw = requ.Object.Raw
 	var resource interface{}
+	var err error
 
 	l.Debugf("request: %s", string(raw))
 
 	switch requ.Resource {
 	case deploymentResource:
 		var deployment appsv1.Deployment
-		if err := json.Unmarshal(raw, &deployment); err != nil {
-			return nil, fmt.Errorf("failed to decode raw deployment: %w", err)
+		err = json.Unmarshal(raw, &deployment)
+		if err != nil {
+			break
 		}
-		mutateDeployment(&deployment)
+		err = mutateDeployment(&deployment)
 		resource = deployment
 
 	case daemonsetResource:
 		var daemonset appsv1.DaemonSet
-		if err := json.Unmarshal(raw, &daemonset); err != nil {
-			return nil, fmt.Errorf("failed to decode raw daemonset: %w", err)
+		err = json.Unmarshal(raw, &daemonset)
+		if err != nil {
+			break
 		}
-		mutateDaemonSet(&daemonset)
+		err = mutateDaemonSet(&daemonset)
 		resource = daemonset
 
 	case cronjobResource:
 		var cronjob batchv1.CronJob
-		if err := json.Unmarshal(raw, &cronjob); err != nil {
-			return nil, fmt.Errorf("failed to decode raw cronjob: %w", err)
+		err = json.Unmarshal(raw, &cronjob)
+		if err != nil {
+			break
 		}
-		mutateCronJob(&cronjob)
+		err = mutateCronJob(&cronjob)
 		resource = cronjob
 
 	case jobResource:
 		var job batchv1.Job
-		if err := json.Unmarshal(raw, &job); err != nil {
-			return nil, fmt.Errorf("failed to decode raw job: %w", err)
+		err = json.Unmarshal(raw, &job)
+		if err != nil {
+			break
 		}
-		mutateJob(&job)
+		err = mutateJob(&job)
 		resource = job
 
 	case statefulsetResource:
 		var statefulset appsv1.StatefulSet
-		if err := json.Unmarshal(raw, &statefulset); err != nil {
-			return nil, fmt.Errorf("failed to decode raw statefulset: %w", err)
+		err = json.Unmarshal(raw, &statefulset)
+		if err != nil {
+			break
 		}
-		mutateStatefulSet(&statefulset)
+		err = mutateStatefulSet(&statefulset)
 		resource = statefulset
 
 	default:
 		return nil, fmt.Errorf("Unsupported resource: %#v", requ.Resource)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to mutate type %#v resource: %v", requ.Resource, err)
 	}
 
 	newRaw, err := json.Marshal(resource)
