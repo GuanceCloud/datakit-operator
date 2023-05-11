@@ -1,10 +1,12 @@
 package apis
 
 import (
+	"fmt"
 	"net/http"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/admission"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/election"
 )
 
 var l = logger.DefaultSLogger("apis")
@@ -16,9 +18,15 @@ const (
 
 func Run(addr string) {
 	l = logger.SLogger("apis")
-	admission.Steup()
 
+	admission.Setup()
+	election.Setup()
+
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "OK\n")
+	})
 	http.HandleFunc("/v1/webhooks/inject", admission.HandleInject)
+	http.HandleFunc("/v1/datakit/election", election.HandleElection)
 	server := &http.Server{
 		Addr: addr,
 	}
