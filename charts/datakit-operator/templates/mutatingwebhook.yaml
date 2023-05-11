@@ -1,0 +1,25 @@
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: datakit-operator-mutation
+webhooks:
+  - name: "mutation.datakit.svc"
+    rules:
+      - operations: [ "CREATE", "UPDATE"]
+        apiGroups: [ "*" ]
+        apiVersions: [ "v1" ]
+        resources: [ "deployments", "daemonsets", "cronjobs", "jobs", "statefulsets" ]
+        scope: "Namespaced"
+    clientConfig:
+      service:
+        namespace: {{ .Release.Namespace }}
+        name: datakit-operator
+        path: "/v1/webhooks/inject"
+      caBundle: "{{ .Values.admissionregistration.webhooks.caBundle }}"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+    reinvocationPolicy: Never
+    failurePolicy: Ignore
