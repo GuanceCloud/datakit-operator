@@ -30,18 +30,29 @@ define build
 
 	@echo "----"
 	@tree -Csh -L 3 $(BUILD_DIR)
-	
+
 endef
 
 define image
 	@sed -e "s/{{HUB}}/$(2)/g" \
 		-e "s/{{VERSION}}/$(VERSION)/g" \
 		-e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
-		datakit-operator.yaml.template > datakit-operator.yaml 
+		datakit-operator.yaml.template > datakit-operator.yaml
 	sudo docker buildx build --platform $(1) \
 		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . --push
 	sudo docker buildx build --platform $(1) \
 		-t $(2)/datakit-operator/datakit-operator:latest . --push
+endef
+
+define build_k8s_charts
+	@helm repo ls
+	@echo `echo $(VERSION) | cut -d'-' -f1`
+	@sed -e "s,{{repository}},$(2)/datakit-operator/datakit-operator,g" \
+	     -e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
+	     charts/values.yaml > charts/datakit-operator/values.yaml
+	@helm package charts/datakit-operator --version `echo $(VERSION) | cut -d'-' -f1` --app-version `echo $(VERSION)`
+	@helm cm-push datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz $(1)
+	@rm -f datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz
 endef
 
 define check_golint_version
@@ -66,10 +77,12 @@ local:
 pub_image:
 	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
+	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
 
 pub_testing_image:
 	$(call image,$(IMAGE_ARCHS),registry.jiagouyun.com)
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
+	$(call build_k8s_charts, 'datakit-operator-testing', registry.jiagouyun.com)
 
 lint:
 	$(GOLINT_BINARY) run --allow-parallel-runners;
