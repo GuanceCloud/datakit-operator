@@ -52,6 +52,13 @@ spec:
             value: pubrepo.jiagouyun.com/datakit/logfwd:1.5.8
           ports:
             - containerPort: 9543
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "1024Mi"
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
