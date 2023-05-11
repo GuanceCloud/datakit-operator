@@ -1,15 +1,22 @@
 default: local
 
-VERSION=v1.0.4
+VERSION=v1.0.5
 
-BIN = datakit-operator
-ENTRY = main.go
-BUILD_DIR = dist
-CERT_DIR = self-certification
-ARCH_AMD64 = amd64
-ARCH_ARM64 = arm64
-IMAGE_ARCHS := "linux/arm64,linux/amd64"
-#UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
+BIN           = datakit-operator
+ENTRY         = main.go
+BUILD_DIR     = dist
+CERT_DIR      = self-certification
+ARCH_AMD64    = amd64
+ARCH_ARM64    = arm64
+IMAGE_ARCHS   = "linux/arm64,linux/amd64"
+GOLINT_BINARY = golangci-lint
+# UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
+
+SUPPORTED_GOLINT_VERSION         = 1.46.2
+SUPPORTED_GOLINT_VERSION_ANOTHER = v1.46.2
+
+GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version | cut -c 27- | cut -d' ' -f1)
+GOLINT_VERSION_ERR_MSG := golangci-lint version($(GOLINT_VERSION)) is not supported, please use version $(SUPPORTED_GOLINT_VERSION)
 
 define build
 	@rm -rf $(BUILD_DIR)/*
@@ -37,6 +44,18 @@ define image
 		-t $(2)/datakit-operator/datakit-operator:latest . --push
 endef
 
+define check_golint_version
+	@case $(GOLINT_VERSION) in \
+	$(SUPPORTED_GOLINT_VERSION)) \
+	;; \
+	$(SUPPORTED_GOLINT_VERSION_ANOTHER)) \
+	;; \
+	*) \
+		echo '$(GOLINT_VERSION_ERR_MSG)'; \
+		exit 1; \
+	esac;
+endef
+
 define upload
 	@bash upload.sh $(1) $(2) $(3) $(4) $(5)
 endef
@@ -53,7 +72,10 @@ pub_testing_image:
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 lint:
-	#TODO
+	$(GOLINT_BINARY) run --allow-parallel-runners;
+	@if [ $$? != 0 ]; then \
+		exit -1; \
+	fi
 
 all_test:
 	#TODO

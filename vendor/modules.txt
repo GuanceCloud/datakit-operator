@@ -14,6 +14,9 @@ github.com/google/gofuzz
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/luci/go-render v0.0.0-20160219211803-9a04cc21af0f
+## explicit
+github.com/luci/go-render/render
 # github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 ## explicit
 github.com/mattbaird/jsonpatch
