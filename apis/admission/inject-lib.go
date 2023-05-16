@@ -27,8 +27,10 @@ const (
 
 	libVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
 
-	ddAgentHostKey      = "DD_AGENT_HOST"
-	ddTraceAgentPortKey = "DD_TRACE_AGENT_PORT"
+	ddAgentHostKey        = "DD_AGENT_HOST"
+	ddTraceAgentPortKey   = "DD_TRACE_AGENT_PORT"
+	jmxfetchStatsdHostKey = "DD_JMXFETCH_STATSD_HOST"
+	jmxfetchStatsdPortKey = "DD_JMXFETCH_STATSD_PORT"
 )
 
 type language string
@@ -161,9 +163,19 @@ func injectLibEnv(podTemplate *corev1.PodTemplateSpec) {
 		Name:  ddTraceAgentPortKey,
 		Value: ddTraceAgentPort(),
 	}
+	jmxfetchHostEnvVar := corev1.EnvVar{
+		Name:  jmxfetchStatsdHostKey,
+		Value: jmxfetchStatsdHost(),
+	}
+	jmxfetchPortEnvVar := corev1.EnvVar{
+		Name:  jmxfetchStatsdPortKey,
+		Value: jmxfetchStatsdPort(),
+	}
 	m := manager.NewEnvVarManager(podTemplate)
 	m.AddEnvVar(&ddHostEnvVar)
 	m.AddEnvVar(&ddPortEnvVar)
+	m.AddEnvVar(&jmxfetchHostEnvVar)
+	m.AddEnvVar(&jmxfetchPortEnvVar)
 }
 
 func envIndex(envs []corev1.EnvVar, name string) int {

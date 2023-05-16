@@ -42,6 +42,10 @@ spec:
             value: datakit-service.datakit.svc
           - name: ENV_DD_TRACE_AGENT_PORT
             value: "9529"
+          - name: ENV_DD_JMXFETCH_STATSD_HOST
+            value: datakit-service.datakit.svc
+          - name: ENV_DD_JMXFETCH_STATSD_PORT
+            value: "8125"
           - name: ENV_DD_JAVA_AGENT_IMAGE
             value: pubrepo.jiagouyun.com/datakit-operator/dd-lib-java-init:v1.8.4-guance
           - name: ENV_DD_PYTHON_AGENT_IMAGE
