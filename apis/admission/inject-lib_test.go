@@ -16,10 +16,16 @@ func TestInjectLib(t *testing.T) {
 	assert.NoError(t, err)
 	err = os.Setenv("ENV_DD_TRACE_AGENT_PORT", "9529")
 	assert.NoError(t, err)
+	err = os.Setenv("ENV_DD_JMXFETCH_STATSD_HOST", "datakit-service.datakit.svc")
+	assert.NoError(t, err)
+	err = os.Setenv("ENV_DD_JMXFETCH_STATSD_PORT", "8125")
+	assert.NoError(t, err)
 	defer func() {
 		os.Unsetenv("ENV_DD_JAVA_AGENT_IMAGE")
 		os.Unsetenv("ENV_DD_AGENT_HOST")
 		os.Unsetenv("ENV_DD_TRACE_AGENT_PORT")
+		os.Unsetenv("ENV_DD_JMXFETCH_STATSD_HOST")
+		os.Unsetenv("ENV_DD_JMXFETCH_STATSD_PORT")
 	}()
 
 	var testCases = []struct {
@@ -69,6 +75,14 @@ func TestInjectLib(t *testing.T) {
 								{
 									Name:  "DD_TRACE_AGENT_PORT",
 									Value: "9529",
+								},
+								{
+									Name:  "DD_JMXFETCH_STATSD_HOST",
+									Value: "datakit-service.datakit.svc",
+								},
+								{
+									Name:  "DD_JMXFETCH_STATSD_PORT",
+									Value: "8125",
 								},
 							},
 						},
