@@ -1,7 +1,6 @@
 package admission
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,9 +9,7 @@ import (
 )
 
 func TestInjectLogfwd(t *testing.T) {
-	err := os.Setenv("ENV_LOGFWD_IMAGE", "pubrepo.jiagouyun.com/datakit-operator/logfwd-testing:v1.0.1")
-	assert.NoError(t, err)
-	defer os.Unsetenv("ENV_LOGFWD_IMAGE")
+	logfwdAppImage = func() string { return "pubrepo.jiagouyun.com/datakit-operator/logfwd-testing:v1.0.1" }
 
 	var instances = `
 [

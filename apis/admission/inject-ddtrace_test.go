@@ -1,7 +1,6 @@
 package admission
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,24 +8,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestInjectLib(t *testing.T) {
-	err := os.Setenv("ENV_DD_JAVA_AGENT_IMAGE", "pubrepo.jiagouyun.com/datakit-operator/java-lib-testing:v1.0.1")
-	assert.NoError(t, err)
-	err = os.Setenv("ENV_DD_AGENT_HOST", "datakit-service.datakit.svc")
-	assert.NoError(t, err)
-	err = os.Setenv("ENV_DD_TRACE_AGENT_PORT", "9529")
-	assert.NoError(t, err)
-	err = os.Setenv("ENV_DD_JMXFETCH_STATSD_HOST", "datakit-service.datakit.svc")
-	assert.NoError(t, err)
-	err = os.Setenv("ENV_DD_JMXFETCH_STATSD_PORT", "8125")
-	assert.NoError(t, err)
-	defer func() {
-		os.Unsetenv("ENV_DD_JAVA_AGENT_IMAGE")
-		os.Unsetenv("ENV_DD_AGENT_HOST")
-		os.Unsetenv("ENV_DD_TRACE_AGENT_PORT")
-		os.Unsetenv("ENV_DD_JMXFETCH_STATSD_HOST")
-		os.Unsetenv("ENV_DD_JMXFETCH_STATSD_PORT")
-	}()
+func TestInjectDDTraceLib(t *testing.T) {
+	ddtraceJavaAgentImage = func() string { return "pubrepo.jiagouyun.com/datakit-operator/java-lib-testing:v1.0.1" }
+	ddtraceEnvs = func() []struct{ Key, Value string } {
+		return []struct{ Key, Value string }{
+			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+			{"DD_TRACE_AGENT_PORT", "9529"},
+			{"DD_JMXFETCH_STATSD_HOST", "datakit-service.datakit.svc"},
+			{"DD_JMXFETCH_STATSD_PORT", "8125"},
+		}
+	}
 
 	var testCases = []struct {
 		in  corev1.PodTemplateSpec
