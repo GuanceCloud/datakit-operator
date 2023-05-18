@@ -26,11 +26,6 @@ const (
 	pythonPathValue = "/datadog-lib/"
 
 	libVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
-
-	ddAgentHostKey        = "DD_AGENT_HOST"
-	ddTraceAgentPortKey   = "DD_TRACE_AGENT_PORT"
-	jmxfetchStatsdHostKey = "DD_JMXFETCH_STATSD_HOST"
-	jmxfetchStatsdPortKey = "DD_JMXFETCH_STATSD_PORT"
 )
 
 type language string
@@ -97,7 +92,7 @@ func injectLibContainer(podTemplate *corev1.PodTemplateSpec, lang language, imag
 	}
 
 	injectLibVolume(podTemplate)
-	injectLibEnv(podTemplate)
+	injectLibEnv(podTemplate, ddtraceEnvs())
 	return nil
 }
 
@@ -154,28 +149,15 @@ func injectLibVolume(podTemplate *corev1.PodTemplateSpec) {
 	manager.NewVolumeManager(podTemplate).AddVolume(&volume)
 }
 
-func injectLibEnv(podTemplate *corev1.PodTemplateSpec) {
-	ddHostEnvVar := corev1.EnvVar{
-		Name:  ddAgentHostKey,
-		Value: ddAgentHost(),
-	}
-	ddPortEnvVar := corev1.EnvVar{
-		Name:  ddTraceAgentPortKey,
-		Value: ddTraceAgentPort(),
-	}
-	jmxfetchHostEnvVar := corev1.EnvVar{
-		Name:  jmxfetchStatsdHostKey,
-		Value: jmxfetchStatsdHost(),
-	}
-	jmxfetchPortEnvVar := corev1.EnvVar{
-		Name:  jmxfetchStatsdPortKey,
-		Value: jmxfetchStatsdPort(),
-	}
+func injectLibEnv(podTemplate *corev1.PodTemplateSpec, envs []struct{ Key, Value string }) {
 	m := manager.NewEnvVarManager(podTemplate)
-	m.AddEnvVar(&ddHostEnvVar)
-	m.AddEnvVar(&ddPortEnvVar)
-	m.AddEnvVar(&jmxfetchHostEnvVar)
-	m.AddEnvVar(&jmxfetchPortEnvVar)
+	for _, env := range envs {
+		envvar := corev1.EnvVar{
+			Name:  env.Key,
+			Value: env.Value,
+		}
+		m.AddEnvVar(&envvar)
+	}
 }
 
 func envIndex(envs []corev1.EnvVar, name string) int {
@@ -209,11 +191,11 @@ func libReleaseImage(lang language, imageVersion string) string {
 
 	switch lang {
 	case java:
-		image = javaAgentImage()
+		image = ddtraceJavaAgentImage()
 	case python:
-		image = pythonAgentImage()
+		image = ddtracePythonAgentImage()
 	case js:
-		image = jsAgentImage()
+		image = ddtraceJsAgentImage()
 	default:
 		return ""
 	}
