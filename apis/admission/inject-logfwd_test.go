@@ -9,7 +9,7 @@ import (
 )
 
 func TestInjectLogfwd(t *testing.T) {
-	logfwdAppImage = func() string { return "pubrepo.jiagouyun.com/datakit-operator/logfwd-testing:v1.0.1" }
+	logfwdAppImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
 
 	var instances = `
 [
@@ -76,7 +76,7 @@ func TestInjectLogfwd(t *testing.T) {
 						},
 						{
 							Name:            "datakit-logfwd",
-							Image:           "pubrepo.jiagouyun.com/datakit-operator/logfwd-testing:v1.0.1",
+							Image:           "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{
