@@ -1,52 +1,43 @@
 package main
 
 import (
-	"flag"
-	"os"
 	"sync"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 )
 
-var l = logger.DefaultSLogger("main")
-
-var (
-	envServerListen = envString("ENV_SERVER_LISTEN", "0.0.0.0:9543")
-	envLogLevel     = envString("ENV_LOG_LEVEL", "debug")
-)
+var log = logger.DefaultSLogger("main")
 
 func initlogger() {
 	lopt := &logger.Option{
 		Flags: logger.OPT_DEFAULT | logger.OPT_STDOUT,
-		Level: envLogLevel,
+		Level: config.Cfg.LogLevel,
 	}
 
 	if err := logger.InitRoot(lopt); err != nil {
-		l.Fatal(err)
+		log.Fatal(err)
 	}
 
-	l = logger.SLogger("main")
+	log = logger.SLogger("main")
 }
 
 func main() {
-	flag.Parse()
-	initlogger()
+	if err := config.LoadConfigWithEnv(); err != nil {
+		log.Error(err)
+		return
+	}
+	log.Info("load configuration successfully")
 
-	l.Info("datakit-operator start")
+	initlogger()
+	log.Info("datakit-operator start")
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		apis.Run(envServerListen)
+		apis.Run(config.Cfg.ServerListen)
 	}()
 	wg.Wait()
-}
-
-func envString(name string, value string) string {
-	if v := os.Getenv(name); v != "" {
-		return v
-	}
-	return value
 }

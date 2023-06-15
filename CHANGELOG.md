@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2023-06-13
+
+- 支持以 json-config 的方式配置 Datakit Operator (#19)
+
 ## [1.0.5] - 2023-05-11
 
 - 添加新的 ping API (#18)
@@ -8,9 +12,9 @@
 ## [1.0.4] - 2023-04-10
 
 - 支持以 Kubernetes Admission 方式注入 logfwd 程序 (#12)
-- 注入 dd-lib 时会默认添加 `DD_AGENT_HOST` 和 `DD_TRACE_AGENT_PORT` 两个环境变量 (#14)
+- 注入 ddtrace agent 时会默认添加 `DD_AGENT_HOST` 和 `DD_TRACE_AGENT_PORT` 两个环境变量 (#14)
 - 修改 Admission 支持的 resources 列表，不再支持原生 Pod (#12)
-- 修改代码的结构，补全 dd-lib 和 logfwd 的单元测试
+- 修改代码的结构，补全 ddtrace 和 logfwd 的单元测试
 - 优化 datakit.yaml 的结构
 - 移除 docs 目录和文档，在 README 提供新的文档链接
 
@@ -31,4 +35,4 @@
 ## [1.0.1] - 2022-12-28
 
 - 添加 Makefile、Dockerfile 和 CI 配置 (#2)
-- 支持以 Kubernetes Admission 方式注入 dd-lib 文件和环境变量 (#1)
+- 支持以 Kubernetes Admission 方式注入 ddtrace 文件和环境变量 (#1)

@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.0.5
+VERSION=v1.2.0
 
 BIN           = datakit-operator
 ENTRY         = main.go
@@ -47,7 +47,7 @@ endef
 define build_k8s_charts
 	@helm repo ls
 	@echo `echo $(VERSION) | cut -d'-' -f1`
-	@sed -e "s,{{repository}},$(2)/datakit-operator/datakit-operator,g" \
+	@sed -e "s,{{REPOSITORY}},$(2)/datakit-operator/datakit-operator,g" \
 	     -e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
 	     charts/values.yaml > charts/datakit-operator/values.yaml
 	@helm package charts/datakit-operator --version `echo $(VERSION) | cut -d'-' -f1` --app-version `echo $(VERSION)`
