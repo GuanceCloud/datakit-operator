@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.6] - 2023-05-24
+## [1.2.0] - 2023-06-13
 
 - 支持以 json-config 的方式配置 Datakit Operator (#19)
 
