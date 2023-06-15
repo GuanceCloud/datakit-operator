@@ -1,7 +1,6 @@
 package apis
 
 import (
-	"fmt"
 	"net/http"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
@@ -22,9 +21,7 @@ func Run(addr string) {
 	admission.Setup()
 	election.Setup()
 
-	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "OK\n")
-	})
+	http.HandleFunc("/ping", HandlePing)
 	http.HandleFunc("/v1/webhooks/inject", admission.HandleInject)
 	http.HandleFunc("/v1/datakit/election", election.HandleElection)
 	server := &http.Server{
