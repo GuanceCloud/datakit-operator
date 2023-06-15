@@ -36,6 +36,11 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
+          - name: ENV_JSON_CONFIG
+            valueFrom:
+              configMapKeyRef:
+                name: {{ include "datakit-operator.fullname" . }}-config
+                key: jsonconfig
           {{- if .Values.env }}
           {{- range $key, $val := .Values.env }}
           - name: {{ $key }}
@@ -44,7 +49,7 @@ spec:
           {{- end }}
           ports:
             - name: http
-              containerPort: 9529
+              containerPort: 9543
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
