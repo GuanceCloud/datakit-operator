@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.2.0
+VERSION=v1.2.1
 
 BIN           = datakit-operator
 ENTRY         = main.go
@@ -75,7 +75,7 @@ local:
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
-	$(call image,$(IMAGE_ARCHS),pubrepo.jiagouyun.com)
+	$(call image,$(IMAGE_ARCHS),pubrepo.guance.com)
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
 
