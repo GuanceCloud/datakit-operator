@@ -26,9 +26,9 @@ func TestParseConfig(t *testing.T) {
           		    "admission_inject": {
           		        "ddtrace": {
           		            "images": {
-          		                "java_agent_image":   "pubrepo.jiagouyun.com/datakit-operator/dd-lib-java-init:v1.8.4-guance",
-          		                "python_agent_image": "pubrepo.jiagouyun.com/datakit-operator/dd-lib-python-init:v1.6.2",
-          		                "js_agent_image":     "pubrepo.jiagouyun.com/datakit-operator/dd-lib-js-init:v3.9.2"
+          		                "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4-guance",
+          		                "python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
+          		                "js_agent_image":     "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2"
           		            },
           		            "envs": {
           		                "DD_AGENT_HOST":           "datakit-service.datakit.svc",
@@ -39,13 +39,13 @@ func TestParseConfig(t *testing.T) {
           		        },
           		        "logfwd": {
           		            "images": {
-          		                "logfwd_image": "pubrepo.jiagouyun.com/datakit/logfwd:1.5.8"
+          		                "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.5.8"
           		            }
           		        },
           		        "profiler": {
           		            "images": {
-          		                "java_profiler_image":   "pubrepo.jiagouyun.com/dataflux/async-profiler:0.1.0",
-          		                "python_profiler_image": "pubrepo.jiagouyun.com/dataflux/py-spy:0.1.0"
+          		                "java_profiler_image":   "pubrepo.guance.com/dataflux/async-profiler:0.1.0",
+          		                "python_profiler_image": "pubrepo.guance.com/dataflux/py-spy:0.1.0"
           		            },
           		            "envs": {
           		                "DK_AGENT_HOST":       "datakit-service.datakit.svc",
@@ -66,9 +66,9 @@ func TestParseConfig(t *testing.T) {
 			AdmissionInject: AdmissionInjectConfig{
 				DDTrace: ContainerConfig{
 					Images: map[string]string{
-						"java_agent_image":   "pubrepo.jiagouyun.com/datakit-operator/dd-lib-java-init:v1.8.4-guance",
-						"python_agent_image": "pubrepo.jiagouyun.com/datakit-operator/dd-lib-python-init:v1.6.2",
-						"js_agent_image":     "pubrepo.jiagouyun.com/datakit-operator/dd-lib-js-init:v3.9.2",
+						"java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4-guance",
+						"python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
+						"js_agent_image":     "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
 					},
 					Environments: map[string]string{
 						"DD_AGENT_HOST":           "datakit-service.datakit.svc",
@@ -85,13 +85,13 @@ func TestParseConfig(t *testing.T) {
 				},
 				Logfwd: ContainerConfig{
 					Images: map[string]string{
-						"logfwd_image": "pubrepo.jiagouyun.com/datakit/logfwd:1.5.8",
+						"logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.5.8",
 					},
 				},
 				Profiler: ContainerConfig{
 					Images: map[string]string{
-						"java_profiler_image":   "pubrepo.jiagouyun.com/dataflux/async-profiler:0.1.0",
-						"python_profiler_image": "pubrepo.jiagouyun.com/dataflux/py-spy:0.1.0",
+						"java_profiler_image":   "pubrepo.guance.com/dataflux/async-profiler:0.1.0",
+						"python_profiler_image": "pubrepo.guance.com/dataflux/py-spy:0.1.0",
 					},
 					Environments: map[string]string{
 						"DK_AGENT_HOST":       "datakit-service.datakit.svc",
