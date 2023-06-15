@@ -9,8 +9,10 @@ spec:
   selector:
     app: datakit-operator
   ports:
-    - port: 443
+    - name: http
+      port: 443
       targetPort: 9543
+      protocal: TCP
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -18,7 +20,7 @@ metadata:
   name: datakit-operator-config
   namespace: datakit
 data:
-  json-config: |-
+  jsonconfig: |-
     {
         "server_listen": "0.0.0.0:9543",
         "log_level":     "info",
@@ -84,9 +86,11 @@ spec:
 	    valueFrom:
             configMapKeyRef:
               name: datakit-operator-config
-              key: json-config
+              key: jsonconfig
           ports:
-            - containerPort: 9543
+            - name: http
+              containerPort: 9543
+              protocol:TCP
           resources:
             requests:
               cpu: "100m"
