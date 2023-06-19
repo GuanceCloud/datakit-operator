@@ -12,7 +12,6 @@ spec:
     - name: http
       port: 443
       targetPort: 9543
-      protocal: TCP
 ---
 apiVersion: v1
 kind: ConfigMap
