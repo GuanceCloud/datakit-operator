@@ -68,14 +68,13 @@ spec:
           imagePullPolicy: Always
           env:
           - name: ENV_JSON_CONFIG
-	    valueFrom:
-            configMapKeyRef:
-              name: datakit-operator-config
-              key: jsonconfig
+            valueFrom:
+              configMapKeyRef:
+                name: datakit-operator-config
+                key: jsonconfig
           ports:
             - name: http
               containerPort: 9543
-              protocol:TCP
           resources:
             requests:
               cpu: "100m"
