@@ -3,7 +3,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: datakit-operator-mutation
+  name: {{ include "datakit-operator.fullname" . }}-mutation
 webhooks:
   - name: "mutation.datakit.svc"
     rules:

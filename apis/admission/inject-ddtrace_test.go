@@ -9,7 +9,7 @@ import (
 )
 
 func TestInjectDDTraceLib(t *testing.T) {
-	ddtraceJavaAgentImage = func() string { return "pubrepo.jiagouyun.com/datakit-operator/java-lib-testing:v1.0.1" }
+	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
 			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
@@ -81,7 +81,7 @@ func TestInjectDDTraceLib(t *testing.T) {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "datakit-lib-init",
-							Image:           "pubrepo.jiagouyun.com/datakit-operator/java-lib-testing:latest",
+							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:latest",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
