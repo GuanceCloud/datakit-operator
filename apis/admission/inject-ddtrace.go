@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	initContainerName = "datakit-lib-init"
-	volumeName        = "datakit-auto-instrument"
-	mountPath         = "/datadog-lib"
+	ddtraceInitContainerName          = "datakit-lib-init"
+	ddtraceVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
+	ddtraceVolumeName                 = "datakit-auto-instrument"
+	ddtraceMountPath                  = "/datadog-lib"
 
 	// Java config
 	javaToolOptionsKey   = "JAVA_TOOL_OPTIONS"
@@ -24,8 +25,6 @@ const (
 	// Python config
 	pythonPathKey   = "PYTHONPATH"
 	pythonPathValue = "/datadog-lib/"
-
-	libVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
 )
 
 type language string
@@ -38,32 +37,73 @@ const (
 
 var supportedLanguages = []language{java, js, python}
 
-func injectLibToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
+func injectDDTraceToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
 	if podTemplate == nil {
-		return fmt.Errorf("cannot inject lib into nil podTemplate")
+		return fmt.Errorf("cannot inject ddtrace-lib into nil podTemplate")
 	}
 
-	if manager.NewContainerManager(podTemplate).ContainsInitContainer(initContainerName) {
-		return nil
-	}
-
-	lang, image, shouldInject := extractLibInfo(parent, podTemplate)
-	if !shouldInject {
-		return nil
-	}
-
-	return injectLibContainer(podTemplate, lang, image)
+	r := newDDTraceResource(parent, podTemplate)
+	r.process()
+	return nil
 }
 
-func extractLibInfo(parent string, podTemplate *corev1.PodTemplateSpec) (language, string, bool) {
-	annotations := podTemplate.GetAnnotations()
+type ddtraceResource struct {
+	parent      string
+	podTemplate *corev1.PodTemplateSpec
+}
+
+func newDDTraceResource(parent string, podTemplate *corev1.PodTemplateSpec) *ddtraceResource {
+	return &ddtraceResource{
+		parent:      parent,
+		podTemplate: podTemplate,
+	}
+}
+
+func (r *ddtraceResource) process() {
+	if !r.checkIfNeedsOperation() {
+		return
+	}
+
+	lang, image, shouldInject := r.extractInfo()
+	if !shouldInject {
+		return
+	}
+	r.injectInitContainer(image)
+
+	var err error
+	switch lang {
+	case java:
+		err = r.injectConfig(javaToolOptionsKey, javaEnvValFunc)
+	case js:
+		err = r.injectConfig(nodeOptionsKey, jsEnvValFunc)
+	case python:
+		err = r.injectConfig(pythonPathKey, pythonEnvValFunc)
+	default:
+		err = fmt.Errorf("language %s is no supported, only supported %v", lang, supportedLanguages)
+	}
+
+	if err != nil {
+		l.Warnf("Unable to inject DDTrace into %s, err: %s", r.parent, err)
+		return
+	}
+
+	r.injectVolume()
+	r.injectEnvs(ddtraceEnvs())
+}
+
+func (r *ddtraceResource) checkIfNeedsOperation() bool {
+	return !manager.NewContainerManager(r.podTemplate).ContainsInitContainer(ddtraceInitContainerName)
+}
+
+func (r *ddtraceResource) extractInfo() (language, string, bool) {
+	annotations := r.podTemplate.GetAnnotations()
 
 	for _, lang := range supportedLanguages {
-		libVersionAnnotation := strings.ToLower(fmt.Sprintf(libVersionAnnotationKeyFormat, lang))
+		versionAnnotation := strings.ToLower(fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang))
 
-		if imageVersion, found := annotations[libVersionAnnotation]; found {
-			image := libReleaseImage(lang, imageVersion)
-			l.Infof("Use of %s-agent image %s to %s", lang, image, parent)
+		if imageVersion, found := annotations[versionAnnotation]; found {
+			image := ddtraceReleaseImage(lang, imageVersion)
+			l.Infof("Use of %s-agent image %s to %s", lang, image, r.parent)
 
 			return lang, image, true
 		}
@@ -72,48 +112,23 @@ func extractLibInfo(parent string, podTemplate *corev1.PodTemplateSpec) (languag
 	return "", "", false
 }
 
-func injectLibContainer(podTemplate *corev1.PodTemplateSpec, lang language, image string) error {
-	injectLibInitContainer(podTemplate, image)
-
-	var err error
-	switch lang {
-	case java:
-		err = injectLibConfig(podTemplate, javaToolOptionsKey, javaEnvValFunc)
-	case js:
-		err = injectLibConfig(podTemplate, nodeOptionsKey, jsEnvValFunc)
-	case python:
-		err = injectLibConfig(podTemplate, pythonPathKey, pythonEnvValFunc)
-	default:
-		err = fmt.Errorf("language %s is no supported, only supported %v", lang, supportedLanguages)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	injectLibVolume(podTemplate)
-	injectLibEnv(podTemplate, ddtraceEnvs())
-	return nil
-}
-
-func injectLibInitContainer(podTemplate *corev1.PodTemplateSpec, image string) {
+func (r *ddtraceResource) injectInitContainer(image string) {
 	container := corev1.Container{
-		Name:            initContainerName,
+		Name:            ddtraceInitContainerName,
 		Image:           image,
-		Command:         []string{"sh", "copy-lib.sh", mountPath},
+		Command:         []string{"sh", "copy-lib.sh", ddtraceMountPath},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      volumeName,
-				MountPath: mountPath,
+				Name:      ddtraceVolumeName,
+				MountPath: ddtraceMountPath,
 			},
 		},
 	}
-	manager.NewContainerManager(podTemplate).AddInitContainer(&container)
+	manager.NewContainerManager(r.podTemplate).AddInitContainer(&container)
 }
-
-func injectLibConfig(podTemplate *corev1.PodTemplateSpec, envKey string, envVal envValFunc) error {
-	podSpec := podTemplate.Spec
+func (r *ddtraceResource) injectConfig(envKey string, envVal envValFunc) error {
+	podSpec := r.podTemplate.Spec
 	for i, container := range podSpec.Containers {
 		index := envIndex(container.Env, envKey)
 
@@ -132,25 +147,25 @@ func injectLibConfig(podTemplate *corev1.PodTemplateSpec, envKey string, envVal 
 
 		podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
 			corev1.VolumeMount{
-				Name:      volumeName,
-				MountPath: mountPath,
+				Name:      ddtraceVolumeName,
+				MountPath: ddtraceMountPath,
 			})
 	}
 	return nil
 }
 
-func injectLibVolume(podTemplate *corev1.PodTemplateSpec) {
+func (r *ddtraceResource) injectVolume() {
 	volume := corev1.Volume{
-		Name: volumeName,
+		Name: ddtraceVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
-	manager.NewVolumeManager(podTemplate).AddVolume(&volume)
+	manager.NewVolumeManager(r.podTemplate).AddVolume(&volume)
 }
 
-func injectLibEnv(podTemplate *corev1.PodTemplateSpec, envs []struct{ Key, Value string }) {
-	m := manager.NewEnvVarManager(podTemplate)
+func (r *ddtraceResource) injectEnvs(envs []struct{ Key, Value string }) {
+	m := manager.NewEnvVarManager(r.podTemplate)
 	for _, env := range envs {
 		envvar := corev1.EnvVar{
 			Name:  env.Key,
@@ -186,7 +201,7 @@ func pythonEnvValFunc(predefinedVal string) string {
 	return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
 }
 
-func libReleaseImage(lang language, imageVersion string) string {
+func ddtraceReleaseImage(lang language, imageVersion string) string {
 	var image string
 
 	switch lang {
@@ -206,43 +221,4 @@ func libReleaseImage(lang language, imageVersion string) string {
 
 	imageName, _, _ := ParseImage(image)
 	return fmt.Sprintf("%s:%s", imageName, imageVersion)
-}
-
-// ParseImage adapts some of the logic from the actual Docker library's image parsing
-// routines:
-// https://github.com/docker/distribution/blob/release/2.7/reference/normalize.go
-func ParseImage(image string) (string, string, string) {
-	var domain, remainder string
-
-	i := strings.IndexRune(image, '/')
-
-	if i == -1 || (!strings.ContainsAny(image[:i], ".:") && image[:i] != "localhost") {
-		remainder = image
-	} else {
-		domain, remainder = image[:i], image[i+1:]
-	}
-
-	var imageName string
-	imageVersion := "unknown"
-
-	i = strings.LastIndex(remainder, ":")
-	if i > -1 {
-		imageVersion = remainder[i+1:]
-		imageName = remainder[:i]
-	} else {
-		imageName = remainder
-	}
-
-	if domain != "" {
-		imageName = domain + "/" + imageName
-	}
-
-	shortName := imageName
-	if imageBlock := strings.Split(imageName, "/"); len(imageBlock) > 0 {
-		// there is no need to do
-		// Split not return empty slice
-		shortName = imageBlock[len(imageBlock)-1]
-	}
-
-	return imageName, shortName, imageVersion
 }
