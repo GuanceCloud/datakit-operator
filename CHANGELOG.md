@@ -2,7 +2,7 @@
 
 ## [1.2.0] - 2023-06-13
 
-- 支持以 json-config 的方式配置 Datakit Operator (#19)
+- 支持以 json-config 的方式配置 Datakit Operator，现有的环境变量方式保持兼容 (#19)
 
 ## [1.0.5] - 2023-05-11
 
