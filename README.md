@@ -12,6 +12,7 @@ Datakit Operator 是 Datakit 在 Kubernetes 编排的联动项目，旨在协助
 
 - [x] 注入 DDTrace Agent（Java/Python/JavaScript）以及对应环境变量信息。
 - [x] 注入 Sidecar logfwd 服务以采集容器内日志。
+- [x] 注入 Profiler（Java/Python）以及对应环境变量信息。
 - [x] 支持 Datakit 采集器的任务分发。
 
 先决条件：

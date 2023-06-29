@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestInjectDDTraceLib(t *testing.T) {
+func TestInjectDDTrace(t *testing.T) {
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -106,7 +106,7 @@ func TestInjectDDTraceLib(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := injectLibToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
+		err := injectDDTraceToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)

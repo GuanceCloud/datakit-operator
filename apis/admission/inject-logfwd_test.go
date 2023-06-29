@@ -11,8 +11,7 @@ import (
 func TestInjectLogfwd(t *testing.T) {
 	logfwdAppImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
 
-	var instances = `
-[
+	var instances = `[
     {
         "datakit_addr": "datakit-service.datakit.svc:9533",
         "loggings": [
