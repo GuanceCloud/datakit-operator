@@ -39,22 +39,60 @@ func injectLogfwdToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpe
 		return fmt.Errorf("cannot inject logfwd into nil podTemplate")
 	}
 
-	if manager.NewContainerManager(podTemplate).ContainsContainer(logfwdContainerName) {
-		return nil
-	}
-
-	config, volumePaths, shouldInject := extractLogfwdInfo(parent, podTemplate)
-	if !shouldInject {
-		return nil
-	}
-
-	image := logfwdAppImage()
-	injectLogfwd(podTemplate, image, config, volumePaths)
+	r := newLogfwdResource(parent, podTemplate)
+	r.process()
 	return nil
 }
 
-func extractLogfwdInfo(parent string, podTemplate *corev1.PodTemplateSpec) (string, []string, bool) {
-	annotations := podTemplate.GetAnnotations()
+type logfwdResource struct {
+	parent      string
+	podTemplate *corev1.PodTemplateSpec
+}
+
+func newLogfwdResource(parent string, podTemplate *corev1.PodTemplateSpec) *logfwdResource {
+	return &logfwdResource{
+		parent:      parent,
+		podTemplate: podTemplate,
+	}
+}
+
+func (r *logfwdResource) process() {
+	if !r.checkIfNeedsOperation() {
+		return
+	}
+
+	image := logfwdAppImage()
+	config, volumePaths, shouldInject := r.extractInfo()
+	if !shouldInject {
+		return
+	}
+
+	var volumeNames []string
+	for idx := range volumePaths {
+		volumeNames = append(volumeNames, fmt.Sprintf("datakit-logfwd-volume-%d", idx))
+	}
+
+	r.injectVolume(volumeNames)
+
+	// First, add volumeMount to the main container.
+	r.injectVolumeMount(volumeNames, volumePaths)
+
+	// Then create a logfwd container, the container needs to be ReadOnly.
+	r.injectContainer(image, config, volumeNames, volumePaths)
+}
+
+func (r *logfwdResource) checkIfNeedsOperation() bool {
+	if manager.NewContainerManager(r.podTemplate).ContainsContainer(logfwdContainerName) {
+		return false
+	}
+
+	annotations := r.podTemplate.GetAnnotations()
+	_, found := annotations[logfwdInstancesAnnotationKey]
+	return found
+}
+
+func (r *logfwdResource) extractInfo() (string, []string, bool) {
+	annotations := r.podTemplate.GetAnnotations()
 	instances, found := annotations[logfwdInstancesAnnotationKey]
 	if !found {
 		return "", nil, false
@@ -62,18 +100,18 @@ func extractLogfwdInfo(parent string, podTemplate *corev1.PodTemplateSpec) (stri
 
 	var configBuff bytes.Buffer
 	if err := json.Compact(&configBuff, []byte(instances)); err != nil {
-		l.Warnf("Logfwd of %s failed to compact config: %s, err: %s", parent, instances, err)
+		l.Warnf("Logfwd of %s failed to compact config: %s, err: %s", r.parent, instances, err)
 		return "", nil, false
 	}
 
 	var configs []*logfwdConfig
 
 	if err := json.Unmarshal(configBuff.Bytes(), &configs); err != nil {
-		l.Warnf("Logfwd of %s failed to unmarshal config: %s, err: %s", parent, instances, err)
+		l.Warnf("Logfwd of %s failed to unmarshal config: %s, err: %s", r.parent, instances, err)
 		return "", nil, false
 	}
 
-	l.Infof("Use of logfwd instances to %s, config: %s", parent, configBuff.String())
+	l.Infof("Use of logfwd instances to %s, config: %s", r.parent, configBuff.String())
 
 	var paths []string
 	for _, cfg := range configs {
@@ -88,21 +126,34 @@ func extractLogfwdInfo(parent string, podTemplate *corev1.PodTemplateSpec) (stri
 		}
 	}
 
-	return configBuff.String(), unique(paths), true
+	return configBuff.String(), Unique(paths), true
 }
 
-func injectLogfwd(podTemplate *corev1.PodTemplateSpec, image, config string, volumePaths []string) {
-	var volumeNames []string
-	for idx := range volumePaths {
-		volumeNames = append(volumeNames, fmt.Sprintf("datakit-logfwd-volume-%d", idx))
+func (r *logfwdResource) injectVolume(volumeNames []string) {
+	manager := manager.NewVolumeManager(r.podTemplate)
+	for _, name := range volumeNames {
+		volume := corev1.Volume{
+			Name: name,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+		manager.AddVolume(&volume)
 	}
-
-	injectLogfwdVolume(podTemplate, volumeNames)
-	injectLogfwdVolumeMount(podTemplate, volumeNames, volumePaths)
-	injectLogfwdContainer(podTemplate, image, config, volumeNames, volumePaths)
 }
 
-func injectLogfwdContainer(podTemplate *corev1.PodTemplateSpec, image, config string, volumeNames, volumePaths []string) {
+func (r *logfwdResource) injectVolumeMount(volumeNames, volumePaths []string) {
+	manager := manager.NewVolumeMountManager(r.podTemplate)
+	for idx := range volumeNames {
+		volumeMount := corev1.VolumeMount{
+			Name:      volumeNames[idx],
+			MountPath: volumePaths[idx],
+		}
+		manager.AddVolumeMount(&volumeMount)
+	}
+}
+
+func (r *logfwdResource) injectContainer(image, config string, volumeNames, volumePaths []string) {
 	container := corev1.Container{
 		Name:            logfwdContainerName,
 		Image:           image,
@@ -141,43 +192,5 @@ func injectLogfwdContainer(podTemplate *corev1.PodTemplateSpec, image, config st
 		})
 	}
 
-	manager.NewContainerManager(podTemplate).AddContainer(&container)
-}
-
-func injectLogfwdVolume(podTemplate *corev1.PodTemplateSpec, volumeNames []string) {
-	manager := manager.NewVolumeManager(podTemplate)
-	for _, name := range volumeNames {
-		volume := corev1.Volume{
-			Name: name,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		}
-		manager.AddVolume(&volume)
-	}
-}
-
-func injectLogfwdVolumeMount(podTemplate *corev1.PodTemplateSpec, volumeNames, volumePaths []string) {
-	manager := manager.NewVolumeMountManager(podTemplate)
-	for idx := range volumeNames {
-		volumeMount := corev1.VolumeMount{
-			Name:      volumeNames[idx],
-			MountPath: volumePaths[idx],
-		}
-		manager.AddVolumeMount(&volumeMount)
-	}
-}
-
-func unique(slice []string) []string {
-	var uniqMap = make(map[string]struct{})
-	var uniqSlice []string
-	for _, s := range slice {
-		_, exist := uniqMap[s]
-		if exist {
-			continue
-		}
-		uniqMap[s] = struct{}{}
-		uniqSlice = append(uniqSlice, s)
-	}
-	return uniqSlice
+	manager.NewContainerManager(r.podTemplate).AddContainer(&container)
 }

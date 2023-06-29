@@ -38,10 +38,13 @@ func mutateStatefulSet(statefulSet *appsv1.StatefulSet) error {
 
 func mutatePodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
 	l.Debug("mutated podTemplate")
-	if err := injectLibToPodTemplate(parent, podTemplate); err != nil {
+	if err := injectDDTraceToPodTemplate(parent, podTemplate); err != nil {
 		return err
 	}
 	if err := injectLogfwdToPodTemplate(parent, podTemplate); err != nil {
+		return err
+	}
+	if err := injectProfilerToPodTemplate(parent, podTemplate); err != nil {
 		return err
 	}
 	return nil
