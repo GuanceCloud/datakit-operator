@@ -75,6 +75,7 @@ func TestInjectProfiler(t *testing.T) {
 							Name:            "datakit-profiler",
 							Image:           "pubrepo.guance.com/datakit-operator/java-profiler-testing:latest",
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							WorkingDir:      "/app/datakit-profiler",
 							Command: []string{
 								"bash",
 								"-c",
