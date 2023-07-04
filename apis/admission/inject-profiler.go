@@ -108,6 +108,13 @@ func (r *profilerResource) injectVolume() {
 		},
 	}
 
+	tmp := corev1.Volume{
+		Name: "tmp",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
 	fileOrCreate := corev1.HostPathFileOrCreate
 	timezone := corev1.Volume{
 		Name: profilerTimezone,
@@ -121,6 +128,7 @@ func (r *profilerResource) injectVolume() {
 
 	manager := manager.NewVolumeManager(r.podTemplate)
 	manager.AddVolume(&workdir)
+	manager.AddVolume(&tmp)
 	manager.AddVolume(&timezone)
 }
 
@@ -129,6 +137,12 @@ func (r *profilerResource) injectVolumeMount() {
 		Name:      profilerVolumeName,
 		MountPath: profilerMountPath,
 	}
+
+	tmp := corev1.VolumeMount{
+		Name:      "tmp",
+		MountPath: "/tmp",
+	}
+
 	timezone := corev1.VolumeMount{
 		Name:      profilerTimezone,
 		MountPath: profilerTimezoneMountPath,
@@ -136,6 +150,7 @@ func (r *profilerResource) injectVolumeMount() {
 
 	manager := manager.NewVolumeMountManager(r.podTemplate)
 	manager.AddVolumeMount(&workdir)
+	manager.AddVolumeMount(&tmp)
 	manager.AddVolumeMount(&timezone)
 }
 
