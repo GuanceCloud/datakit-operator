@@ -62,6 +62,10 @@ func TestInjectProfiler(t *testing.T) {
 									MountPath: "/app/datakit-profiler",
 								},
 								{
+									Name:      "tmp",
+									MountPath: "/tmp",
+								},
+								{
 									Name:      "timezone",
 									MountPath: "/etc/localtime",
 								},
@@ -108,6 +112,10 @@ func TestInjectProfiler(t *testing.T) {
 									MountPath: "/app/datakit-profiler",
 								},
 								{
+									Name:      "tmp",
+									MountPath: "/tmp",
+								},
+								{
 									Name:      "timezone",
 									MountPath: "/etc/localtime",
 								},
@@ -122,6 +130,12 @@ func TestInjectProfiler(t *testing.T) {
 					Volumes: []corev1.Volume{
 						{
 							Name: "datakit-profiler-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "tmp",
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
