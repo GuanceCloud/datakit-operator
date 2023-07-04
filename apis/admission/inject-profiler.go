@@ -160,6 +160,7 @@ func (r *profilerResource) injectContainer(image string, commands []string, envs
 		Image:           image,
 		Command:         commands,
 		ImagePullPolicy: corev1.PullIfNotPresent,
+		WorkingDir:      profilerMountPath,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{"SYS_PTRACE"},
