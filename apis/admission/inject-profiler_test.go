@@ -52,6 +52,7 @@ func TestInjectProfiler(t *testing.T) {
 				},
 				Spec: corev1.PodSpec{
 					ShareProcessNamespace: &shareProcessNamespace,
+					RestartPolicy:         corev1.RestartPolicyAlways,
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
@@ -78,8 +79,7 @@ func TestInjectProfiler(t *testing.T) {
 							WorkingDir:      "/app/datakit-profiler",
 							Command: []string{
 								"bash",
-								"-c",
-								"mv -f /app/async-profiler/* /app/datakit-profiler/; ./profiling.sh --add-crontab; cron -f",
+								"cmd.sh",
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -123,7 +123,7 @@ func TestInjectProfiler(t *testing.T) {
 							},
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"SYS_PTRACE"},
+									Add: []corev1.Capability{"SYS_PTRACE", "SYS_ADMIN"},
 								},
 							},
 						},
