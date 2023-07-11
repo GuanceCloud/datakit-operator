@@ -20,20 +20,6 @@ const (
 
 var (
 	supportedLanguagesForProfiler = []language{java, python}
-	commandsForProfiler           = [][]string{
-		// java
-		{
-			"bash",
-			"-c",
-			"mv -f /app/async-profiler/* /app/datakit-profiler/; ./profiling.sh --add-crontab; cron -f",
-		},
-		// python
-		{
-			"bash",
-			"-c",
-			"./profiling.sh --add-crontab; cron -f",
-		},
-	}
 )
 
 func injectProfilerToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
@@ -63,13 +49,13 @@ func (r *profilerResource) process() {
 		return
 	}
 
-	image, commands, shouldInject := r.extractInfo()
+	image, shouldInject := r.extractInfo()
 	if !shouldInject {
 		return
 	}
 
-	r.resetShareProcessNamespace()
-	r.injectContainer(image, commands, profilerEnvs())
+	r.resetSpec()
+	r.injectContainer(image, profilerEnvs())
 	r.injectVolume()
 	r.injectVolumeMount()
 }
@@ -78,26 +64,27 @@ func (r *profilerResource) checkIfNeedsOperation() bool {
 	return !manager.NewContainerManager(r.podTemplate).ContainsContainer(profilerContainerName)
 }
 
-func (r *profilerResource) extractInfo() (string, []string, bool) {
+func (r *profilerResource) extractInfo() (string, bool) {
 	annotations := r.podTemplate.GetAnnotations()
 
-	for idx, lang := range supportedLanguagesForProfiler {
+	for _, lang := range supportedLanguagesForProfiler {
 		profilerVersionAnnotation := strings.ToLower(fmt.Sprintf(profilerVersionAnnotationKeyFormat, lang))
 
 		if imageVersion, found := annotations[profilerVersionAnnotation]; found {
 			image := profilerReleaseImage(lang, imageVersion)
 			l.Infof("Use of %s-profiler image %s to %s", lang, image, r.parent)
 
-			return image, commandsForProfiler[idx], true
+			return image, true
 		}
 	}
 
-	return "", nil, false
+	return "", false
 }
 
-func (r *profilerResource) resetShareProcessNamespace() {
+func (r *profilerResource) resetSpec() {
 	var b = true
 	r.podTemplate.Spec.ShareProcessNamespace = &b
+	r.podTemplate.Spec.RestartPolicy = corev1.RestartPolicyAlways
 }
 
 func (r *profilerResource) injectVolume() {
@@ -154,16 +141,16 @@ func (r *profilerResource) injectVolumeMount() {
 	manager.AddVolumeMount(&timezone)
 }
 
-func (r *profilerResource) injectContainer(image string, commands []string, envs []struct{ Key, Value string }) {
+func (r *profilerResource) injectContainer(image string, envs []struct{ Key, Value string }) {
 	container := corev1.Container{
 		Name:            profilerContainerName,
 		Image:           image,
-		Command:         commands,
+		Command:         []string{"bash", "cmd.sh"},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		WorkingDir:      profilerMountPath,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"SYS_PTRACE"},
+				Add: []corev1.Capability{"SYS_PTRACE", "SYS_ADMIN"},
 			},
 		},
 	}
