@@ -1,4 +1,4 @@
-package admission
+package injector
 
 import (
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
