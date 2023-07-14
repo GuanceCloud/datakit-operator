@@ -8,8 +8,7 @@ import (
 
 	"github.com/mattbaird/jsonpatch"
 	admissionv1 "k8s.io/api/admission/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -18,13 +17,7 @@ const (
 	jsonContentType = "application/json"
 )
 
-var (
-	deploymentResource  = metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-	daemonsetResource   = metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}
-	cronjobResource     = metav1.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}
-	jobResource         = metav1.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
-	statefulsetResource = metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}
-)
+var podResource = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
 func HandleInject(w http.ResponseWriter, r *http.Request) {
 	handle(w, r)
@@ -102,50 +95,14 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 	l.Debugf("request: %s", string(raw))
 
 	switch requ.Resource {
-	case deploymentResource:
-		var deployment appsv1.Deployment
-		err = json.Unmarshal(raw, &deployment)
+	case podResource:
+		var pod corev1.Pod
+		err = json.Unmarshal(raw, &pod)
 		if err != nil {
 			break
 		}
-		err = mutateDeployment(&deployment)
-		resource = deployment
-
-	case daemonsetResource:
-		var daemonset appsv1.DaemonSet
-		err = json.Unmarshal(raw, &daemonset)
-		if err != nil {
-			break
-		}
-		err = mutateDaemonSet(&daemonset)
-		resource = daemonset
-
-	case cronjobResource:
-		var cronjob batchv1.CronJob
-		err = json.Unmarshal(raw, &cronjob)
-		if err != nil {
-			break
-		}
-		err = mutateCronJob(&cronjob)
-		resource = cronjob
-
-	case jobResource:
-		var job batchv1.Job
-		err = json.Unmarshal(raw, &job)
-		if err != nil {
-			break
-		}
-		err = mutateJob(&job)
-		resource = job
-
-	case statefulsetResource:
-		var statefulset appsv1.StatefulSet
-		err = json.Unmarshal(raw, &statefulset)
-		if err != nil {
-			break
-		}
-		err = mutateStatefulSet(&statefulset)
-		resource = statefulset
+		err = mutatePod("", &pod)
+		resource = pod
 
 	default:
 		return nil, fmt.Errorf("Unsupported resource: %#v", requ.Resource)

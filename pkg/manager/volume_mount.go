@@ -10,32 +10,32 @@ type VolumeMountManager interface {
 	AddVolumeMountToInitContainer(containerName string, newVolumeMount *corev1.VolumeMount)
 }
 
-func NewVolumeMountManager(podTemplate *corev1.PodTemplateSpec) VolumeMountManager {
-	return &volumeMountManager{podTemplate}
+func NewVolumeMountManager(pod *corev1.Pod) VolumeMountManager {
+	return &volumeMountManager{pod}
 }
 
 type volumeMountManager struct {
-	podTemplate *corev1.PodTemplateSpec
+	pod *corev1.Pod
 }
 
 func (m *volumeMountManager) AddVolumeMount(newVolumeMount *corev1.VolumeMount) {
-	for idx := range m.podTemplate.Spec.Containers {
-		_ = AddVolumeMountToContainer(&m.podTemplate.Spec.Containers[idx], newVolumeMount)
+	for idx := range m.pod.Spec.Containers {
+		_ = AddVolumeMountToContainer(&m.pod.Spec.Containers[idx], newVolumeMount)
 	}
 }
 
 func (m *volumeMountManager) AddVolumeMountToContainer(containerName string, newVolumeMount *corev1.VolumeMount) {
-	for idx := range m.podTemplate.Spec.Containers {
-		if m.podTemplate.Spec.Containers[idx].Name == containerName {
-			_ = AddVolumeMountToContainer(&m.podTemplate.Spec.Containers[idx], newVolumeMount)
+	for idx := range m.pod.Spec.Containers {
+		if m.pod.Spec.Containers[idx].Name == containerName {
+			_ = AddVolumeMountToContainer(&m.pod.Spec.Containers[idx], newVolumeMount)
 		}
 	}
 }
 
 func (m *volumeMountManager) AddVolumeMountToInitContainer(containerName string, newVolumeMount *corev1.VolumeMount) {
-	for idx := range m.podTemplate.Spec.InitContainers {
-		if m.podTemplate.Spec.InitContainers[idx].Name == containerName {
-			_ = AddVolumeMountToContainer(&m.podTemplate.Spec.InitContainers[idx], newVolumeMount)
+	for idx := range m.pod.Spec.InitContainers {
+		if m.pod.Spec.InitContainers[idx].Name == containerName {
+			_ = AddVolumeMountToContainer(&m.pod.Spec.InitContainers[idx], newVolumeMount)
 		}
 	}
 }

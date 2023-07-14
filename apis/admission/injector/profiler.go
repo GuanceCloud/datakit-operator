@@ -1,4 +1,4 @@
-package admission
+package injector
 
 import (
 	"fmt"
@@ -22,25 +22,25 @@ var (
 	supportedLanguagesForProfiler = []language{java, python}
 )
 
-func injectProfilerToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
-	if podTemplate == nil {
-		return fmt.Errorf("cannot inject profiler into nil podTemplate")
+func InjectProfilerToPod(parent string, pod *corev1.Pod) error {
+	if pod == nil {
+		return fmt.Errorf("cannot inject profiler into nil pod")
 	}
 
-	r := newProfilerResource(parent, podTemplate)
+	r := newProfilerResource(parent, pod)
 	r.process()
 	return nil
 }
 
 type profilerResource struct {
-	parent      string
-	podTemplate *corev1.PodTemplateSpec
+	parent string
+	pod    *corev1.Pod
 }
 
-func newProfilerResource(parent string, podTemplate *corev1.PodTemplateSpec) *profilerResource {
+func newProfilerResource(parent string, pod *corev1.Pod) *profilerResource {
 	return &profilerResource{
-		parent:      parent,
-		podTemplate: podTemplate,
+		parent: parent,
+		pod:    pod,
 	}
 }
 
@@ -61,11 +61,11 @@ func (r *profilerResource) process() {
 }
 
 func (r *profilerResource) checkIfNeedsOperation() bool {
-	return !manager.NewContainerManager(r.podTemplate).ContainsContainer(profilerContainerName)
+	return !manager.NewContainerManager(r.pod).ContainsContainer(profilerContainerName)
 }
 
 func (r *profilerResource) extractInfo() (string, bool) {
-	annotations := r.podTemplate.GetAnnotations()
+	annotations := r.pod.GetAnnotations()
 
 	for _, lang := range supportedLanguagesForProfiler {
 		profilerVersionAnnotation := strings.ToLower(fmt.Sprintf(profilerVersionAnnotationKeyFormat, lang))
@@ -83,8 +83,8 @@ func (r *profilerResource) extractInfo() (string, bool) {
 
 func (r *profilerResource) resetSpec() {
 	var b = true
-	r.podTemplate.Spec.ShareProcessNamespace = &b
-	r.podTemplate.Spec.RestartPolicy = corev1.RestartPolicyAlways
+	r.pod.Spec.ShareProcessNamespace = &b
+	r.pod.Spec.RestartPolicy = corev1.RestartPolicyAlways
 }
 
 func (r *profilerResource) injectVolume() {
@@ -113,7 +113,7 @@ func (r *profilerResource) injectVolume() {
 		},
 	}
 
-	manager := manager.NewVolumeManager(r.podTemplate)
+	manager := manager.NewVolumeManager(r.pod)
 	manager.AddVolume(&workdir)
 	manager.AddVolume(&tmp)
 	manager.AddVolume(&timezone)
@@ -135,7 +135,7 @@ func (r *profilerResource) injectVolumeMount() {
 		MountPath: profilerTimezoneMountPath,
 	}
 
-	manager := manager.NewVolumeMountManager(r.podTemplate)
+	manager := manager.NewVolumeMountManager(r.pod)
 	manager.AddVolumeMount(&workdir)
 	manager.AddVolumeMount(&tmp)
 	manager.AddVolumeMount(&timezone)
@@ -163,7 +163,7 @@ func (r *profilerResource) injectContainer(image string, envs []struct{ Key, Val
 		container.Env = append(container.Env, envvar)
 	}
 
-	manager.NewContainerManager(r.podTemplate).AddContainer(&container)
+	manager.NewContainerManager(r.pod).AddContainer(&container)
 }
 
 func profilerReleaseImage(lang language, imageVersion string) string {

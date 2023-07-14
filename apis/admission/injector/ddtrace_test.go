@@ -1,4 +1,4 @@
-package admission
+package injector
 
 import (
 	"testing"
@@ -20,13 +20,13 @@ func TestInjectDDTrace(t *testing.T) {
 	}
 
 	var testCases = []struct {
-		in  corev1.PodTemplateSpec
-		out corev1.PodTemplateSpec
+		in  corev1.Pod
+		out corev1.Pod
 	}{
 		{
-			in: corev1.PodTemplateSpec{
+			in: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/java-lib.version": "latest"},
 				},
 				Spec: corev1.PodSpec{
@@ -38,9 +38,9 @@ func TestInjectDDTrace(t *testing.T) {
 					},
 				},
 			},
-			out: corev1.PodTemplateSpec{
+			out: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/java-lib.version": "latest"},
 				},
 				Spec: corev1.PodSpec{
@@ -106,7 +106,7 @@ func TestInjectDDTrace(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := injectDDTraceToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
