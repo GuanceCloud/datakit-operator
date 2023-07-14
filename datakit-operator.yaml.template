@@ -105,9 +105,9 @@ webhooks:
   - name: "mutation.datakit.svc"
     rules:
       - operations: [ "CREATE", "UPDATE"]
-        apiGroups: [ "*" ]
+        apiGroups: [ "" ]
         apiVersions: [ "v1" ]
-        resources: [ "deployments", "daemonsets", "cronjobs", "jobs", "statefulsets" ]
+        resources: [ "pod" ]
         scope: "Namespaced"
     clientConfig:
       service:

@@ -1,4 +1,4 @@
-package admission
+package injector
 
 import (
 	"bytes"
@@ -34,25 +34,25 @@ type logfwdConfig struct {
 	} `json:"loggings"`
 }
 
-func injectLogfwdToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
-	if podTemplate == nil {
-		return fmt.Errorf("cannot inject logfwd into nil podTemplate")
+func InjectLogfwdToPod(parent string, pod *corev1.Pod) error {
+	if pod == nil {
+		return fmt.Errorf("cannot inject logfwd into nil pod")
 	}
 
-	r := newLogfwdResource(parent, podTemplate)
+	r := newLogfwdResource(parent, pod)
 	r.process()
 	return nil
 }
 
 type logfwdResource struct {
-	parent      string
-	podTemplate *corev1.PodTemplateSpec
+	parent string
+	pod    *corev1.Pod
 }
 
-func newLogfwdResource(parent string, podTemplate *corev1.PodTemplateSpec) *logfwdResource {
+func newLogfwdResource(parent string, pod *corev1.Pod) *logfwdResource {
 	return &logfwdResource{
-		parent:      parent,
-		podTemplate: podTemplate,
+		parent: parent,
+		pod:    pod,
 	}
 }
 
@@ -82,17 +82,17 @@ func (r *logfwdResource) process() {
 }
 
 func (r *logfwdResource) checkIfNeedsOperation() bool {
-	if manager.NewContainerManager(r.podTemplate).ContainsContainer(logfwdContainerName) {
+	if manager.NewContainerManager(r.pod).ContainsContainer(logfwdContainerName) {
 		return false
 	}
 
-	annotations := r.podTemplate.GetAnnotations()
+	annotations := r.pod.GetAnnotations()
 	_, found := annotations[logfwdInstancesAnnotationKey]
 	return found
 }
 
 func (r *logfwdResource) extractInfo() (string, []string, bool) {
-	annotations := r.podTemplate.GetAnnotations()
+	annotations := r.pod.GetAnnotations()
 	instances, found := annotations[logfwdInstancesAnnotationKey]
 	if !found {
 		return "", nil, false
@@ -130,7 +130,7 @@ func (r *logfwdResource) extractInfo() (string, []string, bool) {
 }
 
 func (r *logfwdResource) injectVolume(volumeNames []string) {
-	manager := manager.NewVolumeManager(r.podTemplate)
+	manager := manager.NewVolumeManager(r.pod)
 	for _, name := range volumeNames {
 		volume := corev1.Volume{
 			Name: name,
@@ -143,7 +143,7 @@ func (r *logfwdResource) injectVolume(volumeNames []string) {
 }
 
 func (r *logfwdResource) injectVolumeMount(volumeNames, volumePaths []string) {
-	manager := manager.NewVolumeMountManager(r.podTemplate)
+	manager := manager.NewVolumeMountManager(r.pod)
 	for idx := range volumeNames {
 		volumeMount := corev1.VolumeMount{
 			Name:      volumeNames[idx],
@@ -192,5 +192,5 @@ func (r *logfwdResource) injectContainer(image, config string, volumeNames, volu
 		})
 	}
 
-	manager.NewContainerManager(r.podTemplate).AddContainer(&container)
+	manager.NewContainerManager(r.pod).AddContainer(&container)
 }

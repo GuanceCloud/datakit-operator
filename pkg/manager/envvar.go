@@ -10,32 +10,32 @@ type EnvVarManager interface {
 	AddEnvVarToInitContainer(containerName string, newEnvVar *corev1.EnvVar)
 }
 
-func NewEnvVarManager(podTemplate *corev1.PodTemplateSpec) EnvVarManager {
-	return &envVarMangaer{podTemplate}
+func NewEnvVarManager(pod *corev1.Pod) EnvVarManager {
+	return &envVarMangaer{pod}
 }
 
 type envVarMangaer struct {
-	podTemplate *corev1.PodTemplateSpec
+	pod *corev1.Pod
 }
 
 func (m *envVarMangaer) AddEnvVar(newEnvVar *corev1.EnvVar) {
-	for idx := range m.podTemplate.Spec.Containers {
-		_ = AddEnvVarToContainer(&m.podTemplate.Spec.Containers[idx], newEnvVar)
+	for idx := range m.pod.Spec.Containers {
+		_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
 	}
 }
 
 func (m *envVarMangaer) AddEnvVarToContainer(containerName string, newEnvVar *corev1.EnvVar) {
-	for idx := range m.podTemplate.Spec.Containers {
-		if m.podTemplate.Spec.Containers[idx].Name == containerName {
-			_ = AddEnvVarToContainer(&m.podTemplate.Spec.Containers[idx], newEnvVar)
+	for idx := range m.pod.Spec.Containers {
+		if m.pod.Spec.Containers[idx].Name == containerName {
+			_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
 		}
 	}
 }
 
 func (m *envVarMangaer) AddEnvVarToInitContainer(initContainerName string, newEnvVar *corev1.EnvVar) {
-	for idx := range m.podTemplate.Spec.InitContainers {
-		if m.podTemplate.Spec.InitContainers[idx].Name == initContainerName {
-			_ = AddEnvVarToContainer(&m.podTemplate.Spec.InitContainers[idx], newEnvVar)
+	for idx := range m.pod.Spec.InitContainers {
+		if m.pod.Spec.InitContainers[idx].Name == initContainerName {
+			_ = AddEnvVarToContainer(&m.pod.Spec.InitContainers[idx], newEnvVar)
 		}
 	}
 }
