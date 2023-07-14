@@ -1,4 +1,4 @@
-package admission
+package injector
 
 import (
 	"fmt"
@@ -37,25 +37,25 @@ const (
 
 var supportedLanguages = []language{java, js, python}
 
-func injectDDTraceToPodTemplate(parent string, podTemplate *corev1.PodTemplateSpec) error {
-	if podTemplate == nil {
-		return fmt.Errorf("cannot inject ddtrace-lib into nil podTemplate")
+func InjectDDTraceToPod(parent string, pod *corev1.Pod) error {
+	if pod == nil {
+		return fmt.Errorf("cannot inject ddtrace-lib into nil pod")
 	}
 
-	r := newDDTraceResource(parent, podTemplate)
+	r := newDDTraceResource(parent, pod)
 	r.process()
 	return nil
 }
 
 type ddtraceResource struct {
-	parent      string
-	podTemplate *corev1.PodTemplateSpec
+	parent string
+	pod    *corev1.Pod
 }
 
-func newDDTraceResource(parent string, podTemplate *corev1.PodTemplateSpec) *ddtraceResource {
+func newDDTraceResource(parent string, pod *corev1.Pod) *ddtraceResource {
 	return &ddtraceResource{
-		parent:      parent,
-		podTemplate: podTemplate,
+		parent: parent,
+		pod:    pod,
 	}
 }
 
@@ -92,11 +92,11 @@ func (r *ddtraceResource) process() {
 }
 
 func (r *ddtraceResource) checkIfNeedsOperation() bool {
-	return !manager.NewContainerManager(r.podTemplate).ContainsInitContainer(ddtraceInitContainerName)
+	return !manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName)
 }
 
 func (r *ddtraceResource) extractInfo() (language, string, bool) {
-	annotations := r.podTemplate.GetAnnotations()
+	annotations := r.pod.GetAnnotations()
 
 	for _, lang := range supportedLanguages {
 		versionAnnotation := strings.ToLower(fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang))
@@ -125,10 +125,10 @@ func (r *ddtraceResource) injectInitContainer(image string) {
 			},
 		},
 	}
-	manager.NewContainerManager(r.podTemplate).AddInitContainer(&container)
+	manager.NewContainerManager(r.pod).AddInitContainer(&container)
 }
 func (r *ddtraceResource) injectConfig(envKey string, envVal envValFunc) error {
-	podSpec := r.podTemplate.Spec
+	podSpec := r.pod.Spec
 	for i, container := range podSpec.Containers {
 		index := envIndex(container.Env, envKey)
 
@@ -161,11 +161,11 @@ func (r *ddtraceResource) injectVolume() {
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
-	manager.NewVolumeManager(r.podTemplate).AddVolume(&volume)
+	manager.NewVolumeManager(r.pod).AddVolume(&volume)
 }
 
 func (r *ddtraceResource) injectEnvs(envs []struct{ Key, Value string }) {
-	m := manager.NewEnvVarManager(r.podTemplate)
+	m := manager.NewEnvVarManager(r.pod)
 	for _, env := range envs {
 		envvar := corev1.EnvVar{
 			Name:  env.Key,

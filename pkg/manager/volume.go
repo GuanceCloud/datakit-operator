@@ -8,19 +8,19 @@ type VolumeManager interface {
 	AddVolume(newVolume *corev1.Volume)
 }
 
-func NewVolumeManager(podTemplate *corev1.PodTemplateSpec) VolumeManager {
-	return &volumeMangaer{podTemplate}
+func NewVolumeManager(pod *corev1.Pod) VolumeManager {
+	return &volumeMangaer{pod}
 }
 
 type volumeMangaer struct {
-	podTemplate *corev1.PodTemplateSpec
+	pod *corev1.Pod
 }
 
 func (m *volumeMangaer) AddVolume(newVolume *corev1.Volume) {
-	for idx := range m.podTemplate.Spec.Volumes {
-		if m.podTemplate.Spec.Volumes[idx].Name == newVolume.Name {
+	for idx := range m.pod.Spec.Volumes {
+		if m.pod.Spec.Volumes[idx].Name == newVolume.Name {
 			return
 		}
 	}
-	m.podTemplate.Spec.Volumes = append(m.podTemplate.Spec.Volumes, *newVolume)
+	m.pod.Spec.Volumes = append(m.pod.Spec.Volumes, *newVolume)
 }
