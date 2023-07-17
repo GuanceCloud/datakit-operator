@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2023-07-17
+
+- 修改 admission 注入的最小单元为 Pod，需要将 yaml 更新到最新或 datakit-operator-v1.3.0.yaml (#22)
+- 支持注入 profiler (#5)
+
+## [1.2.1] - 2023-06-28
+
+- 修改默认的镜像仓库为 guance.com (#19)
+- 更新 Helm 结构
+
 ## [1.2.0] - 2023-06-13
 
 - 支持以 json-config 的方式配置 Datakit Operator，现有的环境变量方式保持兼容 (#19)
