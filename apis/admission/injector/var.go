@@ -29,6 +29,10 @@ var (
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerPythonImageKey)
 	}
 
+	profilerGolangImage = func() string {
+		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerGolangImageKey)
+	}
+
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return config.Cfg.AdmissionInject.DDTrace.Envs()
 	}
