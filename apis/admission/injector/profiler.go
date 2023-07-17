@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	supportedLanguagesForProfiler = []language{java, python}
+	supportedLanguagesForProfiler = []language{java, python, golang}
 )
 
 func InjectProfilerToPod(parent string, pod *corev1.Pod) error {
@@ -174,6 +174,8 @@ func profilerReleaseImage(lang language, imageVersion string) string {
 		image = profilerJavaImage()
 	case python:
 		image = profilerPythonImage()
+	case golang:
+		image = profilerGolangImage()
 	default:
 		return ""
 	}
