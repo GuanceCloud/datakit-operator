@@ -31,6 +31,7 @@ type language string
 
 const (
 	java   language = "java"
+	golang language = "golang"
 	js     language = "js"
 	python language = "python"
 )
