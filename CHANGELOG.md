@@ -4,6 +4,7 @@
 
 - 修改 admission 注入的最小单元为 Pod，需要将 yaml 更新到最新或 datakit-operator-v1.3.0.yaml (#22)
 - 支持注入 profiler (#5)
+- 注入的 sidecar 添加 Resource Limit (#20)
 
 ## [1.2.1] - 2023-06-28
 
