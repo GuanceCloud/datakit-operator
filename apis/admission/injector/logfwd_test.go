@@ -1,18 +1,18 @@
-package admission
+package injector
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInjectLogfwd(t *testing.T) {
 	logfwdAppImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
 
-	var instances = `
-[
+	var instances = `[
     {
         "datakit_addr": "datakit-service.datakit.svc:9533",
         "loggings": [
@@ -35,13 +35,13 @@ func TestInjectLogfwd(t *testing.T) {
 	var instancesCompact = `[{"datakit_addr":"datakit-service.datakit.svc:9533","loggings":[{"logfiles":["/var/log/nginx/success/*.log"],"source":"nginx-success","tags":{"key01":"value01"}},{"logfiles":["/var/log/nginx/error/*.log"],"source":"nginx-error","pipeline":"nginx-error.p"}]}]`
 
 	var testCases = []struct {
-		in  corev1.PodTemplateSpec
-		out corev1.PodTemplateSpec
+		in  corev1.Pod
+		out corev1.Pod
 	}{
 		{
-			in: corev1.PodTemplateSpec{
+			in: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/logfwd.instances": instances},
 				},
 				Spec: corev1.PodSpec{
@@ -53,9 +53,9 @@ func TestInjectLogfwd(t *testing.T) {
 					},
 				},
 			},
-			out: corev1.PodTemplateSpec{
+			out: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/logfwd.instances": instances},
 				},
 				Spec: corev1.PodSpec{
@@ -114,6 +114,16 @@ func TestInjectLogfwd(t *testing.T) {
 									ReadOnly:  true,
 								},
 							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -136,7 +146,7 @@ func TestInjectLogfwd(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := injectLogfwdToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectLogfwdToPod(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)

@@ -1,14 +1,15 @@
-package admission
+package injector
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestInjectDDTraceLib(t *testing.T) {
+func TestInjectDDTrace(t *testing.T) {
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -20,13 +21,13 @@ func TestInjectDDTraceLib(t *testing.T) {
 	}
 
 	var testCases = []struct {
-		in  corev1.PodTemplateSpec
-		out corev1.PodTemplateSpec
+		in  corev1.Pod
+		out corev1.Pod
 	}{
 		{
-			in: corev1.PodTemplateSpec{
+			in: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/java-lib.version": "latest"},
 				},
 				Spec: corev1.PodSpec{
@@ -38,9 +39,9 @@ func TestInjectDDTraceLib(t *testing.T) {
 					},
 				},
 			},
-			out: corev1.PodTemplateSpec{
+			out: corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testing-podTemplate",
+					Name:        "testing-pod",
 					Annotations: map[string]string{"admission.datakit/java-lib.version": "latest"},
 				},
 				Spec: corev1.PodSpec{
@@ -90,6 +91,16 @@ func TestInjectDDTraceLib(t *testing.T) {
 									MountPath: "/datadog-lib",
 								},
 							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -106,7 +117,7 @@ func TestInjectDDTraceLib(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := injectLibToPodTemplate(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
