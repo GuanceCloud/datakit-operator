@@ -13,6 +13,7 @@ const (
 
 	ProfilerJavaImageKey   = "java_profiler_image"
 	ProfilerPythonImageKey = "python_profiler_image"
+	ProfilerGolangImageKey = "golang_profiler_image"
 )
 
 type Configuration struct {
