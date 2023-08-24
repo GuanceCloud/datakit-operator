@@ -44,9 +44,9 @@ data:
             },
             "profiler": {
                 "images": {
-                    "java_profiler_image":   "pubrepo.jiagouyun.com/dataflux/async-profiler:0.1.0",
-                    "python_profiler_image": "pubrepo.jiagouyun.com/dataflux/py-spy:0.1.0",
-                    "golang_profiler_image": "pubrepo.jiagouyun.com/dataflux/pprof:0.1.0"
+                    "java_profiler_image":   "pubrepo.jiagouyun.com/datakit-operator/async-profiler:0.1.0",
+                    "python_profiler_image": "pubrepo.jiagouyun.com/datakit-operator/py-spy:0.1.0",
+                    "golang_profiler_image": "pubrepo.jiagouyun.com/datakit-operator/pprof:0.1.0"
                 },
                 "envs": {
                     "DK_AGENT_HOST":  "datakit-service.datakit.svc",
@@ -54,7 +54,7 @@ data:
                     "DK_PROFILE_VERSION": "1.2.333",
                     "DK_PROFILE_ENV": "prod",
                     "DK_PROFILE_DURATION": "240",
-                    "DK_PROFILE_SCHEDULE": "*/20 * * * *"
+                    "DK_PROFILE_SCHEDULE": "0 * * * *"
                 }
             }
         }

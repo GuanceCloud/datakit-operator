@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.3.1] - 2023-08-24
+
+- 更新默认 Profiler image
+
 ## [1.3.0] - 2023-07-17
 
 - 修改 admission 注入的最小单元为 Pod，需要将 yaml 更新到最新或 datakit-operator-v1.3.0.yaml (#22)
