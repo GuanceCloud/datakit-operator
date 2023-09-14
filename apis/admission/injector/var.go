@@ -1,8 +1,23 @@
 package injector
 
 import (
+	"fmt"
+
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
+	corev1 "k8s.io/api/core/v1"
 )
+
+type language string
+
+const (
+	java   language = "java"
+	golang language = "golang"
+	js     language = "js"
+	python language = "python"
+)
+
+const enableEnvFieldRef = true
 
 var (
 	ddtraceJavaAgentImage = func() string {
@@ -37,7 +52,18 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.Envs()
 	}
 
+	ddtraceEnvObjects = func() []corev1.EnvVar {
+		envs := ddtraceEnvs()
+		fmt.Println(envs)
+		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
+	}
+
 	profilerEnvs = func() []struct{ Key, Value string } {
 		return config.Cfg.AdmissionInject.Profiler.Envs()
+	}
+
+	profilerEnvObjects = func() []corev1.EnvVar {
+		envs := profilerEnvs()
+		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
 	}
 )
