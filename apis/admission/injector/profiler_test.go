@@ -15,10 +15,8 @@ func TestInjectProfiler(t *testing.T) {
 		return []struct{ Key, Value string }{
 			{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 			{"DK_AGENT_PORT", "9529"},
-			{"DK_PROFILE_DURATION", "240"},
-			{"DK_PROFILE_ENV", "prod"},
-			{"DK_PROFILE_SCHEDULE", "*/20 * * * *"},
-			{"DK_PROFILE_VERSION", "1.2.333"},
+
+			{"POD_NAME", "{fieldRef:metadata.name}"},
 		}
 	}
 
@@ -92,20 +90,12 @@ func TestInjectProfiler(t *testing.T) {
 									Value: "9529",
 								},
 								{
-									Name:  "DK_PROFILE_DURATION",
-									Value: "240",
-								},
-								{
-									Name:  "DK_PROFILE_ENV",
-									Value: "prod",
-								},
-								{
-									Name:  "DK_PROFILE_SCHEDULE",
-									Value: "*/20 * * * *",
-								},
-								{
-									Name:  "DK_PROFILE_VERSION",
-									Value: "1.2.333",
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{

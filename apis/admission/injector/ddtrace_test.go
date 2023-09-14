@@ -15,8 +15,12 @@ func TestInjectDDTrace(t *testing.T) {
 		return []struct{ Key, Value string }{
 			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
 			{"DD_TRACE_AGENT_PORT", "9529"},
-			{"DD_JMXFETCH_STATSD_HOST", "datakit-service.datakit.svc"},
-			{"DD_JMXFETCH_STATSD_PORT", "8125"},
+
+			{"POD_NAME", "{fieldRef:metadata.name}"},
+			{"SERVICE", "{fieldRef:metadata.annotations['service']}"},
+
+			// invalid annotation key
+			{"SERVICE_NOT", "{fieldRef:metadata.annotations['hello-$$$']}"},
 		}
 	}
 
@@ -69,12 +73,24 @@ func TestInjectDDTrace(t *testing.T) {
 									Value: "9529",
 								},
 								{
-									Name:  "DD_JMXFETCH_STATSD_HOST",
-									Value: "datakit-service.datakit.svc",
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
 								},
 								{
-									Name:  "DD_JMXFETCH_STATSD_PORT",
-									Value: "8125",
+									Name: "SERVICE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.annotations['service']",
+										},
+									},
+								},
+								{
+									Name:  "SERVICE_NOT",
+									Value: "{fieldRef:metadata.annotations['hello-$$$']}",
 								},
 							},
 						},
