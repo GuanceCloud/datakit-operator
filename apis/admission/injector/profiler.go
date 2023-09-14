@@ -56,7 +56,7 @@ func (r *profilerResource) process() {
 	}
 
 	r.resetSpec()
-	r.injectContainer(image, profilerEnvs())
+	r.injectContainer(image, profilerEnvObjects())
 	r.injectVolume()
 	r.injectVolumeMount()
 }
@@ -142,7 +142,7 @@ func (r *profilerResource) injectVolumeMount() {
 	manager.AddVolumeMount(&timezone)
 }
 
-func (r *profilerResource) injectContainer(image string, envs []struct{ Key, Value string }) {
+func (r *profilerResource) injectContainer(image string, envs []corev1.EnvVar) {
 	container := corev1.Container{
 		Name:            profilerContainerName,
 		Image:           image,
@@ -166,13 +166,7 @@ func (r *profilerResource) injectContainer(image string, envs []struct{ Key, Val
 		},
 	}
 
-	for _, env := range envs {
-		envvar := corev1.EnvVar{
-			Name:  env.Key,
-			Value: env.Value,
-		}
-		container.Env = append(container.Env, envvar)
-	}
+	container.Env = append(container.Env, envs...)
 
 	manager.NewContainerManager(r.pod).AddContainer(&container)
 }

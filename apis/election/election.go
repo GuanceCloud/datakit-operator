@@ -3,7 +3,7 @@ package election
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/luci/go-render/render"
@@ -22,16 +22,10 @@ func HandleElection(w http.ResponseWriter, r *http.Request) {
 func handle(w http.ResponseWriter, r *http.Request) {
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
-
-	// contentType := r.Header.Get("Content-Type")
-	// if contentType != jsonContentType {
-	// 	l.Errorf("contentType=%s, expect application/json", contentType)
-	// 	return
-	// }
 
 	l.Debugf("handling request: %s", body)
 
