@@ -28,16 +28,7 @@ const (
 	pythonPathValue = "/datadog-lib/"
 )
 
-type language string
-
-const (
-	java   language = "java"
-	golang language = "golang"
-	js     language = "js"
-	python language = "python"
-)
-
-var supportedLanguages = []language{java, js, python}
+var supportedLanguagesForDDTrace = []language{java, js, python}
 
 func InjectDDTraceToPod(parent string, pod *corev1.Pod) error {
 	if pod == nil {
@@ -81,7 +72,7 @@ func (r *ddtraceResource) process() {
 	case python:
 		err = r.injectConfig(pythonPathKey, pythonEnvValFunc)
 	default:
-		err = fmt.Errorf("language %s is no supported, only supported %v", lang, supportedLanguages)
+		err = fmt.Errorf("language %s is no supported, only supported %v", lang, supportedLanguagesForDDTrace)
 	}
 
 	if err != nil {
@@ -90,7 +81,7 @@ func (r *ddtraceResource) process() {
 	}
 
 	r.injectVolume()
-	r.injectEnvs(ddtraceEnvs())
+	r.injectEnvs(ddtraceEnvObjects())
 }
 
 func (r *ddtraceResource) checkIfNeedsOperation() bool {
@@ -100,7 +91,7 @@ func (r *ddtraceResource) checkIfNeedsOperation() bool {
 func (r *ddtraceResource) extractInfo() (language, string, bool) {
 	annotations := r.pod.GetAnnotations()
 
-	for _, lang := range supportedLanguages {
+	for _, lang := range supportedLanguagesForDDTrace {
 		versionAnnotation := strings.ToLower(fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang))
 
 		if imageVersion, found := annotations[versionAnnotation]; found {
@@ -176,14 +167,10 @@ func (r *ddtraceResource) injectVolume() {
 	manager.NewVolumeManager(r.pod).AddVolume(&volume)
 }
 
-func (r *ddtraceResource) injectEnvs(envs []struct{ Key, Value string }) {
+func (r *ddtraceResource) injectEnvs(envs []corev1.EnvVar) {
 	m := manager.NewEnvVarManager(r.pod)
-	for _, env := range envs {
-		envvar := corev1.EnvVar{
-			Name:  env.Key,
-			Value: env.Value,
-		}
-		m.AddEnvVar(&envvar)
+	for idx := range envs {
+		m.AddEnvVar(&envs[idx])
 	}
 }
 
