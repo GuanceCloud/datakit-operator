@@ -44,7 +44,12 @@ data:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.15.1"
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.15.2"
+                },
+                "envs": {
+                    "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
+                    "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
                 }
             },
             "profiler": {

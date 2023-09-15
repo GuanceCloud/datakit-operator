@@ -30,7 +30,7 @@ admissionregistration:
     caBundle: {{CABUNDLE}}
 
 configmap:
-  jsonconfig: '
+  jsonconfig: |
     {
         "server_listen": "0.0.0.0:9543",
         "log_level":     "info",
@@ -55,7 +55,12 @@ configmap:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.15.1"
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.15.2"
+                },
+                "envs": {
+                    "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
+                    "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
                 }
             },
             "profiler": {
@@ -74,7 +79,7 @@ configmap:
                 }
             }
         }
-    }'
+    }
 
 service:
   type: ClusterIP

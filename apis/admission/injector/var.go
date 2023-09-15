@@ -1,8 +1,6 @@
 package injector
 
 import (
-	"fmt"
-
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +30,7 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceJsImageKey)
 	}
 
-	logfwdAppImage = func() string {
+	logfwdImage = func() string {
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
 
@@ -47,14 +45,15 @@ var (
 	profilerGolangImage = func() string {
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerGolangImageKey)
 	}
+)
 
+var (
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return config.Cfg.AdmissionInject.DDTrace.Envs()
 	}
 
 	ddtraceEnvObjects = func() []corev1.EnvVar {
 		envs := ddtraceEnvs()
-		fmt.Println(envs)
 		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
 	}
 
@@ -64,6 +63,15 @@ var (
 
 	profilerEnvObjects = func() []corev1.EnvVar {
 		envs := profilerEnvs()
+		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
+	}
+
+	logfwdEnvs = func() []struct{ Key, Value string } {
+		return config.Cfg.AdmissionInject.Logfwd.Envs()
+	}
+
+	logfwdEnvObjects = func() []corev1.EnvVar {
+		envs := logfwdEnvs()
 		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
 	}
 )
