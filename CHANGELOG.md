@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0] - 2023-09-13
+
+- 支持以 Kubernetes DownloadAPI FieldRef 的方式配置环境变量 (#26)
+- ddtrace 默认添加 DD_TAGS (#26)
+
 ## [1.3.1] - 2023-08-24
 
 - 更新默认 Profiler image
