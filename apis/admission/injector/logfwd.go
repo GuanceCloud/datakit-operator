@@ -14,10 +14,7 @@ import (
 const (
 	logfwdContainerName          = "datakit-logfwd"
 	logfwdInstancesAnnotationKey = "admission.datakit/logfwd.instances"
-
-	logfwdJSONConfigKey   = "LOGFWD_JSON_CONFIG"
-	logfwdPodNameKey      = "LOGFWD_POD_NAME"
-	logfwdPodNamespaceKey = "LOGFWD_POD_NAMESPACE"
+	logfwdJSONConfigKey          = "LOGFWD_JSON_CONFIG"
 )
 
 type logfwdConfig struct {
@@ -62,7 +59,7 @@ func (r *logfwdResource) process() {
 		return
 	}
 
-	image := logfwdAppImage()
+	image := logfwdImage()
 	config, volumePaths, shouldInject := r.extractInfo()
 	if !shouldInject {
 		return
@@ -79,7 +76,9 @@ func (r *logfwdResource) process() {
 	r.injectVolumeMount(volumeNames, volumePaths)
 
 	// Then create a logfwd container, the container needs to be ReadOnly.
-	r.injectContainer(image, config, volumeNames, volumePaths)
+	envs := logfwdEnvObjects()
+	envs = append(envs, corev1.EnvVar{Name: logfwdJSONConfigKey, Value: config})
+	r.injectContainer(image, envs, volumeNames, volumePaths)
 }
 
 func (r *logfwdResource) checkIfNeedsOperation() bool {
@@ -154,35 +153,12 @@ func (r *logfwdResource) injectVolumeMount(volumeNames, volumePaths []string) {
 	}
 }
 
-func (r *logfwdResource) injectContainer(image, config string, volumeNames, volumePaths []string) {
+func (r *logfwdResource) injectContainer(image string, envs []corev1.EnvVar, volumeNames, volumePaths []string) {
 	container := corev1.Container{
 		Name:            logfwdContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Env: []corev1.EnvVar{
-			{
-				Name:  logfwdJSONConfigKey,
-				Value: config,
-			},
-			{
-				Name: logfwdPodNameKey,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			{
-				Name: logfwdPodNamespaceKey,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
-		},
+		Env:             envs,
 		Resources: corev1.ResourceRequirements{
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceCPU:    resource.MustParse("200m"),

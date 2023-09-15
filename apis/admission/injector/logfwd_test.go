@@ -10,7 +10,14 @@ import (
 )
 
 func TestInjectLogfwd(t *testing.T) {
-	logfwdAppImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
+	logfwdImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
+	logfwdEnvs = func() []struct{ Key, Value string } {
+		return []struct{ Key, Value string }{
+			{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
+			{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
+			{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
+		}
+	}
 
 	var instances = `[
     {
@@ -80,15 +87,10 @@ func TestInjectLogfwd(t *testing.T) {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{
-									Name:  "LOGFWD_JSON_CONFIG",
-									Value: instancesCompact,
-								},
-								{
 									Name: "LOGFWD_POD_NAME",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.name",
+											FieldPath: "metadata.name",
 										},
 									},
 								},
@@ -96,10 +98,21 @@ func TestInjectLogfwd(t *testing.T) {
 									Name: "LOGFWD_POD_NAMESPACE",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.namespace",
+											FieldPath: "metadata.namespace",
 										},
 									},
+								},
+								{
+									Name: "LOGFWD_GLOBAL_SERVICE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.labels['app']",
+										},
+									},
+								},
+								{
+									Name:  "LOGFWD_JSON_CONFIG",
+									Value: instancesCompact,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
