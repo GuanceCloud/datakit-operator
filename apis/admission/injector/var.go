@@ -30,7 +30,7 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceJsImageKey)
 	}
 
-	logfwdAppImage = func() string {
+	logfwdImage = func() string {
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
 
@@ -45,7 +45,9 @@ var (
 	profilerGolangImage = func() string {
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerGolangImageKey)
 	}
+)
 
+var (
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return config.Cfg.AdmissionInject.DDTrace.Envs()
 	}
@@ -61,6 +63,15 @@ var (
 
 	profilerEnvObjects = func() []corev1.EnvVar {
 		envs := profilerEnvs()
+		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
+	}
+
+	logfwdEnvs = func() []struct{ Key, Value string } {
+		return config.Cfg.AdmissionInject.Logfwd.Envs()
+	}
+
+	logfwdEnvObjects = func() []corev1.EnvVar {
+		envs := logfwdEnvs()
 		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
 	}
 )
