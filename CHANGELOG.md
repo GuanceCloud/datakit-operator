@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.1] - 2023-09-15
+
+- 支持给 logfwd 注入环境变量 (#27)
+
 ## [1.4.0] - 2023-09-13
 
 - 支持以 Kubernetes DownloadAPI FieldRef 的方式配置环境变量 (#26)
