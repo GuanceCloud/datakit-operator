@@ -1,8 +1,6 @@
 package injector
 
 import (
-	"fmt"
-
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
 	corev1 "k8s.io/api/core/v1"
@@ -54,7 +52,6 @@ var (
 
 	ddtraceEnvObjects = func() []corev1.EnvVar {
 		envs := ddtraceEnvs()
-		fmt.Println(envs)
 		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
 	}
 
