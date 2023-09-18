@@ -39,7 +39,7 @@ data:
 
                     "POD_NAME":      "{fieldRef:metadata.name}",
                     "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
-                    "NODE_NAME":     "{fieldRef:status.nodeName}"
+                    "NODE_NAME":     "{fieldRef:spec.nodeName}"
                 }
             },
             "logfwd": {
