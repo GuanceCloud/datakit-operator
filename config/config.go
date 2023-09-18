@@ -47,11 +47,27 @@ func loadEnvs(c *Configuration) {
 	}
 
 	if v := os.Getenv("ENV_DD_AGENT_HOST"); v != "" {
-		c.AdmissionInject.DDTrace.Environments["DD_AGENT_HOST"] = v
+		for idx, item := range c.AdmissionInject.DDTrace.Environments {
+			key, ok := item.Key.(string)
+			if !ok {
+				continue
+			}
+			if key == "DD_AGENT_HOST" {
+				c.AdmissionInject.DDTrace.Environments[idx].Value = v
+			}
+		}
 	}
 
 	if v := os.Getenv("ENV_DD_TRACE_AGENT_PORT"); v != "" {
-		c.AdmissionInject.DDTrace.Environments["DD_TRACE_AGENT_PORT"] = v
+		for idx, item := range c.AdmissionInject.DDTrace.Environments {
+			key, ok := item.Key.(string)
+			if !ok {
+				continue
+			}
+			if key == "DD_TRACE_AGENT_PORT" {
+				c.AdmissionInject.DDTrace.Environments[idx].Value = v
+			}
+		}
 	}
 
 	if v := os.Getenv("ENV_DD_JAVA_AGENT_IMAGE"); v != "" {
