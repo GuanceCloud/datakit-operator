@@ -45,12 +45,11 @@ configmap:
                     "DD_AGENT_HOST":           "datakit-service.datakit.svc",
                     "DD_TRACE_AGENT_PORT":     "9529",
                     "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc",
-                    "DD_JMXFETCH_STATSD_PORT": "8125"
-                    "DD_TAGS":                 "pod_name:${POD_NAME},pod_namespace:${POD_NAMESPACE},host:${NODE_NAME}",
-
-                    "POD_NAME":      "{fieldRef:metadata.name}",
-                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
-                    "NODE_NAME":     "{fieldRef:status.nodeName}"
+                    "DD_JMXFETCH_STATSD_PORT": "8125",
+                    "POD_NAME":                "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
+                    "NODE_NAME":               "{fieldRef:spec.nodeName}",
+                    "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
                 }
             },
             "logfwd": {

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"sort"
+	"github.com/ake-persson/mapslice-json"
 )
 
 const (
@@ -38,7 +38,7 @@ type Envs []struct{ Key, Value string }
 
 type ContainerConfig struct {
 	Images       map[string]string `json:"images"`
-	Environments map[string]string `json:"envs"`
+	Environments mapslice.MapSlice `json:"envs"`
 	envs         Envs
 }
 
@@ -48,7 +48,7 @@ func (c ContainerConfig) Envs() Envs               { return c.envs }
 func newContainerConfig() ContainerConfig {
 	return ContainerConfig{
 		Images:       make(map[string]string),
-		Environments: make(map[string]string),
+		Environments: mapslice.MapSlice{},
 	}
 }
 
@@ -57,15 +57,15 @@ func (c *ContainerConfig) fillEnvs() {
 		return
 	}
 
-	var keys []string
-	for key := range c.Environments {
-		keys = append(keys, key)
-	}
-
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		value := c.Environments[key]
+	for _, item := range c.Environments {
+		key, ok := item.Key.(string)
+		if !ok {
+			continue
+		}
+		value, ok := item.Value.(string)
+		if !ok {
+			continue
+		}
 		c.envs = append(c.envs, struct{ Key, Value string }{key, value})
 	}
 }
