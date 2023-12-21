@@ -54,7 +54,7 @@ configmap:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.15.2"
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.16.0"
                 },
                 "envs": {
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
