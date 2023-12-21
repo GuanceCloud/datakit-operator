@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"github.com/mattbaird/jsonpatch"
+	// jsonpatch "github.com/herkyl/patchwerk"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,7 +103,7 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		if err != nil {
 			break
 		}
-		err = mutatePod("", &pod)
+		err = mutatePod(getGenerateName(pod.GenerateName), &pod)
 		resource = pod
 
 	default:
@@ -125,4 +127,11 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 	}
 
 	return json.Marshal(patchs)
+}
+
+func getGenerateName(name string) string {
+	if name[len(name)-1] == '-' {
+		return name[:len(name)-1]
+	}
+	return name
 }
