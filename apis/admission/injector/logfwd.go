@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
 	corev1 "k8s.io/api/core/v1"
@@ -116,13 +115,8 @@ func (r *logfwdResource) extractInfo() (string, []string, bool) {
 	var paths []string
 	for _, cfg := range configs {
 		for _, logging := range cfg.Loggings {
-			for _, file := range logging.LogFiles {
-				paths = append(paths, filepath.Dir(file))
-			}
-
-			for _, ignoreFile := range logging.Ignore {
-				paths = append(paths, filepath.Dir(ignoreFile))
-			}
+			paths = append(paths, getMountPaths(logging.LogFiles)...)
+			paths = append(paths, getMountPaths(logging.Ignore)...)
 		}
 	}
 

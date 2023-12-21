@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/ake-persson/mapslice-json v0.0.0-20210720081907-22c8edf57807
 	github.com/luci/go-render v0.0.0-20160219211803-9a04cc21af0f
-	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
+	github.com/mattbaird/jsonpatch v0.0.0-20230413205102-771768614e91
 	github.com/stretchr/testify v1.8.2
 	gitlab.jiagouyun.com/cloudcare-tools/cliutils v0.0.0-20220928075050-6a94ccf938f8
 	k8s.io/api v0.25.4
@@ -14,6 +14,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
