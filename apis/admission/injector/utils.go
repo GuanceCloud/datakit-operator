@@ -1,6 +1,9 @@
 package injector
 
-import "strings"
+import (
+	"path/filepath"
+	"strings"
+)
 
 func Unique(slice []string) []string {
 	var uniqMap = make(map[string]struct{})
@@ -53,4 +56,22 @@ func ParseImage(image string) (string, string, string) {
 	}
 
 	return imageName, shortName, imageVersion
+}
+
+func getMountPaths(paths []string) []string {
+	var res []string
+	for _, path := range paths {
+		if s := getMountPath(path); s != "" {
+			res = append(res, s)
+		}
+	}
+	return res
+}
+
+func getMountPath(path string) string {
+	arr := strings.Split(path, "*")
+	if len(arr) != 0 {
+		return filepath.Clean(filepath.Dir(arr[0]))
+	}
+	return ""
 }
