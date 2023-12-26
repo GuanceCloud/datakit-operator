@@ -10,6 +10,7 @@ import (
 )
 
 func TestInjectLogfwd(t *testing.T) {
+	logfwdReuseExistVolume = func() bool { return true }
 	logfwdImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
 	logfwdEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -56,6 +57,21 @@ func TestInjectLogfwd(t *testing.T) {
 						{
 							Name:  "nginx",
 							Image: "nginx:1.22",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "exist-mount",
+									MountPath: "/var/log/nginx/success",
+									ReadOnly:  false,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "exist-mount",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
 						},
 					},
 				},
@@ -72,9 +88,15 @@ func TestInjectLogfwd(t *testing.T) {
 							Image: "nginx:1.22",
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "datakit-logfwd-volume-0",
+									Name:      "exist-mount",
 									MountPath: "/var/log/nginx/success",
+									ReadOnly:  false,
 								},
+								// {
+								// 	// reuse exist-mount
+								// 	Name:      "datakit-logfwd-volume-0",
+								// 	MountPath: "/var/log/nginx/success",
+								// },
 								{
 									Name:      "datakit-logfwd-volume-1",
 									MountPath: "/var/log/nginx/error",
@@ -117,7 +139,9 @@ func TestInjectLogfwd(t *testing.T) {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "datakit-logfwd-volume-0",
+									// reuse exist-mount
+									// Name: "datakit-logfwd-volume-0",
+									Name:      "exist-mount",
 									MountPath: "/var/log/nginx/success",
 									ReadOnly:  true,
 								},
@@ -141,11 +165,17 @@ func TestInjectLogfwd(t *testing.T) {
 					},
 					Volumes: []corev1.Volume{
 						{
-							Name: "datakit-logfwd-volume-0",
+							Name: "exist-mount",
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
+						// {
+						// 	Name: "datakit-logfwd-volume-0",
+						// 	VolumeSource: corev1.VolumeSource{
+						// 		EmptyDir: &corev1.EmptyDirVolumeSource{},
+						// 	},
+						// },
 						{
 							Name: "datakit-logfwd-volume-1",
 							VolumeSource: corev1.VolumeSource{
