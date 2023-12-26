@@ -9,7 +9,8 @@ const (
 	DDTracePythonImageKey = "python_agent_image"
 	DDTraceJsImageKey     = "js_agent_image"
 
-	LogfwdImageKey = "logfwd_image"
+	LogfwdImageKey            = "logfwd_image"
+	LogfwdReuseExistVolumeOpt = "reuse_exist_volume"
 
 	ProfilerJavaImageKey   = "java_profiler_image"
 	ProfilerPythonImageKey = "python_profiler_image"
@@ -37,16 +38,19 @@ func (c *AdmissionInjectConfig) setup() {
 type Envs []struct{ Key, Value string }
 
 type ContainerConfig struct {
+	Options      map[string]string `json:"options,omitempty"`
 	Images       map[string]string `json:"images"`
 	Environments mapslice.MapSlice `json:"envs"`
 	envs         Envs
 }
 
-func (c ContainerConfig) Image(name string) string { return c.Images[name] }
-func (c ContainerConfig) Envs() Envs               { return c.envs }
+func (c ContainerConfig) Image(name string) string  { return c.Images[name] }
+func (c ContainerConfig) Option(name string) string { return c.Options[name] }
+func (c ContainerConfig) Envs() Envs                { return c.envs }
 
 func newContainerConfig() ContainerConfig {
 	return ContainerConfig{
+		Options:      make(map[string]string),
 		Images:       make(map[string]string),
 		Environments: mapslice.MapSlice{},
 	}
