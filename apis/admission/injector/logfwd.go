@@ -59,18 +59,22 @@ func (r *logfwdResource) process() {
 	}
 
 	image := logfwdImage()
-	config, volumePaths, shouldInject := r.extractInfo()
+	config, needVolumePaths, shouldInject := r.extractInfo()
 	if !shouldInject {
 		return
 	}
 
-	var volumeNames []string
-	for idx := range volumePaths {
-		volumeNames = append(volumeNames, fmt.Sprintf("datakit-logfwd-volume-%d", idx))
+	if !logfwdReuseExistVolume() {
+		unique, name, path := r.checkVolumeUnique(needVolumePaths)
+		if !unique {
+			l.Warnf("The volumeMounts must be unique, found %s(%s) on %s, please enable 'reuse_exist_volume'.",
+				path, name, r.parent)
+			return
+		}
 	}
 
+	volumeNames, volumePaths := r.getVolumePairs(logfwdReuseExistVolume(), needVolumePaths)
 	r.injectVolume(volumeNames)
-
 	// First, add volumeMount to the main container.
 	r.injectVolumeMount(volumeNames, volumePaths)
 
@@ -174,4 +178,43 @@ func (r *logfwdResource) injectContainer(image string, envs []corev1.EnvVar, vol
 	}
 
 	manager.NewContainerManager(r.pod).AddContainer(&container)
+}
+
+func (r *logfwdResource) getVolumePairs(reuse bool, needVolumePaths []string) (volumeNames, volumePaths []string) {
+	volumePaths = needVolumePaths
+
+	if !reuse {
+		for idx := range needVolumePaths {
+			volumeNames = append(volumeNames, fmt.Sprintf("datakit-logfwd-volume-%d", idx))
+		}
+		return
+	}
+
+	volumeManager := manager.NewVolumeManager(r.pod)
+	volumeMountManager := manager.NewVolumeMountManager(r.pod)
+
+	for idx := range needVolumePaths {
+		name := volumeMountManager.ContainsVolumeMountInContainer(needVolumePaths[idx])
+
+		if name != "" && volumeManager.IsEmptyDirVolume(name) {
+			l.Infof("Reuse volume %s for mountPath %s on %s", name, needVolumePaths[idx], r.parent)
+		} else {
+			name = fmt.Sprintf("datakit-logfwd-volume-%d", idx)
+		}
+
+		volumeNames = append(volumeNames, name)
+	}
+
+	return
+}
+
+func (r *logfwdResource) checkVolumeUnique(needVolumePaths []string) (bool, string, string) {
+	volumeMountManager := manager.NewVolumeMountManager(r.pod)
+	for idx := range needVolumePaths {
+		name := volumeMountManager.ContainsVolumeMountInContainer(needVolumePaths[idx])
+		if name != "" { // found equal path, not unique.
+			return false, name, needVolumePaths[idx]
+		}
+	}
+	return true, "", ""
 }

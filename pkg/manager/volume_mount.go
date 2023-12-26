@@ -8,6 +8,7 @@ type VolumeMountManager interface {
 	AddVolumeMount(newVolumeMount *corev1.VolumeMount)
 	AddVolumeMountToContainer(containerName string, newVolumeMount *corev1.VolumeMount)
 	AddVolumeMountToInitContainer(containerName string, newVolumeMount *corev1.VolumeMount)
+	ContainsVolumeMountInContainer(mountPath string) (name string)
 }
 
 func NewVolumeMountManager(pod *corev1.Pod) VolumeMountManager {
@@ -38,6 +39,17 @@ func (m *volumeMountManager) AddVolumeMountToInitContainer(containerName string,
 			_ = AddVolumeMountToContainer(&m.pod.Spec.InitContainers[idx], newVolumeMount)
 		}
 	}
+}
+
+func (m *volumeMountManager) ContainsVolumeMountInContainer(mountPath string) (name string) {
+	for idx := range m.pod.Spec.Containers {
+		for _, mount := range m.pod.Spec.Containers[idx].VolumeMounts {
+			if mount.MountPath == mountPath {
+				return mount.Name
+			}
+		}
+	}
+	return ""
 }
 
 func AddVolumeMountToContainer(container *corev1.Container, newVolumeMount *corev1.VolumeMount) []corev1.VolumeMount {

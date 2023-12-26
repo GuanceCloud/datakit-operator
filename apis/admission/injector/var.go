@@ -34,6 +34,10 @@ var (
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
 
+	logfwdReuseExistVolume = func() bool {
+		return config.Cfg.AdmissionInject.Logfwd.Option(config.LogfwdReuseExistVolumeOpt) == "true"
+	}
+
 	profilerJavaImage = func() string {
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerJavaImageKey)
 	}
