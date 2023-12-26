@@ -42,6 +42,9 @@ data:
                 }
             },
             "logfwd": {
+		"options": {
+                    "reuse_exist_volume": "true"
+		},
                 "images": {
                     "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.16.0"
                 },
