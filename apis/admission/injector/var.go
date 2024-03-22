@@ -9,15 +9,20 @@ import (
 type language string
 
 const (
+	null   language = ""
 	java   language = "java"
 	golang language = "golang"
-	js     language = "js"
+	nodejs language = "js"
 	python language = "python"
 )
 
 const enableEnvFieldRef = true
 
 var (
+	ddtraceEnabledNamespaces = func(ns string) string {
+		return config.Cfg.AdmissionInject.DDTrace.MatchNamespace(ns)
+	}
+
 	ddtraceJavaAgentImage = func() string {
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceJavaImageKey)
 	}
@@ -26,8 +31,8 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTracePythonImageKey)
 	}
 
-	ddtraceJsAgentImage = func() string {
-		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceJsImageKey)
+	ddtraceNodejsAgentImage = func() string {
+		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceNodejsImageKey)
 	}
 
 	logfwdImage = func() string {
