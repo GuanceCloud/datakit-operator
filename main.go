@@ -31,7 +31,7 @@ func main() {
 	log.Info("load configuration successfully")
 
 	initlogger()
-	log.Info("datakit-operator start")
+	log.Info("datakit-operator start..")
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
