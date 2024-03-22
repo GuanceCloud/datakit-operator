@@ -12,23 +12,12 @@ import (
 const (
 	ddtraceInitContainerName          = "datakit-lib-init"
 	ddtraceVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
-	ddtraceVolumeName                 = "datakit-auto-instrument"
-	ddtraceMountPath                  = "/datadog-lib"
 
-	// Java config
-	javaToolOptionsKey   = "JAVA_TOOL_OPTIONS"
-	javaToolOptionsValue = " -javaagent:/datadog-lib/dd-java-agent.jar"
-
-	// Node config
-	nodeOptionsKey   = "NODE_OPTIONS"
-	nodeOptionsValue = " --require=/datadog-lib/node_modules/dd-trace/init"
-
-	// Python config
-	pythonPathKey   = "PYTHONPATH"
-	pythonPathValue = "/datadog-lib/"
+	ddtraceVolumeName = "datakit-auto-instrument"
+	ddtraceMountPath  = "/datadog-lib"
 )
 
-var supportedLanguagesForDDTrace = []language{java, js, python}
+var supportedLanguagesForDDTrace = []language{java, python, nodejs}
 
 func InjectDDTraceToPod(parent string, pod *corev1.Pod) error {
 	if pod == nil {
@@ -53,59 +42,200 @@ func newDDTraceResource(parent string, pod *corev1.Pod) *ddtraceResource {
 }
 
 func (r *ddtraceResource) process() {
-	if !r.checkIfNeedsOperation() {
+	should, lang, imageVersion := r.shouldInjectLib()
+	if !should {
 		return
 	}
 
-	lang, image, shouldInject := r.extractInfo()
-	if !shouldInject {
-		return
-	}
-	r.injectInitContainer(image)
+	var lib ddtraceLibrary
 
-	var err error
 	switch lang {
 	case java:
-		err = r.injectConfig(javaToolOptionsKey, javaEnvValFunc)
-	case js:
-		err = r.injectConfig(nodeOptionsKey, jsEnvValFunc)
+		lib = &ddtraceJava{}
+	case nodejs:
+		lib = &ddtraceNodejs{}
 	case python:
-		err = r.injectConfig(pythonPathKey, pythonEnvValFunc)
+		lib = &ddtracePython{}
 	default:
-		err = fmt.Errorf("language %s is no supported, only supported %v", lang, supportedLanguagesForDDTrace)
+		l.Warnf("Language %s is no supported, only supported %v", lang, supportedLanguagesForDDTrace)
+		return
 	}
 
-	if err != nil {
+	image := lib.joinReleaseImage(imageVersion)
+	l.Infof("Use of ddtrace %s-lib image %s to %s for namespace %s", lang, image, r.parent, r.pod.Namespace)
+
+	// must be nil
+	_ = lib.injectInitContainer(r.pod, image)
+	if err := lib.injectConfig(r.pod); err != nil {
 		l.Warnf("Unable to inject DDTrace into %s, err: %s", r.parent, err)
 		return
 	}
 
-	r.injectVolume()
-	r.injectEnvs(ddtraceEnvObjects())
+	r.injectGlobalVolume()
+	r.injectGlobalEnvs(ddtraceEnvObjects())
 }
 
-func (r *ddtraceResource) checkIfNeedsOperation() bool {
-	return !manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName)
-}
+func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
+	if manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName) {
+		return false, null, ""
+	}
 
-func (r *ddtraceResource) extractInfo() (language, string, bool) {
 	annotations := r.pod.GetAnnotations()
-
 	for _, lang := range supportedLanguagesForDDTrace {
 		versionAnnotation := strings.ToLower(fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang))
-
 		if imageVersion, found := annotations[versionAnnotation]; found {
-			image := ddtraceReleaseImage(lang, imageVersion)
-			l.Infof("Use of %s-agent image %s to %s", lang, image, r.parent)
-
-			return lang, image, true
+			return true, lang, imageVersion
 		}
 	}
 
-	return "", "", false
+	lang := ddtraceEnabledNamespaces(r.pod.Namespace)
+	switch language(lang) {
+	case java, python, nodejs:
+		return true, language(lang), ""
+	default:
+		//nil
+	}
+
+	return false, null, ""
 }
 
-func (r *ddtraceResource) injectInitContainer(image string) {
+func (r *ddtraceResource) injectGlobalVolume() {
+	volume := corev1.Volume{
+		Name: ddtraceVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	manager.NewVolumeManager(r.pod).AddVolume(&volume)
+}
+
+func (r *ddtraceResource) injectGlobalEnvs(envs []corev1.EnvVar) {
+	m := manager.NewEnvVarManager(r.pod)
+	for idx := range envs {
+		m.AddEnvVar(&envs[idx])
+	}
+}
+
+type ddtraceLibrary interface {
+	joinReleaseImage(imageVersion string) string
+	injectInitContainer(pod *corev1.Pod, image string) error
+	injectConfig(pod *corev1.Pod) error
+}
+
+//
+// ddtraceJava
+//
+
+type ddtraceJava struct{}
+
+func (d *ddtraceJava) joinReleaseImage(imageVersion string) string {
+	return replaceImageVersion(ddtraceJavaAgentImage(), imageVersion)
+}
+
+func (d *ddtraceJava) injectInitContainer(pod *corev1.Pod, image string) error {
+	return injectDDTraceInitContainer(pod, image)
+}
+
+func (d *ddtraceJava) injectConfig(pod *corev1.Pod) error {
+	// Java config
+	const (
+		javaToolOptionsKey   = "JAVA_TOOL_OPTIONS"
+		javaToolOptionsValue = " -javaagent:/datadog-lib/dd-java-agent.jar"
+	)
+
+	envValFunc := func(predefinedVal string) string {
+		return predefinedVal + javaToolOptionsValue
+	}
+	return injectDDTraceConfig(pod, javaToolOptionsKey, envValFunc)
+}
+
+//
+// ddtracePython
+//
+
+type ddtracePython struct{}
+
+func (d *ddtracePython) joinReleaseImage(imageVersion string) string {
+	return replaceImageVersion(ddtracePythonAgentImage(), imageVersion)
+}
+
+func (d *ddtracePython) injectInitContainer(pod *corev1.Pod, image string) error {
+	return injectDDTraceInitContainer(pod, image)
+}
+
+func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
+	// Python config
+	const (
+		pythonPathKey   = "PYTHONPATH"
+		pythonPathValue = "/datadog-lib/"
+	)
+
+	envValFunc := func(predefinedVal string) string {
+		if predefinedVal == "" {
+			return pythonPathValue
+		}
+		return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
+	}
+	return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
+}
+
+//
+// ddtraceNodejs
+//
+
+type ddtraceNodejs struct{}
+
+func (d *ddtraceNodejs) joinReleaseImage(imageVersion string) string {
+	return replaceImageVersion(ddtraceNodejsAgentImage(), imageVersion)
+}
+
+func (d *ddtraceNodejs) injectInitContainer(pod *corev1.Pod, image string) error {
+	return injectDDTraceInitContainer(pod, image)
+}
+
+func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
+	// Nodejs config
+	const (
+		nodejsOptionsKey   = "NODE_OPTIONS"
+		nodejsOptionsValue = " --require=/datadog-lib/node_modules/dd-trace/init"
+	)
+
+	envValFunc := func(predefinedVal string) string {
+		return predefinedVal + nodejsOptionsValue
+	}
+	return injectDDTraceConfig(pod, nodejsOptionsKey, envValFunc)
+}
+
+func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) string) error {
+	podSpec := pod.Spec
+	for i, container := range podSpec.Containers {
+		index := envIndex(container.Env, envKey)
+
+		if index < 0 {
+			podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{
+				Name:  envKey,
+				Value: envVal(""),
+			})
+		} else {
+			if podSpec.Containers[i].Env[index].ValueFrom != nil {
+				return fmt.Errorf("%q is defined via ValueFrom", envKey)
+			}
+
+			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
+		}
+
+		if !manager.NewVolumeMountManager(pod).ContainsVolumeMountInContainer(ddtraceVolumeName) {
+			podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
+				corev1.VolumeMount{
+					Name:      ddtraceVolumeName,
+					MountPath: ddtraceMountPath,
+				})
+		}
+	}
+	return nil
+}
+
+func injectDDTraceInitContainer(pod *corev1.Pod, image string) error {
 	container := corev1.Container{
 		Name:            ddtraceInitContainerName,
 		Image:           image,
@@ -128,50 +258,16 @@ func (r *ddtraceResource) injectInitContainer(image string) {
 			},
 		},
 	}
-	manager.NewContainerManager(r.pod).AddInitContainer(&container)
-}
-func (r *ddtraceResource) injectConfig(envKey string, envVal envValFunc) error {
-	podSpec := r.pod.Spec
-	for i, container := range podSpec.Containers {
-		index := envIndex(container.Env, envKey)
-
-		if index < 0 {
-			podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{
-				Name:  envKey,
-				Value: envVal(""),
-			})
-		} else {
-			if podSpec.Containers[i].Env[index].ValueFrom != nil {
-				return fmt.Errorf("%q is defined via ValueFrom", envKey)
-			}
-
-			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
-		}
-
-		podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      ddtraceVolumeName,
-				MountPath: ddtraceMountPath,
-			})
-	}
+	manager.NewContainerManager(pod).AddInitContainer(&container)
 	return nil
 }
 
-func (r *ddtraceResource) injectVolume() {
-	volume := corev1.Volume{
-		Name: ddtraceVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
+func replaceImageVersion(image, imageVersion string) string {
+	if imageVersion == "" {
+		return image
 	}
-	manager.NewVolumeManager(r.pod).AddVolume(&volume)
-}
-
-func (r *ddtraceResource) injectEnvs(envs []corev1.EnvVar) {
-	m := manager.NewEnvVarManager(r.pod)
-	for idx := range envs {
-		m.AddEnvVar(&envs[idx])
-	}
+	imageName, _, _ := ParseImage(image)
+	return fmt.Sprintf("%s:%s", imageName, imageVersion)
 }
 
 func envIndex(envs []corev1.EnvVar, name string) int {
@@ -181,43 +277,4 @@ func envIndex(envs []corev1.EnvVar, name string) int {
 		}
 	}
 	return -1
-}
-
-type envValFunc func(string) string
-
-func javaEnvValFunc(predefinedVal string) string {
-	return predefinedVal + javaToolOptionsValue
-}
-
-func jsEnvValFunc(predefinedVal string) string {
-	return predefinedVal + nodeOptionsValue
-}
-
-func pythonEnvValFunc(predefinedVal string) string {
-	if predefinedVal == "" {
-		return pythonPathValue
-	}
-	return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
-}
-
-func ddtraceReleaseImage(lang language, imageVersion string) string {
-	var image string
-
-	switch lang {
-	case java:
-		image = ddtraceJavaAgentImage()
-	case python:
-		image = ddtracePythonAgentImage()
-	case js:
-		image = ddtraceJsAgentImage()
-	default:
-		return ""
-	}
-
-	if imageVersion == "" {
-		return image
-	}
-
-	imageName, _, _ := ParseImage(image)
-	return fmt.Sprintf("%s:%s", imageName, imageVersion)
 }
