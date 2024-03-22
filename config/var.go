@@ -7,9 +7,10 @@ import (
 const (
 	DDTraceJavaImageKey   = "java_agent_image"
 	DDTracePythonImageKey = "python_agent_image"
-	DDTraceJsImageKey     = "js_agent_image"
+	DDTraceNodejsImageKey = "js_agent_image"
 
-	LogfwdImageKey = "logfwd_image"
+	LogfwdImageKey            = "logfwd_image"
+	LogfwdReuseExistVolumeOpt = "reuse_exist_volume"
 
 	ProfilerJavaImageKey   = "java_profiler_image"
 	ProfilerPythonImageKey = "python_profiler_image"
@@ -36,17 +37,31 @@ func (c *AdmissionInjectConfig) setup() {
 
 type Envs []struct{ Key, Value string }
 
+type EnabledNamespace struct{ Namespace, Language string }
+
 type ContainerConfig struct {
-	Images       map[string]string `json:"images"`
-	Environments mapslice.MapSlice `json:"envs"`
-	envs         Envs
+	EnabledNamespaces []EnabledNamespace `json:"enabled_namespaces,omitempty"`
+	Options           map[string]string  `json:"options,omitempty"`
+	Images            map[string]string  `json:"images"`
+	Environments      mapslice.MapSlice  `json:"envs"`
+	envs              Envs
 }
 
-func (c ContainerConfig) Image(name string) string { return c.Images[name] }
-func (c ContainerConfig) Envs() Envs               { return c.envs }
+func (c ContainerConfig) Image(name string) string  { return c.Images[name] }
+func (c ContainerConfig) Option(name string) string { return c.Options[name] }
+func (c ContainerConfig) Envs() Envs                { return c.envs }
+func (c ContainerConfig) MatchNamespace(ns string) string {
+	for _, s := range c.EnabledNamespaces {
+		if s.Namespace == ns {
+			return s.Language
+		}
+	}
+	return ""
+}
 
 func newContainerConfig() ContainerConfig {
 	return ContainerConfig{
+		Options:      make(map[string]string),
 		Images:       make(map[string]string),
 		Environments: mapslice.MapSlice{},
 	}
