@@ -194,9 +194,9 @@ func (r *logfwdResource) getVolumePairs(reuse bool, needVolumePaths []string) (v
 	volumeMountManager := manager.NewVolumeMountManager(r.pod)
 
 	for idx := range needVolumePaths {
-		name := volumeMountManager.ContainsVolumeMountInContainer(needVolumePaths[idx])
+		exist, name := volumeMountManager.FindVolumeMountPathInContainer(needVolumePaths[idx])
 
-		if name != "" && volumeManager.IsEmptyDirVolume(name) {
+		if exist && volumeManager.IsEmptyDirVolume(name) {
 			l.Infof("Reuse volume %s for mountPath %s on %s", name, needVolumePaths[idx], r.parent)
 		} else {
 			name = fmt.Sprintf("datakit-logfwd-volume-%d", idx)
@@ -211,7 +211,7 @@ func (r *logfwdResource) getVolumePairs(reuse bool, needVolumePaths []string) (v
 func (r *logfwdResource) checkVolumeUnique(needVolumePaths []string) (bool, string, string) {
 	volumeMountManager := manager.NewVolumeMountManager(r.pod)
 	for idx := range needVolumePaths {
-		name := volumeMountManager.ContainsVolumeMountInContainer(needVolumePaths[idx])
+		_, name := volumeMountManager.FindVolumeMountPathInContainer(needVolumePaths[idx])
 		if name != "" { // found equal path, not unique.
 			return false, name, needVolumePaths[idx]
 		}

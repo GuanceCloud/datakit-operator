@@ -79,7 +79,7 @@ func loadEnvs(c *Configuration) {
 	}
 
 	if v := os.Getenv("ENV_DD_JS_AGENT_IMAGE"); v != "" {
-		c.AdmissionInject.DDTrace.Images[DDTraceJsImageKey] = v
+		c.AdmissionInject.DDTrace.Images[DDTraceNodejsImageKey] = v
 	}
 
 	if v := os.Getenv("ENV_LOGFWD_IMAGE"); v != "" {

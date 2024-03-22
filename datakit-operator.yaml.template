@@ -25,8 +25,9 @@ data:
         "log_level":     "info",
         "admission_inject": {
             "ddtrace": {
+                "enabled_namespaces": [],
                 "images": {
-                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.20.2-guance",
+                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.30.1-guance",
                     "python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
                     "js_agent_image":     "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2"
                 },
@@ -35,6 +36,7 @@ data:
                     "DD_TRACE_AGENT_PORT":     "9529",
                     "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc",
                     "DD_JMXFETCH_STATSD_PORT": "8125",
+                    "DD_SERVICE":              "{fieldRef:metadata.labels['service']}",
                     "POD_NAME":                "{fieldRef:metadata.name}",
                     "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
                     "NODE_NAME":               "{fieldRef:spec.nodeName}",
@@ -42,11 +44,11 @@ data:
                 }
             },
             "logfwd": {
-		"options": {
-                    "reuse_exist_volume": "true"
-		},
+                "options": {
+                    "reuse_exist_volume": "false"
+                },
                 "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.16.0"
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.26.0"
                 },
                 "envs": {
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
