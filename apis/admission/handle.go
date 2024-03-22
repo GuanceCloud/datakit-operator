@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/mattbaird/jsonpatch"
-	// jsonpatch "github.com/herkyl/patchwerk"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -130,6 +129,9 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 }
 
 func getGenerateName(name string) string {
+	if len(name) == 0 {
+		return "<no-one>"
+	}
 	if name[len(name)-1] == '-' {
 		return name[:len(name)-1]
 	}

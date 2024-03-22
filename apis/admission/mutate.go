@@ -11,8 +11,23 @@ import (
 
 type jsonPatch []byte
 
+const (
+	injectEnabled = "admission.datakit/enabled"
+)
+
+func abandonInject(annotations map[string]string) bool {
+	s, found := annotations[injectEnabled]
+	return found && s == "false"
+}
+
 func mutatePod(parent string, pod *corev1.Pod) error {
+	if abandonInject(pod.GetAnnotations()) {
+		l.Infof("The pod %s is abandoned", parent)
+		return nil
+	}
+
 	l.Debug("mutated pod")
+
 	if err := injector.InjectDDTraceToPod(parent, pod); err != nil {
 		return err
 	}

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0] - 2024-03-18
+
+- 支持在 Pod 上添加 Annotation `admission.datakit/enabled="false"` 关闭所有的注入，包括注入 ddtrace、logfwd 等（#39）
+- 支持给指定的 namespace 批量注入 ddtrace（#38）
+- 在注入 logfwd 时可以选择复用 volume，避免同路径多次挂载的报错问题（#34）
+
 ## [1.4.3] - 2023-12-21
 
 - 修复在注入 logfwd 时，如果 logfiles 写通配路径会导致 mount 错误的问题（#31）
