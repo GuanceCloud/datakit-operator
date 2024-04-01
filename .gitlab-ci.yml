@@ -45,7 +45,7 @@ release-stable:
     - make clean
     - make
     - make pub_image
-
+    - make pub_uos_image
 
 #release-helm-test:
 #  stage: deploy
