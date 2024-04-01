@@ -33,15 +33,15 @@ define build
 
 endef
 
-define image
+define build_image
 	@sed -e "s/{{HUB}}/$(2)/g" \
 		-e "s/{{VERSION}}/$(VERSION)/g" \
 		-e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
 		datakit-operator.yaml.template > datakit-operator.yaml
 	sudo docker buildx build --platform $(1) \
-		-t $(2)/datakit-operator/datakit-operator:$(VERSION) . --push
+		-t $(2)/datakit-operator/datakit-operator:$(VERSION) -f Dockerfile . --push
 	sudo docker buildx build --platform $(1) \
-		-t $(2)/datakit-operator/datakit-operator:latest . --push
+		-t $(2)/datakit-operator/datakit-operator:latest -f Dockerfile . --push
 endef
 
 define build_k8s_charts
@@ -75,12 +75,12 @@ local:
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
-	$(call image,$(IMAGE_ARCHS),pubrepo.guance.com)
+	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com)
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
 
 pub_testing_image:
-	$(call image,$(IMAGE_ARCHS),registry.jiagouyun.com)
+	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com)
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator-testing', registry.jiagouyun.com)
 
