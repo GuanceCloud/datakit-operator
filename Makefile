@@ -44,6 +44,13 @@ define build_image
 		-t $(2)/datakit-operator/datakit-operator:latest -f Dockerfile . --push
 endef
 
+define build_uos_image
+	sudo docker buildx build --platform $(1) \
+		-t $(2)/uos-dataflux/datakit-operator:$(VERSION) -f Dockerfile.uos . --push
+	sudo docker buildx build --platform $(1) \
+		-t $(2)/uos-dataflux/datakit-operator:latest -f Dockerfile.uos . --push
+endef
+
 define build_k8s_charts
 	@helm repo ls
 	@echo `echo $(VERSION) | cut -d'-' -f1`
@@ -78,6 +85,9 @@ pub_image:
 	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com)
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
+
+pub_uos_image:
+	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com)
 
 pub_testing_image:
 	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com)
