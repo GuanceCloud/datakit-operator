@@ -9,6 +9,7 @@ CERT_DIR      = self-certification
 ARCH_AMD64    = amd64
 ARCH_ARM64    = arm64
 IMAGE_ARCHS   = "linux/arm64,linux/amd64"
+IMAGE_AMD64   = "linux/amd64"
 GOLINT_BINARY = golangci-lint
 # UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
@@ -87,7 +88,7 @@ pub_image:
 	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
 
 pub_uos_image:
-	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com)
+	$(call build_uos_image,$(IMAGE_AMD64),pubrepo.guance.com)
 
 pub_testing_image:
 	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com)

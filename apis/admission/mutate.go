@@ -15,14 +15,13 @@ const (
 	injectEnabled = "admission.datakit/enabled"
 )
 
-func abandonInject(annotations map[string]string) bool {
+func shouldNotInject(annotations map[string]string) bool {
 	s, found := annotations[injectEnabled]
 	return found && s == "false"
 }
 
 func mutatePod(parent string, pod *corev1.Pod) error {
-	if abandonInject(pod.GetAnnotations()) {
-		l.Infof("The pod %s is abandoned", parent)
+	if shouldNotInject(pod.GetAnnotations()) {
 		return nil
 	}
 
