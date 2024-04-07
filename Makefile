@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.5.0
+VERSION=v1.5.1
 
 BIN           = datakit-operator
 ENTRY         = main.go
@@ -11,13 +11,35 @@ ARCH_ARM64    = arm64
 IMAGE_ARCHS   = "linux/arm64,linux/amd64"
 IMAGE_AMD64   = "linux/amd64"
 GOLINT_BINARY = golangci-lint
-# UNAME_M:=$(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
+# UNAME_S     = $(shell uname -s)
+# UNAME_M     = $(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
 SUPPORTED_GOLINT_VERSION         = 1.46.2
 SUPPORTED_GOLINT_VERSION_ANOTHER = v1.46.2
 
+# Make them evaluate(expand) only once
+DATE                   := $(shell date -u +'%Y-%m-%d %H:%M:%S')
+GOVERSION              := $(shell go version)
+COMMIT                 := $(shell git rev-parse --short HEAD)
+GIT_BRANCH             := $(shell git rev-parse --abbrev-ref HEAD)
 GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version | cut -c 27- | cut -d' ' -f1)
 GOLINT_VERSION_ERR_MSG := golangci-lint version($(GOLINT_VERSION)) is not supported, please use version $(SUPPORTED_GOLINT_VERSION)
+
+# Generate 'internal/git' package
+define GIT_INFO
+package git
+
+//nolint
+const (
+	BuildAt string = "$(DATE)"
+	Version string = "$(VERSION)"
+	Golang  string = "$(GOVERSION)"
+	Commit  string = "$(COMMIT)"
+	Branch  string = "$(GIT_BRANCH)"
+)
+endef
+export GIT_INFO
+
 
 define build
 	@rm -rf $(BUILD_DIR)/*
@@ -79,7 +101,7 @@ define upload
 	@bash upload.sh $(1) $(2) $(3) $(4) $(5)
 endef
 
-local:
+local: deps
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
@@ -100,6 +122,16 @@ lint:
 	@if [ $$? != 0 ]; then \
 		exit -1; \
 	fi
+
+deps: prepare gofmt
+
+# ignore files under vendor/.git/git
+gofmt:
+	@GO111MODULE=off gofmt -w -l $(shell find . -type f -name '*.go'| grep -v "/vendor/\|/.git/\|/git/\|.*_y.go\|packed-packr.go")
+
+prepare:
+	@mkdir -p internal/git
+	@echo "$$GIT_INFO" > pkg/git/git.go
 
 all_test:
 	#TODO
