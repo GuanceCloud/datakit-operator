@@ -6,6 +6,7 @@ import (
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/git"
 )
 
 var log = logger.DefaultSLogger("main")
@@ -32,6 +33,8 @@ func main() {
 
 	initlogger()
 	log.Info("datakit-operator start..")
+	log.Infof("buildAt: %s, version: %s, commit: %s, branch: %s",
+		git.BuildAt, git.Version, git.Commit, git.Branch)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
