@@ -241,3 +241,107 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
 	}
 }
+
+func TestInjectDDTraceForLabelSelectors(t *testing.T) {
+	ddtraceEnabledLabelSelectors = func(_ map[string]string) string { return "python" }
+	// not used namespaces
+	ddtraceEnabledNamespaces = func(_ string) string { return "java" }
+	ddtracePythonAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1" }
+
+	ddtraceEnvs = func() []struct{ Key, Value string } {
+		return []struct{ Key, Value string }{
+			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+		}
+	}
+
+	var testCases = []struct {
+		in  corev1.Pod
+		out corev1.Pod
+	}{
+		{
+			in: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testing-pod",
+					Namespace: "testing-namespace",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.22",
+						},
+					},
+				},
+			},
+			out: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testing-pod",
+					Namespace: "testing-namespace",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.22",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "datakit-auto-instrument",
+									MountPath: "/datadog-lib",
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PYTHONPATH",
+									Value: "/datadog-lib/",
+								},
+								{
+									Name:  "DD_AGENT_HOST",
+									Value: "datakit-service.datakit.svc",
+								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            "datakit-lib-init",
+							Image:           "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1",
+							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "datakit-auto-instrument",
+									MountPath: "/datadog-lib",
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "datakit-auto-instrument",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for idx := range testCases {
+		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
+		assert.NoError(t, err)
+
+		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
+	}
+}

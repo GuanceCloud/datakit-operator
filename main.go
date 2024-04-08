@@ -29,7 +29,7 @@ func main() {
 		log.Error(err)
 		return
 	}
-	log.Info("load configuration successfully")
+	log.Info("parse configuration successfully")
 
 	initlogger()
 	log.Info("datakit-operator start..")
