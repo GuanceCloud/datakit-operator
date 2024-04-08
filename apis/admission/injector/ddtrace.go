@@ -84,11 +84,20 @@ func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
 	for _, lang := range supportedLanguagesForDDTrace {
 		versionAnnotation := strings.ToLower(fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang))
 		if imageVersion, found := annotations[versionAnnotation]; found {
+			l.Debugf("ddtrace %s-lib finds annotation for %s", lang, r.parent)
 			return true, lang, imageVersion
 		}
 	}
 
-	lang := ddtraceEnabledNamespaces(r.pod.Namespace)
+	var lang string
+	if v := ddtraceEnabledLabelSelectors(r.pod.GetLabels()); v != "" {
+		lang = v
+		l.Debugf("ddtrace %s-lib finds labelSelector for %s", lang, r.parent)
+	} else {
+		lang = ddtraceEnabledNamespaces(r.pod.Namespace)
+		l.Debugf("ddtrace %s-lib finds namespace for %s", lang, r.parent)
+	}
+
 	switch language(lang) {
 	case java, python, nodejs:
 		return true, language(lang), ""

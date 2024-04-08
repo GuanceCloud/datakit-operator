@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.2] - 2024-04-08
+
+- 支持根据 labelSelector 批量注入 ddtrace（#41）
+
+## [1.5.1] - 2024-04-07
+
+- 在日志打印当前版本和编译信息（#41）
+
 ## [1.5.0] - 2024-03-18
 
 - 支持在 Pod 上添加 Annotation `admission.datakit/enabled="false"` 关闭所有的注入，包括注入 ddtrace、logfwd 等（#39）
