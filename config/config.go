@@ -4,9 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 )
 
-var Cfg = initDefaultConfiguration()
+var (
+	Cfg = initDefaultConfiguration()
+	log = logger.DefaultSLogger("config")
+)
+
+func initLog() {
+	log = logger.SLogger("config")
+}
 
 func initDefaultConfiguration() *Configuration {
 	return &Configuration{
@@ -19,6 +28,8 @@ func initDefaultConfiguration() *Configuration {
 }
 
 func LoadConfigWithEnv() error {
+	initLog()
+	log.Info("loading config..")
 	cfgStr := os.Getenv("ENV_JSON_CONFIG")
 	return parseConfig(cfgStr, Cfg)
 }
