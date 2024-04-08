@@ -23,6 +23,10 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.MatchNamespace(ns)
 	}
 
+	ddtraceEnabledLabelSelectors = func(labels map[string]string) string {
+		return config.Cfg.AdmissionInject.DDTrace.MatchLabelSelector(labels)
+	}
+
 	ddtraceJavaAgentImage = func() string {
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceJavaImageKey)
 	}

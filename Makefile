@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.5.1
+VERSION=v1.5.2
 
 BIN           = datakit-operator
 ENTRY         = main.go
@@ -25,11 +25,11 @@ GIT_BRANCH             := $(shell git rev-parse --abbrev-ref HEAD)
 GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version | cut -c 27- | cut -d' ' -f1)
 GOLINT_VERSION_ERR_MSG := golangci-lint version($(GOLINT_VERSION)) is not supported, please use version $(SUPPORTED_GOLINT_VERSION)
 
-# Generate 'internal/git' package
+# Generate 'pkg/git' package
 define GIT_INFO
 package git
 
-//nolint
+// nolint
 const (
 	BuildAt string = "$(DATE)"
 	Version string = "$(VERSION)"
@@ -117,7 +117,7 @@ pub_testing_image:
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator-testing', registry.jiagouyun.com)
 
-lint:
+lint: deps
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \
@@ -130,10 +130,10 @@ gofmt:
 	@GO111MODULE=off gofmt -w -l $(shell find . -type f -name '*.go'| grep -v "/vendor/\|/.git/\|/git/\|.*_y.go\|packed-packr.go")
 
 prepare:
-	@mkdir -p internal/git
+	@mkdir -p pkg/git
 	@echo "$$GIT_INFO" > pkg/git/git.go
 
-all_test:
+all_test: deps
 	#TODO
 
 clean:
