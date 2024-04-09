@@ -40,6 +40,10 @@ func TestInjectDDTrace(t *testing.T) {
 							Name:  "nginx",
 							Image: "nginx:1.22",
 						},
+						{
+							Name:  "nginx-2",
+							Image: "nginx:1.22",
+						},
 					},
 				},
 			},
@@ -52,6 +56,50 @@ func TestInjectDDTrace(t *testing.T) {
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
+							Image: "nginx:1.22",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "datakit-auto-instrument",
+									MountPath: "/datadog-lib",
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "JAVA_TOOL_OPTIONS",
+									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",
+								},
+								{
+									Name:  "DD_AGENT_HOST",
+									Value: "datakit-service.datakit.svc",
+								},
+								{
+									Name:  "DD_TRACE_AGENT_PORT",
+									Value: "9529",
+								},
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name: "SERVICE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.annotations['service']",
+										},
+									},
+								},
+								{
+									Name:  "SERVICE_NOT",
+									Value: "{fieldRef:metadata.annotations['hello-$$$']}",
+								},
+							},
+						},
+						{
+							Name:  "nginx-2",
 							Image: "nginx:1.22",
 							VolumeMounts: []corev1.VolumeMount{
 								{
