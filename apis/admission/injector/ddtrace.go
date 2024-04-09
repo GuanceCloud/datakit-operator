@@ -232,15 +232,12 @@ func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) str
 
 			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
 		}
-
-		if !manager.NewVolumeMountManager(pod).ContainsVolumeMountInContainer(ddtraceVolumeName) {
-			podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
-				corev1.VolumeMount{
-					Name:      ddtraceVolumeName,
-					MountPath: ddtraceMountPath,
-				})
-		}
 	}
+	volumeMount := corev1.VolumeMount{
+		Name:      ddtraceVolumeName,
+		MountPath: ddtraceMountPath,
+	}
+	manager.NewVolumeMountManager(pod).AddVolumeMount(&volumeMount)
 	return nil
 }
 
