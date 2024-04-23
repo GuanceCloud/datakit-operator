@@ -4,5 +4,5 @@ kind: ConfigMap
 metadata:
   name: {{ include "datakit-operator.fullname" . }}-config
 data:
-  jsonconfig: |
-    {{ .Values.configmap.jsonconfig }}
+  jsonconfig: |-
+{{ .Files.Get "config.json" | indent 4 }}
