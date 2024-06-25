@@ -52,7 +52,7 @@ func (r *ddtraceResource) process() {
 	switch lang {
 	case java:
 		lib = &ddtraceJava{}
-	case nodejs:
+	case nodejs, nodejsDeprecated:
 		lib = &ddtraceNodejs{}
 	case python:
 		lib = &ddtracePython{}
@@ -99,7 +99,7 @@ func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
 	}
 
 	switch language(lang) {
-	case java, python, nodejs:
+	case java, python, nodejs, nodejsDeprecated:
 		return true, language(lang), ""
 	default:
 		//nil
