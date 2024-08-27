@@ -6,7 +6,6 @@ import (
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -52,7 +51,7 @@ func (r *ddtraceResource) process() {
 	switch lang {
 	case java:
 		lib = &ddtraceJava{}
-	case nodejs:
+	case nodejs, nodejsDeprecated:
 		lib = &ddtraceNodejs{}
 	case python:
 		lib = &ddtracePython{}
@@ -99,7 +98,7 @@ func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
 	}
 
 	switch language(lang) {
-	case java, python, nodejs:
+	case java, python, nodejs, nodejsDeprecated:
 		return true, language(lang), ""
 	default:
 		//nil
@@ -251,16 +250,6 @@ func injectDDTraceInitContainer(pod *corev1.Pod, image string) error {
 			{
 				Name:      ddtraceVolumeName,
 				MountPath: ddtraceMountPath,
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
-			},
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
 			},
 		},
 	}

@@ -9,11 +9,12 @@ import (
 type language string
 
 const (
-	null   language = ""
-	java   language = "java"
-	golang language = "golang"
-	nodejs language = "js"
-	python language = "python"
+	null             language = ""
+	java             language = "java"
+	golang           language = "golang"
+	nodejs           language = "nodejs"
+	nodejsDeprecated language = "js"
+	python           language = "python"
 )
 
 const enableEnvFieldRef = true
