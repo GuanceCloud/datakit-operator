@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.4] - 2024-08-27
+
+- 移除在注入 ddtrace 的 resource，降低 logfwd 和 profiler 的 resource（#44）
+
 ## [1.5.3] - 2024-04-09
 
 - 修复在多容器情况下 ddtrace 挂载文件缺失的问题（#42）
