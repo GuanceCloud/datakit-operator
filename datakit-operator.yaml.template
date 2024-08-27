@@ -108,10 +108,10 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "128Mi"
+              memory: "64Mi"
             limits:
               cpu: "500m"
-              memory: "1024Mi"
+              memory: "512Mi"
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
