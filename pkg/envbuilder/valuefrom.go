@@ -57,6 +57,7 @@ var (
 		},
 	}
 
+	//__kubernetes_pod_label_(.+)`
 	annotationsRegex = regexp.MustCompile(`{fieldRef:metadata.annotations\['.*'\]}`)
 	labelsRegex      = regexp.MustCompile(`{fieldRef:metadata.labels\['.*'\]}`)
 )
