@@ -124,7 +124,7 @@ func (r *logfwdResource) extractInfo() (string, []string, bool) {
 		}
 	}
 
-	return configBuff.String(), Unique(paths), true
+	return configBuff.String(), unique(paths), true
 }
 
 func (r *logfwdResource) injectVolume(volumeNames []string) {

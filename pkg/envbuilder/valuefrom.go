@@ -3,92 +3,89 @@ package envbuilder
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-var (
-	valueFromMap = map[string]func() *corev1.EnvVarSource{
-		"{fieldRef:metadata.name}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
-			}
+var valuefroms = []struct {
+	key   string
+	keyRe *regexp.Regexp
+	fn    func(args string) string
+}{
+	{
+		key: "{fieldRef:metadata.name}",
+		fn:  func(_ string) string { return "metadata.name" },
+	},
+	{
+		key: "{fieldRef:metadata.namespace}",
+		fn:  func(_ string) string { return "metadata.namespace" },
+	},
+	{
+		key: "{fieldRef:metadata.uid}",
+		fn:  func(_ string) string { return "metadata.uid" },
+	},
+	{
+		key: "{fieldRef:spec.serviceAccountName}",
+		fn:  func(_ string) string { return "spec.serviceAccountName" },
+	},
+	{
+		key: "{fieldRef:spec.nodeName}",
+		fn:  func(_ string) string { return "spec.nodeName" },
+	},
+	{
+		key: "{fieldRef:status.hostIP}",
+		fn:  func(_ string) string { return "status.hostIP" },
+	},
+	{
+		key: "{fieldRef:status.hostIPs}",
+		fn:  func(_ string) string { return "status.hostIPs" },
+	},
+	{
+		key: "{fieldRef:status.podIP}",
+		fn:  func(_ string) string { return "status.podIP" },
+	},
+	{
+		// e.g. {fieldRef:metadata.labels['app']}
+		keyRe: regexp.MustCompile(`{fieldRef:metadata.labels\['(.+)'\]}`),
+		fn: func(s string) string {
+			return fmt.Sprintf("metadata.labels['%s']", s)
 		},
-		"{fieldRef:metadata.namespace}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
-			}
+	},
+	{
+		// e.g. {fieldRef:metadata.annotations['app']}
+		keyRe: regexp.MustCompile(`{fieldRef:metadata.annotations\['(.+)'\]}`),
+		fn: func(s string) string {
+			return fmt.Sprintf("metadata.annotations['%s']", s)
 		},
-		"{fieldRef:metadata.uid}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.uid"},
-			}
-		},
-		"{fieldRef:spec.serviceAccountName}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.serviceAccountName"},
-			}
-		},
-		"{fieldRef:spec.nodeName}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
-			}
-		},
-		"{fieldRef:status.hostIP}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-			}
-		},
-		"{fieldRef:status.hostIPs}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIPs"},
-			}
-		},
-		"{fieldRef:status.podIP}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-			}
-		},
-		"{fieldRef:status.podIPs}": func() *corev1.EnvVarSource {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIPs"},
-			}
-		},
-	}
+	},
+}
 
-	//__kubernetes_pod_label_(.+)`
-	annotationsRegex = regexp.MustCompile(`{fieldRef:metadata.annotations\['.*'\]}`)
-	labelsRegex      = regexp.MustCompile(`{fieldRef:metadata.labels\['.*'\]}`)
-)
+func converFieldPath(s string) string {
+	for _, v := range valuefroms {
+		if v.key == s {
+			return v.fn("")
+		}
+
+		if v.keyRe != nil && v.keyRe.MatchString(s) {
+			args := v.keyRe.FindStringSubmatch(s)
+			if len(args) != 2 {
+				break
+			}
+			if !IsQualifiedName(args[1]) {
+				break
+			}
+			return v.fn(args[1])
+		}
+	}
+	return ""
+}
 
 func newEnvVarSource(v string) *corev1.EnvVarSource {
-	newEnvVarSource, ok := valueFromMap[v]
-	if ok {
-		return newEnvVarSource()
-	}
-
-	if annotationsRegex.MatchString(v) {
-		key := strings.TrimPrefix(v, "{fieldRef:metadata.annotations['")
-		key = strings.TrimSuffix(key, "']}")
-
-		if IsQualifiedName(key) {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: fmt.Sprintf("metadata.annotations['%s']", key)},
-			}
+	fieldPath := converFieldPath(v)
+	if fieldPath != "" {
+		return &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: fieldPath},
 		}
 	}
-
-	if labelsRegex.MatchString(v) {
-		key := strings.TrimPrefix(v, "{fieldRef:metadata.labels['")
-		key = strings.TrimSuffix(key, "']}")
-
-		if IsQualifiedName(key) {
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: fmt.Sprintf("metadata.labels['%s']", key)},
-			}
-		}
-	}
-
 	return nil
 }
