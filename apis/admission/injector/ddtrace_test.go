@@ -14,6 +14,7 @@ func TestInjectDDTrace(t *testing.T) {
 		return []struct{ Key, Value string }{
 			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
 			{"DD_TRACE_AGENT_PORT", "9529"},
+			{"DD_TAGS", "host:node-02,system:linux"},
 
 			{"POD_NAME", "{fieldRef:metadata.name}"},
 			{"SERVICE", "{fieldRef:metadata.annotations['service']}"},
@@ -38,10 +39,22 @@ func TestInjectDDTrace(t *testing.T) {
 						{
 							Name:  "nginx",
 							Image: "nginx:1.22",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "DD_TAGS",
+									Value: "host:node-01",
+								},
+							},
 						},
 						{
 							Name:  "nginx-2",
 							Image: "nginx:1.22",
+							Env: []corev1.EnvVar{
+								{
+									Name:      "DD_TAGS",
+									ValueFrom: &corev1.EnvVarSource{}, // not nil
+								},
+							},
 						},
 					},
 				},
@@ -63,6 +76,10 @@ func TestInjectDDTrace(t *testing.T) {
 								},
 							},
 							Env: []corev1.EnvVar{
+								{
+									Name:  "DD_TAGS",
+									Value: "host:node-01,system:linux",
+								},
 								{
 									Name:  "JAVA_TOOL_OPTIONS",
 									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",
@@ -107,6 +124,10 @@ func TestInjectDDTrace(t *testing.T) {
 								},
 							},
 							Env: []corev1.EnvVar{
+								{
+									Name:      "DD_TAGS",
+									ValueFrom: &corev1.EnvVarSource{},
+								},
 								{
 									Name:  "JAVA_TOOL_OPTIONS",
 									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",

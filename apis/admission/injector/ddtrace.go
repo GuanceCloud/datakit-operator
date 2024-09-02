@@ -14,6 +14,8 @@ const (
 
 	ddtraceVolumeName = "datakit-auto-instrument"
 	ddtraceMountPath  = "/datadog-lib"
+
+	ddtraceDDTagsKey = "DD_TAGS"
 )
 
 var supportedLanguagesForDDTrace = []language{java, python, nodejs}
@@ -101,7 +103,7 @@ func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
 	case java, python, nodejs, nodejsDeprecated:
 		return true, language(lang), ""
 	default:
-		//nil
+		// nil
 	}
 
 	return false, null, ""
@@ -120,7 +122,30 @@ func (r *ddtraceResource) injectGlobalVolume() {
 func (r *ddtraceResource) injectGlobalEnvs(envs []corev1.EnvVar) {
 	m := manager.NewEnvVarManager(r.pod)
 	for idx := range envs {
+		// DD_TAGS need to be merged
+		if envs[idx].Name == ddtraceDDTagsKey {
+			r.specialDDTagsEnv(&envs[idx])
+			continue
+		}
 		m.AddEnvVar(&envs[idx])
+	}
+}
+
+func (r *ddtraceResource) specialDDTagsEnv(newEnv *corev1.EnvVar) {
+	if newEnv.Value == "" {
+		return
+	}
+
+	for _, container := range r.pod.Spec.Containers {
+		for idx, env := range container.Env {
+			if env.Name == ddtraceDDTagsKey {
+				if env.ValueFrom != nil {
+					break
+				}
+				kvStr := appendKVPairs(env.Value, newEnv.Value)
+				container.Env[idx].Value = kvStr
+			}
+		}
 	}
 }
 

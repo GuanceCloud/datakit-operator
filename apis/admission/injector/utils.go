@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func Unique(slice []string) []string {
+func unique(slice []string) []string {
 	var uniqMap = make(map[string]struct{})
 	var uniqSlice []string
 	for _, s := range slice {
@@ -17,6 +17,47 @@ func Unique(slice []string) []string {
 		uniqSlice = append(uniqSlice, s)
 	}
 	return uniqSlice
+}
+
+func appendKVPairs(origin, neww string) string {
+	var originKVPairs [][]string
+	for _, pair := range strings.Split(origin, ",") {
+		kv := strings.Split(pair, ":")
+		if len(kv) != 2 {
+			continue
+		}
+		originKVPairs = append(originKVPairs, []string{kv[0], kv[1]})
+	}
+
+	for _, pair := range strings.Split(neww, ",") {
+		kv := strings.Split(pair, ":")
+		if len(kv) != 2 {
+			continue
+		}
+
+		exists := false
+		for _, originKV := range originKVPairs {
+			if len(originKV) == 0 {
+				continue
+			}
+			if kv[0] == originKV[0] {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			originKVPairs = append(originKVPairs, kv)
+		}
+	}
+
+	var res []string
+
+	for _, kv := range originKVPairs {
+		res = append(res, strings.Join(kv, ":"))
+	}
+
+	return strings.Join(res, ",")
 }
 
 // ParseImage adapts some of the logic from the actual Docker library's image parsing

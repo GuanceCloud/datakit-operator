@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.5] - 2024-09-02
+
+- 优化注入 ddtrace 环境变量 `DD_TAGS` 逻辑，如果原 Pod 已经存在 `DD_TAGS`，现在会追加而不是忽略（#45）
+
 ## [1.5.4] - 2024-08-27
 
 - 移除在注入 ddtrace 的 resource，降低 logfwd 和 profiler 的 resource（#44）
