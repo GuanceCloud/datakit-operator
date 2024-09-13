@@ -39,9 +39,7 @@ configmap:
                 "enabled_namespaces":     [],
                 "enabled_labelselectors": [],
                 "images": {
-                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.30.1-guance",
-                    "python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
-                    "js_agent_image":     "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2"
+                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.36.2-guance",
                 },
                 "envs": {
                     "DD_AGENT_HOST":           "datakit-service.datakit.svc",
