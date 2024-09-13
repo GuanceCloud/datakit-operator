@@ -194,9 +194,9 @@ func (r *logfwdResource) getVolumePairs(reuse bool, needVolumePaths []string) (v
 	volumeMountManager := manager.NewVolumeMountManager(r.pod)
 
 	for idx := range needVolumePaths {
-		exist, name := volumeMountManager.FindVolumeMountPathInContainer(needVolumePaths[idx])
+		exists, name := volumeMountManager.FindVolumeMountPathInContainer(needVolumePaths[idx])
 
-		if exist && volumeManager.IsEmptyDirVolume(name) {
+		if exists && volumeManager.IsEmptyDirVolume(name) {
 			l.Infof("Reuse volume %s for mountPath %s on %s", name, needVolumePaths[idx], r.parent)
 		} else {
 			name = fmt.Sprintf("datakit-logfwd-volume-%d", idx)
