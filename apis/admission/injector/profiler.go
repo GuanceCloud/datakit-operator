@@ -17,6 +17,8 @@ const (
 	profilerMountPath         = "/app/datakit-profiler"
 	profilerTimezone          = "timezone"
 	profilerTimezoneMountPath = "/etc/localtime"
+	profilerTmp               = "tmp"
+	profilerTmpMountPath      = "/tmp"
 )
 
 var (
@@ -97,7 +99,7 @@ func (r *profilerResource) injectVolume() {
 	}
 
 	tmp := corev1.Volume{
-		Name: "tmp",
+		Name: profilerTmp,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
@@ -126,20 +128,29 @@ func (r *profilerResource) injectVolumeMount() {
 		MountPath: profilerMountPath,
 	}
 
-	tmp := corev1.VolumeMount{
-		Name:      "tmp",
-		MountPath: "/tmp",
-	}
-
-	timezone := corev1.VolumeMount{
-		Name:      profilerTimezone,
-		MountPath: profilerTimezoneMountPath,
-	}
-
 	manager := manager.NewVolumeMountManager(r.pod)
+	// This is a special volumeMount, do not need to check for duplicates.
 	manager.AddVolumeMount(&workdir)
-	manager.AddVolumeMount(&tmp)
-	manager.AddVolumeMount(&timezone)
+
+	if exists, _ := manager.FindVolumeMountPathInContainer(profilerTmpMountPath); exists {
+		l.Infof("Found that the volumeMount with path %s already exists in %s, skip the injection.", profilerTmpMountPath, r.parent)
+	} else {
+		tmp := corev1.VolumeMount{
+			Name:      profilerTmp,
+			MountPath: profilerTmpMountPath,
+		}
+		manager.AddVolumeMount(&tmp)
+	}
+
+	if exists, _ := manager.FindVolumeMountPathInContainer(profilerTimezoneMountPath); exists {
+		l.Infof("Found that the volumeMount with path %s already exists in %s, skip the injection.", profilerTimezoneMountPath, r.parent)
+	} else {
+		timezone := corev1.VolumeMount{
+			Name:      profilerTimezone,
+			MountPath: profilerTimezoneMountPath,
+		}
+		manager.AddVolumeMount(&timezone)
+	}
 }
 
 func (r *profilerResource) injectContainer(image string, envs []corev1.EnvVar) {

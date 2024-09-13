@@ -257,11 +257,14 @@ func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) str
 			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
 		}
 	}
+
 	volumeMount := corev1.VolumeMount{
 		Name:      ddtraceVolumeName,
 		MountPath: ddtraceMountPath,
 	}
+	// This is a special volumeMount, do not need to check for duplicates.
 	manager.NewVolumeMountManager(pod).AddVolumeMount(&volumeMount)
+
 	return nil
 }
 
