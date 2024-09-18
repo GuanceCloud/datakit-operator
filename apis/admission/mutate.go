@@ -11,17 +11,13 @@ import (
 
 type jsonPatch []byte
 
-const (
-	injectEnabled = "admission.datakit/enabled"
-)
-
-func shouldNotInject(annotations map[string]string) bool {
-	s, found := annotations[injectEnabled]
-	return found && s == "false"
+func shouldInject(annotations map[string]string) bool {
+	const injectEnabled = "admission.datakit/enabled"
+	return injector.CheckAnnotationIsTrue(annotations, injectEnabled)
 }
 
 func mutatePod(parent string, pod *corev1.Pod) error {
-	if shouldNotInject(pod.GetAnnotations()) {
+	if !shouldInject(pod.GetAnnotations()) {
 		return nil
 	}
 

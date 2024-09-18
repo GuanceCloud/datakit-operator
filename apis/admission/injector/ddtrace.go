@@ -9,7 +9,9 @@ import (
 )
 
 const (
-	ddtraceInitContainerName          = "datakit-lib-init"
+	ddtraceInitContainerName = "datakit-lib-init"
+
+	ddtraceEnabledAnnotationKey       = "admission.datakit/ddtrace.enabled"
 	ddtraceVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
 
 	ddtraceVolumeName = "datakit-auto-instrument"
@@ -43,7 +45,7 @@ func newDDTraceResource(parent string, pod *corev1.Pod) *ddtraceResource {
 }
 
 func (r *ddtraceResource) process() {
-	should, lang, imageVersion := r.shouldInjectLib()
+	should, lang, imageVersion := r.shouldInject()
 	if !should {
 		return
 	}
@@ -76,7 +78,11 @@ func (r *ddtraceResource) process() {
 	r.injectGlobalEnvs(ddtraceEnvObjects())
 }
 
-func (r *ddtraceResource) shouldInjectLib() (bool, language, string) {
+func (r *ddtraceResource) shouldInject() (bool, language, string) {
+	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), ddtraceEnabledAnnotationKey) {
+		return false, null, ""
+	}
+
 	if manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName) {
 		return false, null, ""
 	}
