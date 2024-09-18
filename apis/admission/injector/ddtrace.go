@@ -142,15 +142,24 @@ func (r *ddtraceResource) specialDDTagsEnv(newEnv *corev1.EnvVar) {
 		return
 	}
 
+	m := manager.NewEnvVarManager(r.pod)
+
 	for _, container := range r.pod.Spec.Containers {
+		foundDDTags := false
+
 		for idx, env := range container.Env {
 			if env.Name == ddtraceDDTagsKey {
+				foundDDTags = true
 				if env.ValueFrom != nil {
 					break
 				}
 				kvStr := appendKVPairs(env.Value, newEnv.Value)
 				container.Env[idx].Value = kvStr
 			}
+		}
+
+		if !foundDDTags {
+			m.AddEnvVarToContainer(container.Name, newEnv)
 		}
 	}
 }
