@@ -2,8 +2,22 @@ package injector
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+// CheckAnnotationIsTrue If no annotation is found or parsing fails, it will return true.
+func CheckAnnotationIsTrue(annotations map[string]string, key string) bool {
+	str, found := annotations[key]
+	if !found {
+		return true
+	}
+	b, err := strconv.ParseBool(str)
+	if err != nil {
+		return true
+	}
+	return b
+}
 
 func unique(slice []string) []string {
 	var uniqMap = make(map[string]struct{})

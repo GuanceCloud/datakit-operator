@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.7] - 2024-09-18
+
+- 修复 v1.5.5 和 v1.5.6 注入环境变量 DD_TAGS 的错误问题（#48）
+- 支持在 Pod 上添加 Annotations（`admission.datakit/ddtrace.enabled="false"`、`admission.datakit/logfwd.enabled="false"` 和 `admission.datakit/profiler.enabled="false"`）更细致地关闭某一类注入（#49）
+
 ## [1.5.6] - 2024-09-13
 
 - 优化注入 profiler volumeMount 逻辑，如果已经存在相同的 path 就不再注入（#46）
@@ -26,7 +31,7 @@
 
 ## [1.5.0] - 2024-03-18
 
-- 支持在 Pod 上添加 Annotation `admission.datakit/enabled="false"` 关闭所有的注入，包括注入 ddtrace、logfwd 等（#39）
+- 支持在 Pod 上添加 Annotation `admission.datakit/enabled="false"` 关闭所有的注入，包括注入 ddtrace、logfwd 和 profiler（#39）
 - 支持给指定的 namespace 批量注入 ddtrace（#38）
 - 在注入 logfwd 时可以选择复用 volume，避免同路径多次挂载的报错问题（#34）
 

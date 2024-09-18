@@ -11,9 +11,12 @@ import (
 )
 
 const (
-	logfwdContainerName          = "datakit-logfwd"
+	logfwdContainerName = "datakit-logfwd"
+
+	logfwdEnabledAnnotationKey   = "admission.datakit/logfwd.enabled"
 	logfwdInstancesAnnotationKey = "admission.datakit/logfwd.instances"
-	logfwdJSONConfigKey          = "LOGFWD_JSON_CONFIG"
+
+	logfwdJSONConfigKey = "LOGFWD_JSON_CONFIG"
 )
 
 type logfwdConfig struct {
@@ -54,7 +57,7 @@ func newLogfwdResource(parent string, pod *corev1.Pod) *logfwdResource {
 }
 
 func (r *logfwdResource) process() {
-	if !r.checkIfNeedsOperation() {
+	if !r.shouldInject() {
 		return
 	}
 
@@ -84,7 +87,11 @@ func (r *logfwdResource) process() {
 	r.injectContainer(image, envs, volumeNames, volumePaths)
 }
 
-func (r *logfwdResource) checkIfNeedsOperation() bool {
+func (r *logfwdResource) shouldInject() bool {
+	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), logfwdEnabledAnnotationKey) {
+		return false
+	}
+
 	if manager.NewContainerManager(r.pod).ContainsContainer(logfwdContainerName) {
 		return false
 	}
