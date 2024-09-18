@@ -10,7 +10,9 @@ import (
 )
 
 const (
-	profilerContainerName              = "datakit-profiler"
+	profilerContainerName = "datakit-profiler"
+
+	profilerEnabledAnnotationKey       = "admission.datakit/profiler.enabled"
 	profilerVersionAnnotationKeyFormat = "admission.datakit/%s-profiler.version"
 
 	profilerVolumeName        = "datakit-profiler-volume"
@@ -48,7 +50,7 @@ func newProfilerResource(parent string, pod *corev1.Pod) *profilerResource {
 }
 
 func (r *profilerResource) process() {
-	if !r.checkIfNeedsOperation() {
+	if !r.shouldInject() {
 		return
 	}
 
@@ -63,7 +65,10 @@ func (r *profilerResource) process() {
 	r.injectVolumeMount()
 }
 
-func (r *profilerResource) checkIfNeedsOperation() bool {
+func (r *profilerResource) shouldInject() bool {
+	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), profilerEnabledAnnotationKey) {
+		return false
+	}
 	return !manager.NewContainerManager(r.pod).ContainsContainer(profilerContainerName)
 }
 
