@@ -167,8 +167,8 @@ func TestInjectDDTrace(t *testing.T) {
 }
 
 func TestInjectDDTraceForNamespaces(t *testing.T) {
-	ddtraceEnabledNamespaces = func(_ string) string { return "python" }
-	ddtracePythonAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1" }
+	ddtraceEnabledNamespaces = func(_ string) string { return "java" }
+	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -213,8 +213,8 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name:  "PYTHONPATH",
-									Value: "/datadog-lib/",
+									Name:  "JAVA_TOOL_OPTIONS",
+									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",
 								},
 								{
 									Name:  "DD_AGENT_HOST",
@@ -226,7 +226,7 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "datakit-lib-init",
-							Image:           "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1",
+							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
@@ -259,10 +259,10 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 }
 
 func TestInjectDDTraceForLabelSelectors(t *testing.T) {
-	ddtraceEnabledLabelSelectors = func(_ map[string]string) string { return "python" }
+	ddtraceEnabledLabelSelectors = func(_ map[string]string) string { return "java" }
 	// not used namespaces
 	ddtraceEnabledNamespaces = func(_ string) string { return "java" }
-	ddtracePythonAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1" }
+	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -307,8 +307,8 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name:  "PYTHONPATH",
-									Value: "/datadog-lib/",
+									Name:  "JAVA_TOOL_OPTIONS",
+									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",
 								},
 								{
 									Name:  "DD_AGENT_HOST",
@@ -320,7 +320,7 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 					InitContainers: []corev1.Container{
 						{
 							Name:            "datakit-lib-init",
-							Image:           "pubrepo.guance.com/datakit-operator/python-lib-testing:v1.0.1",
+							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							VolumeMounts: []corev1.VolumeMount{
