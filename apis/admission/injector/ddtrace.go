@@ -208,23 +208,30 @@ func (d *ddtracePython) joinReleaseImage(imageVersion string) string {
 }
 
 func (d *ddtracePython) injectInitContainer(pod *corev1.Pod, image string) error {
-	return injectDDTraceInitContainer(pod, image)
+	/*
+		return injectDDTraceInitContainer(pod, image)
+	*/
+	return nil
 }
 
 func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
 	// Python config
-	const (
-		pythonPathKey   = "PYTHONPATH"
-		pythonPathValue = "/datadog-lib/"
-	)
+	/*
+		const (
+			pythonPathKey   = "PYTHONPATH"
+			pythonPathValue = "/datadog-lib/"
+		)
 
-	envValFunc := func(predefinedVal string) string {
-		if predefinedVal == "" {
-			return pythonPathValue
+		envValFunc := func(predefinedVal string) string {
+			if predefinedVal == "" {
+				return pythonPathValue
+			}
+			return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
 		}
-		return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
-	}
-	return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
+		return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
+	*/
+
+	return nil
 }
 
 //
