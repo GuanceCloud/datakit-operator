@@ -46,6 +46,7 @@ configmap:
                     "DD_TRACE_AGENT_PORT":     "9529",
                     "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc",
                     "DD_JMXFETCH_STATSD_PORT": "8125",
+                    "DD_SERVICE":              "{fieldRef:metadata.labels['service']}",
                     "POD_NAME":                "{fieldRef:metadata.name}",
                     "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
                     "NODE_NAME":               "{fieldRef:spec.nodeName}",
