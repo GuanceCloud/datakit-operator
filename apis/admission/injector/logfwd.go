@@ -162,7 +162,7 @@ func (r *logfwdResource) injectContainer(image string, envs []corev1.EnvVar, vol
 	container := corev1.Container{
 		Name:            logfwdContainerName,
 		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		Env:             envs,
 		Resources: corev1.ResourceRequirements{
 			Requests: map[corev1.ResourceName]resource.Quantity{

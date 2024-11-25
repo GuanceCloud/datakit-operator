@@ -163,7 +163,7 @@ func (r *profilerResource) injectContainer(image string, envs []corev1.EnvVar) {
 		Name:            profilerContainerName,
 		Image:           image,
 		Command:         []string{"bash", "cmd.sh"},
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		WorkingDir:      profilerMountPath,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
