@@ -136,7 +136,7 @@ func TestInjectDDTrace(t *testing.T) {
 							Name:            "datakit-lib-init",
 							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:latest",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "datakit-auto-instrument",
@@ -228,7 +228,7 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 							Name:            "datakit-lib-init",
 							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "datakit-auto-instrument",
@@ -322,7 +322,7 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 							Name:            "datakit-lib-init",
 							Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 							Command:         []string{"sh", "copy-lib.sh", "/datadog-lib"},
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "datakit-auto-instrument",
