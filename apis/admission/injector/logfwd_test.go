@@ -106,7 +106,7 @@ func TestInjectLogfwd(t *testing.T) {
 						{
 							Name:            "datakit-logfwd",
 							Image:           "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{
 									Name: "LOGFWD_POD_NAME",

@@ -295,7 +295,7 @@ func injectDDTraceInitContainer(pod *corev1.Pod, image string) error {
 		Name:            ddtraceInitContainerName,
 		Image:           image,
 		Command:         []string{"sh", "copy-lib.sh", ddtraceMountPath},
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      ddtraceVolumeName,
