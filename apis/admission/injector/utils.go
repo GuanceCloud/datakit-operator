@@ -6,6 +6,28 @@ import (
 	"strings"
 )
 
+func clearSlice[S ~[]E, E any](s S) {
+	var zero E
+	for i := range s {
+		s[i] = zero
+	}
+}
+
+// Delete This function is adapted from the slice.Delete function introduced in Go 1.20.
+// If the project upgrades to a newer version of Go that supports slice.Delete, this function should be removed.
+func DeleteSlice[S ~[]E, E any](s S, i, j int) S {
+	_ = s[i:j:len(s)] // bounds check
+
+	if i == j {
+		return s
+	}
+
+	oldlen := len(s)
+	s = append(s[:i], s[j:]...)
+	clearSlice(s[len(s):oldlen]) // zero/nil out the obsolete elements, for GC
+	return s
+}
+
 // CheckAnnotationIsTrue If no annotation is found or parsing fails, it will return true.
 func CheckAnnotationIsTrue(annotations map[string]string, key string) bool {
 	str, found := annotations[key]
