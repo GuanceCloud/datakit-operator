@@ -69,16 +69,16 @@ func TestInjectDDTrace(t *testing.T) {
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name:  "DD_TAGS",
-									Value: "host:node-01,system:linux",
-								},
-								{
 									Name:  "JAVA_TOOL_OPTIONS",
 									Value: " -javaagent:/datadog-lib/dd-java-agent.jar",
 								},
 								{
 									Name:  "DD_AGENT_HOST",
 									Value: "datakit-service.datakit.svc",
+								},
+								{
+									Name:  "DD_TAGS",
+									Value: "host:node-01,system:linux",
 								},
 								{
 									Name: "POD_NAME",
@@ -347,6 +347,68 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 	for idx := range testCases {
 		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
+
+		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
+	}
+}
+
+func TestSpecialDDTagsEnv(t *testing.T) {
+	var testCases = []struct {
+		in    corev1.Pod
+		inEnv corev1.EnvVar
+		out   corev1.Pod
+	}{
+		{
+			in: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "nginx",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "DD_TAGS",
+									Value: "host:node-01",
+								},
+								{
+									Name:  "DD_AGENT_HOST",
+									Value: "datakit-service.datakit.svc",
+								},
+							},
+						},
+					},
+				},
+			},
+			inEnv: corev1.EnvVar{
+				Name:  "DD_TAGS",
+				Value: "pod_name:$(POD_NAME)",
+			},
+			out: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "nginx",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "DD_AGENT_HOST",
+									Value: "datakit-service.datakit.svc",
+								},
+								{
+									Name:  "DD_TAGS",
+									Value: "host:node-01,pod_name:$(POD_NAME)",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for idx := range testCases {
+		resource := &ddtraceResource{
+			pod: &testCases[idx].in,
+		}
+		resource.specialDDTagsEnv(&testCases[idx].inEnv)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
 	}
