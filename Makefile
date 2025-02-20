@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.5.10
+VERSION=v1.5.11
 
 BIN           = datakit-operator
 ENTRY         = main.go
@@ -117,7 +117,7 @@ pub_testing_image:
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 	$(call build_k8s_charts, 'datakit-operator-testing', registry.jiagouyun.com)
 
-lint: deps
+lint: deps test
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \
@@ -133,8 +133,9 @@ prepare:
 	@mkdir -p pkg/git
 	@echo "$$GIT_INFO" > pkg/git/git.go
 
-all_test: deps
-	#TODO
+test: deps
+	@echo "======= Running Go tests recursively... ======="
+	@go test ./... | grep -v "no test files" || (echo "Tests failed!" && exit 1)
 
 clean:
 	@rm -rf $(BUILD_DIR)/*
