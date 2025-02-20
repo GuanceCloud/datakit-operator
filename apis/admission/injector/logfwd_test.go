@@ -10,7 +10,6 @@ import (
 )
 
 func TestInjectLogfwd(t *testing.T) {
-	logfwdReuseExistVolume = func() bool { return true }
 	logfwdImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
 	logfwdEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
