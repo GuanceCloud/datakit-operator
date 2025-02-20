@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/admission/injector"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/admission/mutator"
 )
 
 type jsonPatch []byte
@@ -30,6 +31,10 @@ func mutatePod(parent string, pod *corev1.Pod) error {
 		return err
 	}
 	if err := injector.InjectProfilerToPod(parent, pod); err != nil {
+		return err
+	}
+
+	if err := mutator.MutateLoggingToPod(parent, pod); err != nil {
 		return err
 	}
 	return nil
