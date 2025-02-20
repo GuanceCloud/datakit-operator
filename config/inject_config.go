@@ -5,32 +5,13 @@ import (
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/selector"
 )
 
-const (
-	DDTraceJavaImageKey   = "java_agent_image"
-	DDTracePythonImageKey = "python_agent_image"
-	DDTraceNodejsImageKey = "js_agent_image"
-
-	LogfwdImageKey            = "logfwd_image"
-	LogfwdReuseExistVolumeOpt = "reuse_exist_volume"
-
-	ProfilerJavaImageKey   = "java_profiler_image"
-	ProfilerPythonImageKey = "python_profiler_image"
-	ProfilerGolangImageKey = "golang_profiler_image"
-)
-
-type Configuration struct {
-	ServerListen    string                `json:"server_listen"`
-	LogLevel        string                `json:"log_level"`
-	AdmissionInject AdmissionInjectConfig `json:"admission_inject"`
-}
-
 type AdmissionInjectConfig struct {
 	DDTrace  ContainerConfig `json:"ddtrace"`
 	Logfwd   ContainerConfig `json:"logfwd"`
 	Profiler ContainerConfig `json:"profiler"`
 }
 
-func (c *AdmissionInjectConfig) setup() {
+func (c AdmissionInjectConfig) setup() {
 	c.DDTrace.fillEnvs()
 	c.DDTrace.fillLabelSelectors()
 	c.Logfwd.fillEnvs()
@@ -49,15 +30,13 @@ type LabelSelectorCondition struct {
 type ContainerConfig struct {
 	EnabledNamespaces     []NamespaceCondition     `json:"enabled_namespaces,omitempty"`
 	EnabledLabelSelectors []LabelSelectorCondition `json:"enabled_labelselectors,omitempty"`
-	Options               map[string]string        `json:"options,omitempty"`
 	Images                map[string]string        `json:"images"`
 	Environments          mapslice.MapSlice        `json:"envs"`
 	envs                  Envs
 }
 
-func (c ContainerConfig) Image(name string) string  { return c.Images[name] }
-func (c ContainerConfig) Option(name string) string { return c.Options[name] }
-func (c ContainerConfig) Envs() Envs                { return c.envs }
+func (c ContainerConfig) Image(name string) string { return c.Images[name] }
+func (c ContainerConfig) Envs() Envs               { return c.envs }
 func (c ContainerConfig) MatchNamespace(ns string) string {
 	for _, s := range c.EnabledNamespaces {
 		if s.Namespace == ns {
@@ -77,7 +56,6 @@ func (c ContainerConfig) MatchLabelSelector(labels map[string]string) string {
 
 func newContainerConfig() ContainerConfig {
 	return ContainerConfig{
-		Options:      make(map[string]string),
 		Images:       make(map[string]string),
 		Environments: mapslice.MapSlice{},
 	}

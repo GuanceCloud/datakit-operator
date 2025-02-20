@@ -43,9 +43,6 @@ data:
                 }
             },
             "logfwd": {
-                "options": {
-                    "reuse_exist_volume": "false"
-                },
                 "images": {
                     "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.26.0"
                 },
@@ -70,6 +67,15 @@ data:
                     "DK_PROFILE_SCHEDULE": "0 * * * *"
                 }
             }
+        },
+        "admission_mutate": {
+            "logging": [
+                {
+                    "namespace_selectors": [],
+                    "label_selectors":     [],
+                    "config": ""
+                }
+            ]
         }
     }
 ---
