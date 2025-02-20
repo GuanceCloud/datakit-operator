@@ -56,6 +56,9 @@ func (r *loggingResource) process() {
 }
 
 func (r *loggingResource) shouldInject() (bool, string) {
+	if _, exist := r.pod.Annotations[loggingAnnotationKey]; exist {
+		return false, ""
+	}
 	// Use MatchLabelSelector first
 	if configStr := loggingMatchLabelsForConfig(r.pod.Labels); configStr != "" {
 		l.Debugf("logging config '%s' found from namespaceSelector, Pod is %s", configStr, r.parent)
@@ -74,9 +77,7 @@ func (r *loggingResource) injectAnnotationWithLog(configStr string) {
 	if r.pod.Annotations == nil {
 		r.pod.Annotations = make(map[string]string)
 	}
-	if _, exist := r.pod.Annotations[loggingAnnotationKey]; !exist {
-		r.pod.Annotations[loggingAnnotationKey] = configStr
-	}
+	r.pod.Annotations[loggingAnnotationKey] = configStr
 }
 
 func (r *loggingResource) injectEmptyDirVolume(volumeNames []string) {
