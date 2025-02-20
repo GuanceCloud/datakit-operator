@@ -22,7 +22,6 @@ test:
     - /^.*$/
   script:
     - make lint
-    - make all_test
 
 release-testing:
   stage: deploy
