@@ -6,7 +6,7 @@ type AdmissionMutateConfig struct {
 	Loggings LoggingConfigs `json:"loggings"`
 }
 
-func (c AdmissionMutateConfig) setup() {
+func (c *AdmissionMutateConfig) setup() {
 	for idx := range c.Loggings {
 		for _, labelSelector := range c.Loggings[idx].Labels {
 			p, err := selector.ParseSelector(labelSelector)

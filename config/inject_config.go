@@ -11,7 +11,7 @@ type AdmissionInjectConfig struct {
 	Profiler ContainerConfig `json:"profiler"`
 }
 
-func (c AdmissionInjectConfig) setup() {
+func (c *AdmissionInjectConfig) setup() {
 	c.DDTrace.fillEnvs()
 	c.DDTrace.fillLabelSelectors()
 	c.Logfwd.fillEnvs()
