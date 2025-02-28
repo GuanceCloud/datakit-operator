@@ -11,6 +11,8 @@ import (
 
 func TestInjectProfiler(t *testing.T) {
 	profilerJavaImage = func() string { return "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1" }
+	profilerResourceLimits = func() (string, string) { return "200m", "128Mi" }
+
 	profilerEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
 			{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
@@ -118,13 +120,10 @@ func TestInjectProfiler(t *testing.T) {
 								},
 							},
 							Resources: corev1.ResourceRequirements{
-								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("64Mi"),
-								},
+								Requests: map[corev1.ResourceName]resource.Quantity{},
 								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    resource.MustParse("500m"),
-									corev1.ResourceMemory: resource.MustParse("512Mi"),
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
 								},
 							},
 						},
