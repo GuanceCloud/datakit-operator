@@ -6,7 +6,7 @@ type AdmissionMutateConfig struct {
 	Loggings LoggingConfigs `json:"loggings"`
 }
 
-func (c *AdmissionMutateConfig) setup() {
+func (c *AdmissionMutateConfig) Setup() error {
 	for idx := range c.Loggings {
 		for _, labelSelector := range c.Loggings[idx].Labels {
 			p, err := selector.ParseSelector(labelSelector)
@@ -17,6 +17,7 @@ func (c *AdmissionMutateConfig) setup() {
 			c.Loggings[idx].labelSelectors = append(c.Loggings[idx].labelSelectors, p)
 		}
 	}
+	return nil
 }
 
 type LoggingConfigs []LoggingConfig

@@ -155,15 +155,27 @@ func (r *logfwdResource) injectContainer(image string, envs []corev1.EnvVar, vol
 		ImagePullPolicy: corev1.PullAlways,
 		Env:             envs,
 		Resources: corev1.ResourceRequirements{
-			Requests: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("64Mi"),
-			},
-			Limits: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
-			},
+			Requests: map[corev1.ResourceName]resource.Quantity{},
+			Limits:   map[corev1.ResourceName]resource.Quantity{},
 		},
+	}
+
+	// set requests
+	cpuRequest, memoryRequest := logfwdResourceRequests()
+	if cpuRequest != "" {
+		container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cpuRequest)
+	}
+	if memoryRequest != "" {
+		container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(memoryRequest)
+	}
+
+	// set limits
+	cpuLimit, memoryLimit := logfwdResourceLimits()
+	if cpuLimit != "" {
+		container.Resources.Limits[corev1.ResourceCPU] = resource.MustParse(cpuLimit)
+	}
+	if memoryLimit != "" {
+		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
 	}
 
 	for idx := range volumeNames {
