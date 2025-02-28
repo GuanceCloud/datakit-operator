@@ -11,11 +11,17 @@ type AdmissionInjectConfig struct {
 	Profiler ContainerConfig `json:"profiler"`
 }
 
-func (c *AdmissionInjectConfig) setup() {
-	c.DDTrace.fillEnvs()
-	c.DDTrace.fillLabelSelectors()
-	c.Logfwd.fillEnvs()
-	c.Profiler.fillEnvs()
+func (c *AdmissionInjectConfig) Setup() error {
+	if err := c.DDTrace.Setup(); err != nil {
+		return err
+	}
+	if err := c.Logfwd.Setup(); err != nil {
+		return err
+	}
+	if err := c.Profiler.Setup(); err != nil {
+		return err
+	}
+	return nil
 }
 
 type Envs []struct{ Key, Value string }
@@ -32,7 +38,17 @@ type ContainerConfig struct {
 	EnabledLabelSelectors []LabelSelectorCondition `json:"enabled_labelselectors,omitempty"`
 	Images                map[string]string        `json:"images"`
 	Environments          mapslice.MapSlice        `json:"envs"`
+	Resources             *ResourceRequirements    `json:"resources"`
 	envs                  Envs
+}
+
+func (c *ContainerConfig) Setup() error {
+	if c.Resources == nil {
+		c.Resources = defaultResourceRequirements()
+	}
+	c.fillEnvs()
+	c.fillLabelSelectors()
+	return c.Resources.Verify()
 }
 
 func (c ContainerConfig) Image(name string) string { return c.Images[name] }
@@ -52,6 +68,20 @@ func (c ContainerConfig) MatchLabelSelector(labels map[string]string) string {
 		}
 	}
 	return ""
+}
+
+func (c ContainerConfig) ResourceRequests() (cpu string, memory string) {
+	if c.Resources != nil {
+		return c.Resources.Requests.CPU, c.Resources.Requests.Memory
+	}
+	return "", ""
+}
+
+func (c ContainerConfig) ResourceLimits() (cpu string, memory string) {
+	if c.Resources != nil {
+		return c.Resources.Limits.CPU, c.Resources.Limits.Memory
+	}
+	return "", ""
 }
 
 func newContainerConfig() ContainerConfig {

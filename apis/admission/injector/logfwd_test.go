@@ -11,6 +11,9 @@ import (
 
 func TestInjectLogfwd(t *testing.T) {
 	logfwdImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
+	logfwdResourceRequests = func() (string, string) { return "100m", "64Mi" }
+	logfwdResourceLimits = func() (string, string) { return "200m", "128Mi" }
+
 	logfwdEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
 			{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
@@ -156,8 +159,8 @@ func TestInjectLogfwd(t *testing.T) {
 									corev1.ResourceMemory: resource.MustParse("64Mi"),
 								},
 								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    resource.MustParse("500m"),
-									corev1.ResourceMemory: resource.MustParse("512Mi"),
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
 								},
 							},
 						},
@@ -169,6 +172,7 @@ func TestInjectLogfwd(t *testing.T) {
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
+						// reuse exist-mount
 						// {
 						// 	Name: "datakit-logfwd-volume-0",
 						// 	VolumeSource: corev1.VolumeSource{

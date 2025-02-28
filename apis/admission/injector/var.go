@@ -44,6 +44,14 @@ var (
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
 
+	logfwdResourceRequests = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Logfwd.ResourceRequests()
+	}
+
+	logfwdResourceLimits = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Logfwd.ResourceLimits()
+	}
+
 	profilerJavaImage = func() string {
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerJavaImageKey)
 	}
@@ -54,6 +62,14 @@ var (
 
 	profilerGolangImage = func() string {
 		return config.Cfg.AdmissionInject.Profiler.Image(config.ProfilerGolangImageKey)
+	}
+
+	profilerResourceRequests = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Profiler.ResourceRequests()
+	}
+
+	profilerResourceLimits = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Profiler.ResourceLimits()
 	}
 )
 
