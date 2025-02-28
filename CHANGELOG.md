@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.12] - 2025-02-28
+
+- 支持在注入 logfwd 和 profiler 时手动配置 Request 和 Limit（#57）
+
 ## [1.5.11] - 2025-02-20
 
 - 支持给目标 Pod 添加 datakit/logs 注解配置并自动挂载目录（#53）

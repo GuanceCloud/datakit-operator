@@ -50,6 +50,16 @@ data:
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
                     "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
                     "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu":    "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                       "cpu":    "500m",
+                       "memory": "512Mi"
+                    }
                 }
             },
             "profiler": {
@@ -65,6 +75,16 @@ data:
                     "DK_PROFILE_ENV": "prod",
                     "DK_PROFILE_DURATION": "240",
                     "DK_PROFILE_SCHEDULE": "0 * * * *"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu":    "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                       "cpu":    "500m",
+                       "memory": "512Mi"
+                    }
                 }
             }
         },

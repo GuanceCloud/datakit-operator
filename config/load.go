@@ -21,8 +21,13 @@ func parseConfig(cfgStr string, c *Configuration) error {
 	}
 
 	loadEnvs(c)
-	c.AdmissionInject.setup()
-	c.AdmissionMutate.setup()
+
+	if err := c.AdmissionInject.Setup(); err != nil {
+		return err
+	}
+	if err := c.AdmissionMutate.Setup(); err != nil {
+		return err
+	}
 	return nil
 }
 
