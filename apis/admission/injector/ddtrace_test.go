@@ -167,7 +167,7 @@ func TestInjectDDTrace(t *testing.T) {
 }
 
 func TestInjectDDTraceForNamespaces(t *testing.T) {
-	ddtraceEnabledNamespaces = func(_ string) string { return "java" }
+	ddtraceGetLanguageFromNamespace = func(_ string) string { return "java" }
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 
 	ddtraceEnvs = func() []struct{ Key, Value string } {
@@ -259,9 +259,9 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 }
 
 func TestInjectDDTraceForLabelSelectors(t *testing.T) {
-	ddtraceEnabledLabelSelectors = func(_ map[string]string) string { return "java" }
-	// not used namespaces
-	ddtraceEnabledNamespaces = func(_ string) string { return "java" }
+	ddtraceGetLanguageFromLabels = func(_ map[string]string) string { return "java" }
+	ddtraceGetLanguageFromNamespace = func(_ string) string { return "java" }
+
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 
 	ddtraceEnvs = func() []struct{ Key, Value string } {
