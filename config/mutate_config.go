@@ -1,6 +1,10 @@
 package config
 
-import "gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/selector"
+import (
+	"regexp"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/labels"
+)
 
 type AdmissionMutateConfig struct {
 	Loggings LoggingConfigs `json:"loggings"`
@@ -8,14 +12,7 @@ type AdmissionMutateConfig struct {
 
 func (c *AdmissionMutateConfig) Setup() error {
 	for idx := range c.Loggings {
-		for _, labelSelector := range c.Loggings[idx].Labels {
-			p, err := selector.ParseSelector(labelSelector)
-			if err != nil {
-				log.Warnf("Unexpected labelSelector '%s', parse error: %s", labelSelector, err)
-				continue
-			}
-			c.Loggings[idx].labelSelectors = append(c.Loggings[idx].labelSelectors, p)
-		}
+		c.Loggings[idx].Selector.Setup()
 	}
 	return nil
 }
@@ -46,23 +43,44 @@ func (cfgs LoggingConfigs) MatchLabels(labels map[string]string) string {
 }
 
 type Selector struct {
-	Namespaces     []string `json:"namespace_selectors"`
-	Labels         []string `json:"label_selectors"`
-	labelSelectors []selector.Selector
+	Namespaces         []string `json:"namespace_selectors"`
+	Labels             []string `json:"label_selectors"`
+	namespaceSelectors []*regexp.Regexp
+	labelSelectors     []labels.Selector
 }
 
-func (s Selector) matchNamespace(ns string) bool {
-	for _, namespace := range s.Namespaces {
-		if ns == namespace {
+func (s *Selector) Setup() {
+	for _, namespaceSelector := range s.Namespaces {
+		re, err := regexp.Compile(namespaceSelector)
+		if err != nil {
+			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", namespaceSelector, err)
+			continue
+		}
+		s.namespaceSelectors = append(s.namespaceSelectors, re)
+	}
+
+	for _, labelSelector := range s.Labels {
+		p, err := labels.Parse(labelSelector)
+		if err != nil {
+			log.Warnf("Unexpected labelSelector '%s', parse error: %s", labelSelector, err)
+			continue
+		}
+		s.labelSelectors = append(s.labelSelectors, p)
+	}
+}
+
+func (s *Selector) matchNamespace(ns string) bool {
+	for _, re := range s.namespaceSelectors {
+		if re.MatchString(ns) {
 			return true
 		}
 	}
 	return false
 }
 
-func (s Selector) matchLabels(labels map[string]string) bool {
+func (s *Selector) matchLabels(m map[string]string) bool {
 	for _, se := range s.labelSelectors {
-		if se.Matches(labels) {
+		if se.Matches(labels.Set(m)) {
 			return true
 		}
 	}
