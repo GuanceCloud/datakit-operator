@@ -97,11 +97,11 @@ func (r *ddtraceResource) shouldInject() (bool, language, string) {
 	}
 
 	var lang string
-	if v := ddtraceEnabledLabelSelectors(r.pod.GetLabels()); v != "" {
+	if v := ddtraceGetLanguageFromLabels(r.pod.GetLabels()); v != "" {
 		lang = v
 		l.Debugf("ddtrace %s-lib finds labelSelector for %s", lang, r.parent)
 	}
-	if v := ddtraceEnabledNamespaces(r.pod.Namespace); v != "" {
+	if v := ddtraceGetLanguageFromNamespace(r.pod.Namespace); v != "" {
 		lang = v
 		l.Debugf("ddtrace %s-lib finds namespace for %s", lang, r.parent)
 	}

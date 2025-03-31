@@ -50,14 +50,13 @@ func newProfilerResource(parent string, pod *corev1.Pod) *profilerResource {
 }
 
 func (r *profilerResource) process() {
-	if !r.shouldInject() {
+	should, lang, imageVersion := r.shouldInject()
+	if !should {
 		return
 	}
 
-	image, shouldInject := r.extractInfo()
-	if !shouldInject {
-		return
-	}
+	image := profilerReleaseImage(lang, imageVersion)
+	l.Infof("Use of %s-profiler image %s to %s", lang, image, r.parent)
 
 	r.resetSpec()
 	r.injectContainer(image, profilerEnvObjects())
@@ -65,28 +64,43 @@ func (r *profilerResource) process() {
 	r.injectVolumeMount()
 }
 
-func (r *profilerResource) shouldInject() bool {
+func (r *profilerResource) shouldInject() (bool, language, string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), profilerEnabledAnnotationKey) {
-		return false
+		return false, null, ""
 	}
-	return !manager.NewContainerManager(r.pod).ContainsContainer(profilerContainerName)
-}
 
-func (r *profilerResource) extractInfo() (string, bool) {
+	if manager.NewContainerManager(r.pod).ContainsContainer(profilerContainerName) {
+		return false, null, ""
+	}
+
 	annotations := r.pod.GetAnnotations()
-
 	for _, lang := range supportedLanguagesForProfiler {
 		profilerVersionAnnotation := strings.ToLower(fmt.Sprintf(profilerVersionAnnotationKeyFormat, lang))
 
 		if imageVersion, found := annotations[profilerVersionAnnotation]; found {
-			image := profilerReleaseImage(lang, imageVersion)
-			l.Infof("Use of %s-profiler image %s to %s", lang, image, r.parent)
-
-			return image, true
+			l.Debugf("profiler %s finds annotation for %s", lang, r.parent)
+			return true, lang, imageVersion
 		}
 	}
 
-	return "", false
+	var lang string
+	if v := profilerGetLanguageFromLabels(r.pod.GetLabels()); v != "" {
+		lang = v
+		l.Debugf("profiler %s finds labelSelector for %s", lang, r.parent)
+	}
+	if v := profilerGetLanguageFromNamespace(r.pod.Namespace); v != "" {
+		lang = v
+		l.Debugf("profiler %s finds namespace for %s", lang, r.parent)
+	}
+
+	switch language(lang) {
+	case java, python, golang:
+		return true, language(lang), ""
+	default:
+		// nil
+	}
+
+	return false, null, ""
 }
 
 func (r *profilerResource) resetSpec() {
