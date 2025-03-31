@@ -1,8 +1,10 @@
 package config
 
 import (
+	"regexp"
+
 	"github.com/ake-persson/mapslice-json"
-	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/selector"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/labels"
 )
 
 type AdmissionInjectConfig struct {
@@ -26,19 +28,24 @@ func (c *AdmissionInjectConfig) Setup() error {
 
 type Envs []struct{ Key, Value string }
 
-type NamespaceCondition struct{ Namespace, Language string }
+type NamespaceCondition struct {
+	Namespace string
+	Language  string
+	re        *regexp.Regexp
+}
+
 type LabelSelectorCondition struct {
 	LabelSelector string
 	Language      string
-	selector      selector.Selector
+	selector      labels.Selector
 }
 
 type ContainerConfig struct {
-	EnabledNamespaces     []NamespaceCondition     `json:"enabled_namespaces,omitempty"`
-	EnabledLabelSelectors []LabelSelectorCondition `json:"enabled_labelselectors,omitempty"`
-	Images                map[string]string        `json:"images"`
-	Environments          mapslice.MapSlice        `json:"envs"`
-	Resources             *ResourceRequirements    `json:"resources"`
+	EnabledNamespaces     []*NamespaceCondition     `json:"enabled_namespaces,omitempty"`
+	EnabledLabelSelectors []*LabelSelectorCondition `json:"enabled_labelselectors,omitempty"`
+	Images                map[string]string         `json:"images"`
+	Environments          mapslice.MapSlice         `json:"envs"`
+	Resources             *ResourceRequirements     `json:"resources"`
 	envs                  Envs
 }
 
@@ -46,24 +53,26 @@ func (c *ContainerConfig) Setup() error {
 	if c.Resources == nil {
 		c.Resources = defaultResourceRequirements()
 	}
-	c.fillEnvs()
-	c.fillLabelSelectors()
+	c.setupEnvs()
+	c.setupNamespacesAndLabelsSelectors()
 	return c.Resources.Verify()
 }
 
 func (c ContainerConfig) Image(name string) string { return c.Images[name] }
 func (c ContainerConfig) Envs() Envs               { return c.envs }
-func (c ContainerConfig) MatchNamespace(ns string) string {
+
+func (c ContainerConfig) GetLanguageFromNamespace(ns string) string {
 	for _, s := range c.EnabledNamespaces {
-		if s.Namespace == ns {
+		if s.re != nil && s.re.MatchString(ns) {
 			return s.Language
 		}
 	}
 	return ""
 }
-func (c ContainerConfig) MatchLabelSelector(labels map[string]string) string {
+
+func (c ContainerConfig) GetLanguageFromLabels(m map[string]string) string {
 	for _, s := range c.EnabledLabelSelectors {
-		if s.selector != nil && s.selector.Matches(labels) {
+		if s.selector != nil && s.selector.Matches(labels.Set(m)) {
 			return s.Language
 		}
 	}
@@ -91,7 +100,7 @@ func newContainerConfig() ContainerConfig {
 	}
 }
 
-func (c *ContainerConfig) fillEnvs() {
+func (c *ContainerConfig) setupEnvs() {
 	if len(c.Environments) == 0 {
 		return
 	}
@@ -111,15 +120,26 @@ func (c *ContainerConfig) fillEnvs() {
 	}
 }
 
-func (c *ContainerConfig) fillLabelSelectors() {
-	if len(c.EnabledLabelSelectors) == 0 {
+func (c *ContainerConfig) setupNamespacesAndLabelsSelectors() {
+	if len(c.EnabledNamespaces) == 0 && len(c.EnabledLabelSelectors) == 0 {
 		return
 	}
 
-	for idx, item := range c.EnabledLabelSelectors {
-		p, err := selector.ParseSelector(item.LabelSelector)
+	for idx := range c.EnabledNamespaces {
+		ns := c.EnabledNamespaces[idx].Namespace
+		re, err := regexp.Compile(ns)
 		if err != nil {
-			log.Warnf("Unexpected labelSelector '%s', parse error: %s", item.LabelSelector, err)
+			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", ns, err)
+			continue
+		}
+		c.EnabledNamespaces[idx].re = re
+	}
+
+	for idx := range c.EnabledLabelSelectors {
+		se := c.EnabledLabelSelectors[idx].LabelSelector
+		p, err := labels.Parse(se)
+		if err != nil {
+			log.Warnf("Unexpected labelSelector '%s', parse error: %s", se, err)
 			continue
 		}
 		c.EnabledLabelSelectors[idx].selector = p

@@ -20,12 +20,12 @@ const (
 const enableEnvFieldRef = true
 
 var (
-	ddtraceEnabledNamespaces = func(ns string) string {
-		return config.Cfg.AdmissionInject.DDTrace.MatchNamespace(ns)
+	ddtraceGetLanguageFromNamespace = func(ns string) string {
+		return config.Cfg.AdmissionInject.DDTrace.GetLanguageFromNamespace(ns)
 	}
 
-	ddtraceEnabledLabelSelectors = func(labels map[string]string) string {
-		return config.Cfg.AdmissionInject.DDTrace.MatchLabelSelector(labels)
+	ddtraceGetLanguageFromLabels = func(labels map[string]string) string {
+		return config.Cfg.AdmissionInject.DDTrace.GetLanguageFromLabels(labels)
 	}
 
 	ddtraceJavaAgentImage = func() string {
@@ -50,6 +50,14 @@ var (
 
 	logfwdResourceLimits = func() (cpu string, memory string) {
 		return config.Cfg.AdmissionInject.Logfwd.ResourceLimits()
+	}
+
+	profilerGetLanguageFromNamespace = func(ns string) string {
+		return config.Cfg.AdmissionInject.Profiler.GetLanguageFromNamespace(ns)
+	}
+
+	profilerGetLanguageFromLabels = func(labels map[string]string) string {
+		return config.Cfg.AdmissionInject.Profiler.GetLanguageFromLabels(labels)
 	}
 
 	profilerJavaImage = func() string {

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.13] - 2025-03-31
+
+- 支持正则表达式匹配 namespace 和 labels，以注入 DDtrace 和 Profiler（#58）
+- 支持正则表达式匹配 namespace 和 labels 注入 logging 配置（#59）
+
 ## [1.5.12] - 2025-02-28
 
 - 支持在注入 logfwd 和 profiler 时手动配置 Request 和 Limit（#57）

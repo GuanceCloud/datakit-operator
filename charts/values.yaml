@@ -53,27 +53,9 @@ configmap:
                     "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
                 }
             },
-            "logfwd": {
-                "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.26.0"
-                },
-                "envs": {
-                    "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
-                    "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
-                    "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
-                },
-                "resources": {
-                    "requests": {
-                        "cpu":    "100m",
-                        "memory": "64Mi"
-                    },
-                    "limits": {
-                       "cpu":    "500m",
-                       "memory": "512Mi"
-                    }
-                }
-            },
             "profiler": {
+                "enabled_namespaces":     [],
+                "enabled_labelselectors": [],
                 "images": {
                     "java_profiler_image":   "pubrepo.jiagouyun.com/dataflux/async-profiler:0.1.0",
                     "python_profiler_image": "pubrepo.jiagouyun.com/dataflux/py-spy:0.1.0",
@@ -86,6 +68,26 @@ configmap:
                     "DK_PROFILE_ENV":      "prod",
                     "DK_PROFILE_DURATION": "240",
                     "DK_PROFILE_SCHEDULE": "*/20 * * * *"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu":    "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                       "cpu":    "500m",
+                       "memory": "512Mi"
+                    }
+                }
+            },
+            "logfwd": {
+                "images": {
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.26.0"
+                },
+                "envs": {
+                    "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
+                    "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
                 },
                 "resources": {
                     "requests": {
