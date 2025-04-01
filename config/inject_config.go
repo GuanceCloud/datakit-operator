@@ -126,7 +126,7 @@ func (c *ContainerConfig) setupNamespacesAndLabelsSelectors() {
 	}
 
 	for idx := range c.EnabledNamespaces {
-		ns := c.EnabledNamespaces[idx].Namespace
+		ns := replaceAsteriskWithDotAsterisk(c.EnabledNamespaces[idx].Namespace)
 		re, err := regexp.Compile(ns)
 		if err != nil {
 			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", ns, err)
@@ -144,4 +144,12 @@ func (c *ContainerConfig) setupNamespacesAndLabelsSelectors() {
 		}
 		c.EnabledLabelSelectors[idx].selector = p
 	}
+}
+
+// replaceAsteriskWithDotAsterisk is syntactic sugar that simplifies the syntax.
+func replaceAsteriskWithDotAsterisk(s string) string {
+	if s == "*" {
+		return ".*"
+	}
+	return s
 }
