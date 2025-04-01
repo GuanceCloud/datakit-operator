@@ -51,9 +51,10 @@ type Selector struct {
 
 func (s *Selector) Setup() {
 	for _, namespaceSelector := range s.Namespaces {
-		re, err := regexp.Compile(namespaceSelector)
+		ns := replaceAsteriskWithDotAsterisk(namespaceSelector)
+		re, err := regexp.Compile(ns)
 		if err != nil {
-			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", namespaceSelector, err)
+			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", ns, err)
 			continue
 		}
 		s.namespaceSelectors = append(s.namespaceSelectors, re)
