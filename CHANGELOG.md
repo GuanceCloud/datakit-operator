@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.14] - 2025-04-01
+
+- 优化 namespace 正则匹配的写法，现在要匹配 all 只需要写 `*` 而不是 `.*`（#59）
+
 ## [1.5.13] - 2025-03-31
 
 - 支持正则表达式匹配 namespace 和 labels，以注入 DDtrace 和 Profiler（#58）
