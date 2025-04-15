@@ -22,29 +22,37 @@ const (
 
 var supportedLanguagesForDDTrace = []language{java, python, nodejs}
 
-func InjectDDTraceToPod(parent string, pod *corev1.Pod) error {
+func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("cannot inject ddtrace-lib into nil pod")
 	}
 
-	r := newDDTraceResource(parent, pod)
+	r := newDDTraceResource(namespace, parent, pod)
 	r.process()
 	return nil
 }
 
 type ddtraceResource struct {
-	parent string
-	pod    *corev1.Pod
+	// Kubernetes 1.19 and earlier versions do not include the namespace in the AdmissionReview.
+	// Therefore, the namespace from the upper-level AdmissionReview is recorded first
+	namespace string
+	parent    string
+	pod       *corev1.Pod
 }
 
-func newDDTraceResource(parent string, pod *corev1.Pod) *ddtraceResource {
+func newDDTraceResource(namespace, parent string, pod *corev1.Pod) *ddtraceResource {
 	return &ddtraceResource{
-		parent: parent,
-		pod:    pod,
+		namespace: namespace,
+		parent:    parent,
+		pod:       pod,
 	}
 }
 
 func (r *ddtraceResource) process() {
+	if r.pod.Namespace != "" {
+		r.namespace = r.pod.Namespace
+	}
+
 	should, lang, imageVersion := r.shouldInject()
 	if !should {
 		return
@@ -65,7 +73,7 @@ func (r *ddtraceResource) process() {
 	}
 
 	image := lib.joinReleaseImage(imageVersion)
-	l.Infof("Use of ddtrace %s-lib image %s to %s for namespace %s", lang, image, r.parent, r.pod.Namespace)
+	l.Infof("Use of ddtrace %s-lib image %s to %s for namespace %s", lang, image, r.parent, r.namespace)
 
 	// must be nil
 	_ = lib.injectInitContainer(r.pod, image)
@@ -101,7 +109,7 @@ func (r *ddtraceResource) shouldInject() (bool, language, string) {
 		lang = v
 		l.Debugf("ddtrace %s-lib finds labelSelector for %s", lang, r.parent)
 	}
-	if v := ddtraceGetLanguageFromNamespace(r.pod.Namespace); v != "" {
+	if v := ddtraceGetLanguageFromNamespace(r.namespace); v != "" {
 		lang = v
 		l.Debugf("ddtrace %s-lib finds namespace for %s", lang, r.parent)
 	}

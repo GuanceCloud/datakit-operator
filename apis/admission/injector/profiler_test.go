@@ -157,7 +157,7 @@ func TestInjectProfiler(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := InjectProfilerToPod(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectProfilerToPod("", testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)

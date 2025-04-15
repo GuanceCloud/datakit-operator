@@ -14,29 +14,35 @@ const (
 	loggingAnnotationKey = "datakit/logs"
 )
 
-func MutateLoggingToPod(parent string, pod *corev1.Pod) error {
+func MutateLoggingToPod(namespace, parent string, pod *corev1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("cannot inject ddtrace-lib into nil pod")
 	}
 
-	r := newLoggingResource(parent, pod)
+	r := newLoggingResource(namespace, parent, pod)
 	r.process()
 	return nil
 }
 
 type loggingResource struct {
-	parent string
-	pod    *corev1.Pod
+	namespace string
+	parent    string
+	pod       *corev1.Pod
 }
 
-func newLoggingResource(parent string, pod *corev1.Pod) *loggingResource {
+func newLoggingResource(namespace, parent string, pod *corev1.Pod) *loggingResource {
 	return &loggingResource{
-		parent: parent,
-		pod:    pod,
+		namespace: namespace,
+		parent:    parent,
+		pod:       pod,
 	}
 }
 
 func (r *loggingResource) process() {
+	if r.pod.Namespace != "" {
+		r.namespace = r.pod.Namespace
+	}
+
 	should, configStr := r.shouldInject()
 	if !should {
 		return
@@ -61,12 +67,12 @@ func (r *loggingResource) shouldInject() (bool, string) {
 	}
 	// Use MatchLabelSelector first
 	if configStr := loggingMatchLabelsForConfig(r.pod.Labels); configStr != "" {
-		l.Debugf("logging config '%s' found from namespaceSelector, Pod is %s", configStr, r.parent)
+		l.Debugf("logging config '%s' found from labelSelector, Pod is %s", configStr, r.parent)
 		return true, configStr
 	}
 
-	if configStr := loggingMatchNamespaceForConfig(r.pod.Namespace); configStr != "" {
-		l.Debugf("logging config '%s' found from labelSelector, Pod is %s", configStr, r.parent)
+	if configStr := loggingMatchNamespaceForConfig(r.namespace); configStr != "" {
+		l.Debugf("logging config '%s' found from namespaceSelector, Pod is %s", configStr, r.parent)
 		return true, configStr
 	}
 

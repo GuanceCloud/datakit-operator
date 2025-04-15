@@ -17,24 +17,24 @@ func shouldInject(annotations map[string]string) bool {
 	return injector.CheckAnnotationIsTrue(annotations, injectEnabled)
 }
 
-func mutatePod(parent string, pod *corev1.Pod) error {
+func mutatePod(namespace, parent string, pod *corev1.Pod) error {
 	if !shouldInject(pod.GetAnnotations()) {
 		return nil
 	}
 
 	l.Debug("mutated pod")
 
-	if err := injector.InjectDDTraceToPod(parent, pod); err != nil {
+	if err := injector.InjectDDTraceToPod(namespace, parent, pod); err != nil {
 		return err
 	}
-	if err := injector.InjectLogfwdToPod(parent, pod); err != nil {
+	if err := injector.InjectLogfwdToPod(namespace, parent, pod); err != nil {
 		return err
 	}
-	if err := injector.InjectProfilerToPod(parent, pod); err != nil {
+	if err := injector.InjectProfilerToPod(namespace, parent, pod); err != nil {
 		return err
 	}
 
-	if err := mutator.MutateLoggingToPod(parent, pod); err != nil {
+	if err := mutator.MutateLoggingToPod(namespace, parent, pod); err != nil {
 		return err
 	}
 	return nil
