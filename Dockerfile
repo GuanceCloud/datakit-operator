@@ -1,4 +1,4 @@
-FROM pubrepo.guance.com/base/ubuntu:18.04 AS base
+FROM pubrepo.guance.com/base/ubuntu:22.04 AS base
 ARG TARGETARCH
 
 RUN mkdir -p /usr/local/datakit-operator
