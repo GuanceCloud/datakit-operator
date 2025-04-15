@@ -102,7 +102,7 @@ func TestMutateLoging(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := MutateLoggingToPod(testCases[idx].in.Name, &testCases[idx].in)
+		err := MutateLoggingToPod("", testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
