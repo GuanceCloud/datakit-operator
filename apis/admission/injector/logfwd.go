@@ -34,7 +34,7 @@ type logfwdConfig struct {
 	} `json:"loggings"`
 }
 
-func InjectLogfwdToPod(parent string, pod *corev1.Pod) error {
+func InjectLogfwdToPod(_, parent string, pod *corev1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("cannot inject logfwd into nil pod")
 	}
