@@ -159,7 +159,7 @@ func TestInjectDDTrace(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectDDTraceToPod("", testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
@@ -251,7 +251,7 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectDDTraceToPod("", testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)
@@ -345,7 +345,7 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 	}
 
 	for idx := range testCases {
-		err := InjectDDTraceToPod(testCases[idx].in.Name, &testCases[idx].in)
+		err := InjectDDTraceToPod("", testCases[idx].in.Name, &testCases[idx].in)
 		assert.NoError(t, err)
 
 		assert.Equal(t, &testCases[idx].out, &testCases[idx].in)

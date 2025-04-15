@@ -102,7 +102,7 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		if err != nil {
 			break
 		}
-		err = mutatePod(getGenerateName(pod.GenerateName), &pod)
+		err = mutatePod(requ.Namespace, getGenerateName(pod.GenerateName), &pod)
 		resource = pod
 
 	default:

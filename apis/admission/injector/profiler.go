@@ -27,29 +27,35 @@ var (
 	supportedLanguagesForProfiler = []language{java, python, golang}
 )
 
-func InjectProfilerToPod(parent string, pod *corev1.Pod) error {
+func InjectProfilerToPod(namespace, parent string, pod *corev1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("cannot inject profiler into nil pod")
 	}
 
-	r := newProfilerResource(parent, pod)
+	r := newProfilerResource(namespace, parent, pod)
 	r.process()
 	return nil
 }
 
 type profilerResource struct {
-	parent string
-	pod    *corev1.Pod
+	namespace string
+	parent    string
+	pod       *corev1.Pod
 }
 
-func newProfilerResource(parent string, pod *corev1.Pod) *profilerResource {
+func newProfilerResource(namespace, parent string, pod *corev1.Pod) *profilerResource {
 	return &profilerResource{
-		parent: parent,
-		pod:    pod,
+		namespace: namespace,
+		parent:    parent,
+		pod:       pod,
 	}
 }
 
 func (r *profilerResource) process() {
+	if r.pod.Namespace != "" {
+		r.namespace = r.pod.Namespace
+	}
+
 	should, lang, imageVersion := r.shouldInject()
 	if !should {
 		return
@@ -88,7 +94,7 @@ func (r *profilerResource) shouldInject() (bool, language, string) {
 		lang = v
 		l.Debugf("profiler %s finds labelSelector for %s", lang, r.parent)
 	}
-	if v := profilerGetLanguageFromNamespace(r.pod.Namespace); v != "" {
+	if v := profilerGetLanguageFromNamespace(r.namespace); v != "" {
 		lang = v
 		l.Debugf("profiler %s finds namespace for %s", lang, r.parent)
 	}
