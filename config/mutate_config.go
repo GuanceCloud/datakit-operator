@@ -24,17 +24,11 @@ type LoggingConfig struct {
 	Config string `json:"config"`
 }
 
-func (cfgs LoggingConfigs) MatchNamespace(ns string) string {
+func (cfgs LoggingConfigs) Matches(ns string, labels map[string]string) string {
 	for _, cfg := range cfgs {
 		if matched := cfg.Selector.matchNamespace(ns); matched {
 			return cfg.Config
 		}
-	}
-	return ""
-}
-
-func (cfgs LoggingConfigs) MatchLabels(labels map[string]string) string {
-	for _, cfg := range cfgs {
 		if matched := cfg.Selector.matchLabels(labels); matched {
 			return cfg.Config
 		}
