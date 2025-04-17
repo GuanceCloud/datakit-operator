@@ -65,17 +65,10 @@ func (r *loggingResource) shouldInject() (bool, string) {
 	if _, exist := r.pod.Annotations[loggingAnnotationKey]; exist {
 		return false, ""
 	}
-	// Use MatchLabelSelector first
-	if configStr := loggingMatchLabelsForConfig(r.pod.Labels); configStr != "" {
-		l.Debugf("logging config '%s' found from labelSelector, Pod is %s", configStr, r.parent)
+	if configStr := loggingMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.Labels); configStr != "" {
+		l.Debugf("logging config '%s' found from Pod %s", configStr, r.parent)
 		return true, configStr
 	}
-
-	if configStr := loggingMatchNamespaceForConfig(r.namespace); configStr != "" {
-		l.Debugf("logging config '%s' found from namespaceSelector, Pod is %s", configStr, r.parent)
-		return true, configStr
-	}
-
 	return false, ""
 }
 

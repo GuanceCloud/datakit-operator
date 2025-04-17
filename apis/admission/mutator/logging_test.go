@@ -11,8 +11,7 @@ import (
 func TestMutateLoging(t *testing.T) {
 	const configStr = `[{"disable":false,"type":"file","path":"/var/log/opt/**/*log","source":"logging-var"}, {"disable":false,"type":"file","path":"/tmp/opt/log","source":"logging-tmp"}]`
 
-	loggingMatchNamespaceForConfig = func(_ string) string { return configStr }
-	loggingMatchLabelsForConfig = func(_ map[string]string) string { return configStr }
+	loggingMatchNamespaceOrLabelsForConfig = func(_ string, _ map[string]string) string { return configStr }
 
 	var testCases = []struct {
 		in  corev1.Pod
