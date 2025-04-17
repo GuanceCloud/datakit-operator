@@ -1,7 +1,7 @@
 FROM pubrepo.guance.com/base/ubuntu:22.04 AS base
 ARG TARGETARCH
 
-RUN mkdir -p /usr/local/datakit-operator
+# RUN mkdir -p /usr/local/datakit-operator
 
 COPY dist/${TARGETARCH}/ /usr/local/datakit-operator
 COPY self-certification/tls* /usr/local/datakit-operator/certs/
