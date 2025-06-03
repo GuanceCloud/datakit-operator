@@ -39,14 +39,14 @@ configmap:
                 "enabled_namespaces":     [],
                 "enabled_labelselectors": [],
                 "images": {
-                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.36.2-guance"
+                    "java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:latest"
                 },
                 "envs": {
-                    "DD_AGENT_HOST":           "datakit-service.datakit.svc",
+                    "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                     "DD_TRACE_AGENT_PORT":     "9529",
-                    "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc",
+                    "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc.cluster.local",
                     "DD_JMXFETCH_STATSD_PORT": "8125",
-                    "DD_SERVICE":              "{fieldRef:metadata.labels['service']}",
+                    "DD_SERVICE":              "{fieldRef:metadata.labels['app']}",
                     "POD_NAME":                "{fieldRef:metadata.name}",
                     "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
                     "NODE_NAME":               "{fieldRef:spec.nodeName}",
@@ -82,7 +82,7 @@ configmap:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.26.0"
+                    "logfwd_image": "pubrepo.guance.com/datakit/logfwd:latest"
                 },
                 "envs": {
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",

@@ -22,6 +22,8 @@ test:
     - /^.*$/
   script:
     - make lint
+  tags:
+    - cloudcare-ft
 
 release-testing:
   stage: deploy
@@ -33,6 +35,8 @@ release-testing:
     - make clean
     - make
     - make pub_testing_image
+  tags:
+    - cloudcare-ft
 
 release-stable:
   stage: deploy
@@ -45,6 +49,8 @@ release-stable:
     - make
     - make pub_image
     - make pub_uos_image
+  tags:
+    - cloudcare-ft
 
 #release-helm-test:
 #  stage: deploy
