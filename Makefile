@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.5.16
+VERSION=v1.5.17
 
 BIN           = datakit-operator
 ENTRY         = main.go
