@@ -115,7 +115,7 @@ pub_image:
 pub_testing_image:
 	$(call clean_charts)
 	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com/datakit-operator)
-	$(call build_k8s_charts, 'datakit-operator-testing')
+	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 pub_uos_image:
