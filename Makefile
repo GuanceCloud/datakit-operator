@@ -3,9 +3,9 @@ default: local
 VERSION=v1.5.17
 
 BIN           = datakit-operator
-ENTRY         = main.go
+ENTRY         = ./cmd/main.go
 BUILD_DIR     = dist
-CERT_DIR      = self-certification
+DOCKERFILE_DIR= dockerfiles
 ARCH_AMD64    = amd64
 ARCH_ARM64    = arm64
 IMAGE_ARCHS   = linux/arm64,linux/amd64
@@ -39,15 +39,14 @@ const (
 endef
 export GIT_INFO
 
-
 define build
 	@rm -rf $(BUILD_DIR)/*
 
 	@echo "======= $(BIN) $(1) ======="
-	@GO111MODULE=off CGO_ENABLED=0 GOOS=linux GOARCH=$(1) go build -o $(BUILD_DIR)/$(1)/$(BIN) -pkgdir $(ENTRY)
+	@GO111MODULE=off CGO_ENABLED=0 GOOS=linux GOARCH=$(1) go build -o $(BUILD_DIR)/$(1)/$(BIN) $(ENTRY)
 	@echo "[OK] $(BUILD_DIR)/$(1)/$(BIN)"
 	@echo "======= $(BIN) $(2) ======="
-	@GO111MODULE=off CGO_ENABLED=0 GOOS=linux GOARCH=$(2) go build -o $(BUILD_DIR)/$(2)/$(BIN) -pkgdir $(ENTRY)
+	@GO111MODULE=off CGO_ENABLED=0 GOOS=linux GOARCH=$(2) go build -o $(BUILD_DIR)/$(2)/$(BIN) $(ENTRY)
 	@echo "[OK] $(BUILD_DIR)/$(2)/$(BIN)"
 
 	@echo "----"
@@ -56,32 +55,30 @@ define build
 endef
 
 define build_image
-	@sed -e "s/{{HUB}}/$(2)/g" \
-		-e "s/{{VERSION}}/$(VERSION)/g" \
-		-e "s/{{CABUNDLE}}/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
-		datakit-operator.yaml.template > datakit-operator.yaml
-	sudo docker buildx build --platform $(1) \
-		-t $(2)/datakit-operator/datakit-operator:$(VERSION) -f Dockerfile . --push
-	sudo docker buildx build --platform $(1) \
-		-t $(2)/datakit-operator/datakit-operator:latest -f Dockerfile . --push
+	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:$(VERSION) -f $(DOCKERFILE_DIR)/Dockerfile . --push
+	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:latest -f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
 define build_uos_image
-	sudo docker buildx build --platform $(1) \
-		-t $(2)/uos-dataflux/datakit-operator:$(VERSION) -f Dockerfile.uos . --push
-	sudo docker buildx build --platform $(1) \
-		-t $(2)/uos-dataflux/datakit-operator:latest -f Dockerfile.uos . --push
+	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:$(VERSION) -f $(DOCKERFILE_DIR)/Dockerfile.uos . --push
+	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:latest -f $(DOCKERFILE_DIR)/Dockerfile.uos . --push
 endef
 
 define build_k8s_charts
 	@helm repo ls
 	@echo `echo $(VERSION) | cut -d'-' -f1`
-	@sed -e "s,(@REPOSITORY),$(2)/datakit-operator/datakit-operator,g" \
-	     -e "s/(@CABUNDLE)/`cat $(CERT_DIR)/tls.crt | base64 | tr -d "\n"`/g" \
-	     charts/values.yaml > charts/datakit-operator/values.yaml
+	@bash brand.sh $(1) $(VERSION)
+
 	@helm package charts/datakit-operator --version `echo $(VERSION) | cut -d'-' -f1` --app-version `echo $(VERSION)`
-	@helm cm-push datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz $(1)
+	@helm cm-push datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz $(2)
 	@rm -f datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz
+endef
+
+define clean_charts
+	@rm -f datakit-operator.yaml
+	@cat /dev/null > charts/datakit-operator/README.md
+	@cat /dev/null > charts/datakit-operator/Chart.yaml
+	@cat /dev/null > charts/datakit-operator/values.yaml
 endef
 
 define check_golint_version
@@ -104,17 +101,25 @@ local: deps
 	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 
 pub_image:
-	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com)
+	$(call clean_charts)
+	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com/datakit-operator)
+	$(call build_k8s_charts,guance,'datakit-operator')
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
-	$(call build_k8s_charts, 'datakit-operator', pubrepo.guance.com)
 
-pub_uos_image:
-	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com)
+	$(call clean_charts)
+	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com/truewatch)
+	$(call build_k8s_charts,truewatch,'datakit-operator')
+	$(call upload,$(TRUEWATCH_PRODUCTION_OSS_HOST),$(TRUEWATCH_PRODUCTION_OSS_BUCKET),$(TRUEWATCH_PRODUCTION_OSS_ACCESS_KEY),$(TRUEWATCH_PRODUCTION_OSS_SECRET_KEY),$(VERSION))
+
 
 pub_testing_image:
-	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com)
+	$(call clean_charts)
+	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com/datakit-operator)
+	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
-	$(call build_k8s_charts, 'datakit-operator-testing', registry.jiagouyun.com)
+
+pub_uos_image:
+	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)
 
 lint: deps test
 	$(GOLINT_BINARY) run --allow-parallel-runners;
@@ -138,3 +143,4 @@ test: deps
 
 clean:
 	@rm -rf $(BUILD_DIR)/*
+	$(call clean_charts)
