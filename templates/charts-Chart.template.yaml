@@ -1,6 +1,6 @@
 apiVersion: v2
 name: datakit-operator
-description: Chart for the Datakit Operator
+description: Chart for the DataKit Operator
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -21,14 +21,10 @@ version: 0.1.0
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "1.16.0"
+appVersion: (@APP_VERSION)
 
-home: http://www.guance.com
-icon: https://static.guance.com/images/datakit/datakit-icon-white-bg.png
+home: https://www.(@BRAND_DOMAIN)
+icon: https://static.(@BRAND_DOMAIN)/images/datakit/datakit-icon-white-bg.png
+
 keywords:
   - Observable
-maintainers:
-  - email: tanbiao@guance.com
-    name: coanor
-sources:
-  - https://github.com/GuanceCloud/datakit-operator

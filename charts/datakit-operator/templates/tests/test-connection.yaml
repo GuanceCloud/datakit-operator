@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: wget
-      image: pubrepo.jiagouyun.com/googleimages/busybox:1.35.0
+      image: busybox
       command: ['wget']
       args: ['{{ include "datakit-operator.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never
