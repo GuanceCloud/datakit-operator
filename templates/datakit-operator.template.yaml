@@ -91,7 +91,7 @@ data:
             }
         },
         "admission_mutate": {
-            "logging": [
+            "loggings": [
                 {
                     "namespace_selectors": [],
                     "label_selectors":     [],
