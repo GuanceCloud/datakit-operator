@@ -40,6 +40,16 @@ data:
                     "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
                     "NODE_NAME":               "{fieldRef:spec.nodeName}",
                     "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu":    "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                       "cpu":    "200m",
+                       "memory": "128Mi"
+                    }
                 }
             },
             "profiler": {
