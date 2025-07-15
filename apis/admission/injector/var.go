@@ -40,6 +40,14 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.Image(config.DDTraceNodejsImageKey)
 	}
 
+	ddtraceResourceRequests = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.DDTrace.ResourceRequests()
+	}
+
+	ddtraceResourceLimits = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.DDTrace.ResourceLimits()
+	}
+
 	logfwdImage = func() string {
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
