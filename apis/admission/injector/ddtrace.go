@@ -6,6 +6,7 @@ import (
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -75,8 +76,7 @@ func (r *ddtraceResource) process() {
 	image := lib.joinReleaseImage(imageVersion)
 	l.Infof("Use of ddtrace %s-lib image %s to %s for namespace %s", lang, image, r.parent, r.namespace)
 
-	// must be nil
-	_ = lib.injectInitContainer(r.pod, image)
+	r.injectInitContainer(image)
 	if err := lib.injectConfig(r.pod); err != nil {
 		l.Warnf("Unable to inject DDTrace into %s, err: %s", r.parent, err)
 		return
@@ -122,6 +122,45 @@ func (r *ddtraceResource) shouldInject() (bool, language, string) {
 	}
 
 	return false, null, ""
+}
+
+func (r *ddtraceResource) injectInitContainer(image string) {
+	container := corev1.Container{
+		Name:            ddtraceInitContainerName,
+		Image:           image,
+		Command:         []string{"sh", "copy-lib.sh", ddtraceMountPath},
+		ImagePullPolicy: corev1.PullAlways,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      ddtraceVolumeName,
+				MountPath: ddtraceMountPath,
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: map[corev1.ResourceName]resource.Quantity{},
+			Limits:   map[corev1.ResourceName]resource.Quantity{},
+		},
+	}
+
+	// set requests
+	cpuRequest, memoryRequest := ddtraceResourceRequests()
+	if cpuRequest != "" {
+		container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cpuRequest)
+	}
+	if memoryRequest != "" {
+		container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(memoryRequest)
+	}
+
+	// set limits
+	cpuLimit, memoryLimit := ddtraceResourceLimits()
+	if cpuLimit != "" {
+		container.Resources.Limits[corev1.ResourceCPU] = resource.MustParse(cpuLimit)
+	}
+	if memoryLimit != "" {
+		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
+	}
+
+	manager.NewContainerManager(r.pod).AddInitContainer(&container)
 }
 
 func (r *ddtraceResource) injectGlobalVolume() {
@@ -185,22 +224,13 @@ func (r *ddtraceResource) specialDDTagsEnv(newEnv *corev1.EnvVar) {
 
 type ddtraceLibrary interface {
 	joinReleaseImage(imageVersion string) string
-	injectInitContainer(pod *corev1.Pod, image string) error
 	injectConfig(pod *corev1.Pod) error
 }
-
-//
-// ddtraceJava
-//
 
 type ddtraceJava struct{}
 
 func (d *ddtraceJava) joinReleaseImage(imageVersion string) string {
 	return replaceImageVersion(ddtraceJavaAgentImage(), imageVersion)
-}
-
-func (d *ddtraceJava) injectInitContainer(pod *corev1.Pod, image string) error {
-	return injectDDTraceInitContainer(pod, image)
 }
 
 func (d *ddtraceJava) injectConfig(pod *corev1.Pod) error {
@@ -216,21 +246,10 @@ func (d *ddtraceJava) injectConfig(pod *corev1.Pod) error {
 	return injectDDTraceConfig(pod, javaToolOptionsKey, envValFunc)
 }
 
-//
-// ddtracePython
-//
-
 type ddtracePython struct{}
 
 func (d *ddtracePython) joinReleaseImage(imageVersion string) string {
 	return replaceImageVersion(ddtracePythonAgentImage(), imageVersion)
-}
-
-func (d *ddtracePython) injectInitContainer(pod *corev1.Pod, image string) error {
-	/*
-		return injectDDTraceInitContainer(pod, image)
-	*/
-	return nil
 }
 
 func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
@@ -249,22 +268,13 @@ func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
 		}
 		return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
 	*/
-
 	return nil
 }
-
-//
-// ddtraceNodejs
-//
 
 type ddtraceNodejs struct{}
 
 func (d *ddtraceNodejs) joinReleaseImage(imageVersion string) string {
 	return replaceImageVersion(ddtraceNodejsAgentImage(), imageVersion)
-}
-
-func (d *ddtraceNodejs) injectInitContainer(pod *corev1.Pod, image string) error {
-	return injectDDTraceInitContainer(pod, image)
 }
 
 func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
@@ -294,7 +304,6 @@ func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) str
 			if podSpec.Containers[i].Env[index].ValueFrom != nil {
 				return fmt.Errorf("%q is defined via ValueFrom", envKey)
 			}
-
 			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
 		}
 	}
@@ -305,24 +314,6 @@ func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) str
 	}
 	// This is a special volumeMount, do not need to check for duplicates.
 	manager.NewVolumeMountManager(pod).AddVolumeMount(&volumeMount)
-
-	return nil
-}
-
-func injectDDTraceInitContainer(pod *corev1.Pod, image string) error {
-	container := corev1.Container{
-		Name:            ddtraceInitContainerName,
-		Image:           image,
-		Command:         []string{"sh", "copy-lib.sh", ddtraceMountPath},
-		ImagePullPolicy: corev1.PullAlways,
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      ddtraceVolumeName,
-				MountPath: ddtraceMountPath,
-			},
-		},
-	}
-	manager.NewContainerManager(pod).AddInitContainer(&container)
 	return nil
 }
 

@@ -5,11 +5,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInjectDDTrace(t *testing.T) {
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
+	ddtraceResourceRequests = func() (string, string) { return "100m", "64Mi" }
+	ddtraceResourceLimits = func() (string, string) { return "200m", "128Mi" }
+
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
 			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
@@ -143,6 +147,16 @@ func TestInjectDDTrace(t *testing.T) {
 									MountPath: "/datadog-lib",
 								},
 							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -167,9 +181,11 @@ func TestInjectDDTrace(t *testing.T) {
 }
 
 func TestInjectDDTraceForNamespaces(t *testing.T) {
-	ddtraceGetLanguageFromNamespace = func(_ string) string { return "java" }
 	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
+	ddtraceResourceRequests = func() (string, string) { return "", "" }
+	ddtraceResourceLimits = func() (string, string) { return "", "" }
 
+	ddtraceGetLanguageFromNamespace = func(_ string) string { return "java" }
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
 			{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
@@ -234,6 +250,10 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 									Name:      "datakit-auto-instrument",
 									MountPath: "/datadog-lib",
 								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{},
+								Limits:   map[corev1.ResourceName]resource.Quantity{},
 							},
 						},
 					},
@@ -259,10 +279,12 @@ func TestInjectDDTraceForNamespaces(t *testing.T) {
 }
 
 func TestInjectDDTraceForLabelSelectors(t *testing.T) {
+	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
+	ddtraceResourceRequests = func() (string, string) { return "", "" }
+	ddtraceResourceLimits = func() (string, string) { return "", "" }
+
 	ddtraceGetLanguageFromLabels = func(_ map[string]string) string { return "java" }
 	ddtraceGetLanguageFromNamespace = func(_ string) string { return "java" }
-
-	ddtraceJavaAgentImage = func() string { return "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1" }
 
 	ddtraceEnvs = func() []struct{ Key, Value string } {
 		return []struct{ Key, Value string }{
@@ -328,6 +350,10 @@ func TestInjectDDTraceForLabelSelectors(t *testing.T) {
 									Name:      "datakit-auto-instrument",
 									MountPath: "/datadog-lib",
 								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{},
+								Limits:   map[corev1.ResourceName]resource.Quantity{},
 							},
 						},
 					},
