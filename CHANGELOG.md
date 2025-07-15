@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.18] - 2025-07-15
+
+- 支持在注入 ddtrace 时手动配置 Resources Requests 和 Resources Limits（#68）
+
 ## [1.5.17] - 2025-06-03
 
 - 发布 image 支持 uos arm64 版本
@@ -23,7 +27,7 @@
 
 ## [1.5.12] - 2025-02-28
 
-- 支持在注入 logfwd 和 profiler 时手动配置 Request 和 Limit（#57）
+- 支持在注入 logfwd 和 profiler 时手动配置 Resources Requests 和 Resources Limits（#57）
 
 ## [1.5.11] - 2025-02-20
 
