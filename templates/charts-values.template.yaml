@@ -67,9 +67,9 @@ configmap:
                 "enabled_namespaces":     [],
                 "enabled_labelselectors": [],
                 "images": {
-                    "java_profiler_image":   "(@BRAND_REPO_DATAFLUX)/async-profiler:0.1.0",
-                    "python_profiler_image": "(@BRAND_REPO_DATAFLUX)/py-spy:0.1.0",
-                    "golang_profiler_image": "(@BRAND_REPO_DATAFLUX)/pprof:0.1.0"
+                    "java_profiler_image":   "(@BRAND_REPO_DATAKIT_OPERATOR)/async-profiler:0.5.0",
+                    "python_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/py-spy:0.1.0",
+                    "golang_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/pprof:0.1.0"
                 },
                 "envs": {
                     "DK_AGENT_HOST":       "datakit-service.datakit.svc",
@@ -92,7 +92,7 @@ configmap:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:latest"
+                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:1.80.0"
                 },
                 "envs": {
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
