@@ -56,17 +56,17 @@ data:
                 "enabled_namespaces":     [],
                 "enabled_labelselectors": [],
                 "images": {
-                    "java_profiler_image":   "(@BRAND_REPO_DATAFLUX)/async-profiler:0.1.0",
-                    "python_profiler_image": "(@BRAND_REPO_DATAFLUX)/py-spy:0.1.0",
-                    "golang_profiler_image": "(@BRAND_REPO_DATAFLUX)/pprof:0.1.0"
+                    "java_profiler_image":   "(@BRAND_REPO_DATAKIT_OPERATOR)/async-profiler:0.5.0",
+                    "python_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/py-spy:0.1.0",
+                    "golang_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/pprof:0.1.0"
                 },
                 "envs": {
-                    "DK_AGENT_HOST":  "datakit-service.datakit.svc.cluster.local",
-                    "DK_AGENT_PORT":  "9529",
-                    "DK_PROFILE_VERSION": "1.2.333",
-                    "DK_PROFILE_ENV": "prod",
+                    "DK_AGENT_HOST":       "datakit-service.datakit.svc.cluster.local",
+                    "DK_AGENT_PORT":       "9529",
+                    "DK_PROFILE_VERSION":  "1.2.333",
+                    "DK_PROFILE_ENV":      "prod",
                     "DK_PROFILE_DURATION": "240",
-                    "DK_PROFILE_SCHEDULE": "0 * * * *"
+                    "DK_PROFILE_SCHEDULE": "*/20 * * * *"
                 },
                 "resources": {
                     "requests": {
@@ -81,7 +81,7 @@ data:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:latest"
+                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:1.80.0"
                 },
                 "envs": {
                     "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
