@@ -103,16 +103,16 @@ local: deps
 pub_image:
 	$(call clean_charts)
 	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com/datakit-operator)
-	@helm repo add dk-guance https://pubrepo.guance.com/chartrepo/datakit-operator || true
+	@helm repo add datakit-operator-chart-cn https://pubrepo.guance.com/chartrepo/datakit-operator || true
 	@helm repo update
-	$(call build_k8s_charts,guance,'dk-guance')
+	$(call build_k8s_charts,guance,'datakit-operator-chart-cn')
 	$(call upload,$(PRODUCTION_OSS_HOST),$(PRODUCTION_OSS_BUCKET),$(PRODUCTION_OSS_ACCESS_KEY),$(PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 
 	$(call clean_charts)
 	$(call build_image,$(IMAGE_ARCHS),pubrepo.guance.com/truewatch)
-	@helm repo add dk-truewatch https://pubrepo.truewatch.com/chartrepo/truewatch || true
+	@helm repo add datakit-operator-chart-intl https://pubrepo.truewatch.com/chartrepo/truewatch || true
 	@helm repo update
-	$(call build_k8s_charts,truewatch,'dk-truewatch')
+	$(call build_k8s_charts,truewatch,'datakit-operator-chart-intl')
 	$(call upload,$(TRUEWATCH_PRODUCTION_OSS_HOST),$(TRUEWATCH_PRODUCTION_OSS_BUCKET),$(TRUEWATCH_PRODUCTION_OSS_ACCESS_KEY),$(TRUEWATCH_PRODUCTION_OSS_SECRET_KEY),$(VERSION))
 
 
