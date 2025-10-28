@@ -1,5 +1,36 @@
 ## DataKit-Operator (@APP_VERSION) Configuration YAML
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: datakit-operator
+rules:
+- apiGroups: ["logging.datakits.io"]
+  resources: ["clusterloggingconfigs"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datakit-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datakit-operator
+subjects:
+- kind: ServiceAccount
+  name: datakit-operator
+  namespace: datakit
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: datakit-operator
+  namespace: datakit
+
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -12,6 +43,7 @@ spec:
     - name: http
       port: 443
       targetPort: 9543
+
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -81,12 +113,16 @@ data:
             },
             "logfwd": {
                 "images": {
-                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:1.80.0"
+                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:1.86.0"
                 },
                 "envs": {
-                    "LOGFWD_GLOBAL_SERVICE": "{fieldRef:metadata.labels['app']}",
-                    "LOGFWD_POD_NAME":       "{fieldRef:metadata.name}",
-                    "LOGFWD_POD_NAMESPACE":  "{fieldRef:metadata.namespace}"
+                    "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
+                    "LOGFWD_DATAKIT_PORT":              "9533",
+                    "LOGFWD_DATAKIT_OPERATOR_ENDPOINT": "datakit-operator.datakit.svc:443",
+                    "LOGFWD_GLOBAL_SERVICE":            "{fieldRef:metadata.labels['app']}",
+                    "LOGFWD_POD_NAME":                  "{fieldRef:metadata.name}",
+                    "LOGFWD_POD_NAMESPACE":             "{fieldRef:metadata.namespace}",
+                    "LOGFWD_POD_IP":                    "{fieldRef:status.podIP}"
                 },
                 "resources": {
                     "requests": {
@@ -110,6 +146,7 @@ data:
             ]
         }
     }
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -128,6 +165,7 @@ spec:
       labels:
         app: datakit-operator
     spec:
+      serviceAccountName: datakit-operator
       containers:
         - name: operator
           image: (@REPOSITORY):(@APP_VERSION)
@@ -148,6 +186,7 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
