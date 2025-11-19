@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package config
 
 import (
@@ -6,11 +11,30 @@ import (
 	"os"
 )
 
+// LoadConfigWithEnv loads configuration from environment variables.
+// Priority:
+// 1) ENV_CONFIG_FILE: path to a JSON file
+// 2) ENV_JSON_CONFIG: raw JSON string
 func LoadConfigWithEnv() error {
 	initLog()
 	log.Info("loading config..")
+
+	if path := os.Getenv("ENV_CONFIG_FILE"); path != "" {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read config file failed: %w", err)
+		}
+		if err := parseConfig(string(b), Cfg); err != nil {
+			return err
+		}
+		return Cfg.Validate()
+	}
+
 	cfgStr := os.Getenv("ENV_JSON_CONFIG")
-	return parseConfig(cfgStr, Cfg)
+	if err := parseConfig(cfgStr, Cfg); err != nil {
+		return err
+	}
+	return Cfg.Validate()
 }
 
 func parseConfig(cfgStr string, c *Configuration) error {

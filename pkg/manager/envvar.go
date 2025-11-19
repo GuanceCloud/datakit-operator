@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package manager
 
 import (
@@ -11,20 +16,20 @@ type EnvVarManager interface {
 }
 
 func NewEnvVarManager(pod *corev1.Pod) EnvVarManager {
-	return &envVarMangaer{pod}
+	return &envVarManagerImpl{pod}
 }
 
-type envVarMangaer struct {
+type envVarManagerImpl struct {
 	pod *corev1.Pod
 }
 
-func (m *envVarMangaer) AddEnvVar(newEnvVar *corev1.EnvVar) {
+func (m *envVarManagerImpl) AddEnvVar(newEnvVar *corev1.EnvVar) {
 	for idx := range m.pod.Spec.Containers {
 		_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
 	}
 }
 
-func (m *envVarMangaer) AddEnvVarToContainer(containerName string, newEnvVar *corev1.EnvVar) {
+func (m *envVarManagerImpl) AddEnvVarToContainer(containerName string, newEnvVar *corev1.EnvVar) {
 	for idx := range m.pod.Spec.Containers {
 		if m.pod.Spec.Containers[idx].Name == containerName {
 			_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
@@ -32,7 +37,7 @@ func (m *envVarMangaer) AddEnvVarToContainer(containerName string, newEnvVar *co
 	}
 }
 
-func (m *envVarMangaer) AddEnvVarToInitContainer(initContainerName string, newEnvVar *corev1.EnvVar) {
+func (m *envVarManagerImpl) AddEnvVarToInitContainer(initContainerName string, newEnvVar *corev1.EnvVar) {
 	for idx := range m.pod.Spec.InitContainers {
 		if m.pod.Spec.InitContainers[idx].Name == initContainerName {
 			_ = AddEnvVarToContainer(&m.pod.Spec.InitContainers[idx], newEnvVar)

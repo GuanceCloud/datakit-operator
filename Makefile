@@ -1,6 +1,6 @@
 default: local
 
-VERSION=v1.5.18
+VERSION=v1.6.0
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -126,6 +126,7 @@ pub_uos_image:
 	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)
 
 lint: deps test
+	@bash scripts/check_copyright.sh
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \

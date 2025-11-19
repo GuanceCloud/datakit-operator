@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0] - 2025-11-19
+
+- 新增对 Kubernetes ClusterLoggingConfig CRD 的支持，新增 HTTP 接口返回日志采集配置（#70）
+- 调整和优化了注入 logfwd 的方式，适配新的 CRD 日志采集配置（#70）
+
 ## [1.5.18] - 2025-07-15
 
 - 支持在注入 ddtrace 时手动配置 Resources Requests 和 Resources Limits（#68）
