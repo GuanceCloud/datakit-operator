@@ -10,3 +10,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "datakit-operator.fullname" . }}
+  namespace: datakit
