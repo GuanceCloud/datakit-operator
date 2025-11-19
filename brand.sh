@@ -18,7 +18,7 @@ truewatch_repository="pubrepo.truewatch.com/truewatch/datakit-operator"
 testing_brand_domain="guance.com"
 testing_brand_repo_datakit_operator="pubrepo.guance.com/datakit-operator"
 testing_brand_repo_datakit="pubrepo.guance.com/datakit"
-testing_repository="registry.jiagouyun.com/datakit-operator"
+testing_repository="registry.jiagouyun.com/datakit-operator/datakit-operator"
 
 
 # check input parameters
