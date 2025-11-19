@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package manager
 
 import (
@@ -10,14 +15,14 @@ type VolumeManager interface {
 }
 
 func NewVolumeManager(pod *corev1.Pod) VolumeManager {
-	return &volumeMangaer{pod}
+	return &volumeManagerImpl{pod}
 }
 
-type volumeMangaer struct {
+type volumeManagerImpl struct {
 	pod *corev1.Pod
 }
 
-func (m *volumeMangaer) AddVolume(newVolume *corev1.Volume) {
+func (m *volumeManagerImpl) AddVolume(newVolume *corev1.Volume) {
 	for idx := range m.pod.Spec.Volumes {
 		if m.pod.Spec.Volumes[idx].Name == newVolume.Name {
 			return
@@ -26,7 +31,7 @@ func (m *volumeMangaer) AddVolume(newVolume *corev1.Volume) {
 	m.pod.Spec.Volumes = append(m.pod.Spec.Volumes, *newVolume)
 }
 
-func (m *volumeMangaer) IsEmptyDirVolume(name string) bool {
+func (m *volumeManagerImpl) IsEmptyDirVolume(name string) bool {
 	for idx := range m.pod.Spec.Volumes {
 		if m.pod.Spec.Volumes[idx].Name == name {
 			return m.pod.Spec.Volumes[idx].EmptyDir != nil

@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package config
 
 import "gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
@@ -33,10 +38,27 @@ func initLog() {
 
 func initDefaultConfiguration() *Configuration {
 	return &Configuration{
+		ServerListen: ":9543",
+		LogLevel:     "info",
 		AdmissionInject: AdmissionInjectConfig{
 			DDTrace:  newContainerConfig(),
 			Logfwd:   newContainerConfig(),
 			Profiler: newContainerConfig(),
 		},
 	}
+}
+
+// Validate performs basic sanity checks after loading configuration.
+func (c *Configuration) Validate() error {
+	// ensure image maps are always initialized
+	if c.AdmissionInject.DDTrace.Images == nil {
+		c.AdmissionInject.DDTrace.Images = make(map[string]string)
+	}
+	if c.AdmissionInject.Logfwd.Images == nil {
+		c.AdmissionInject.Logfwd.Images = make(map[string]string)
+	}
+	if c.AdmissionInject.Profiler.Images == nil {
+		c.AdmissionInject.Profiler.Images = make(map[string]string)
+	}
+	return nil
 }
