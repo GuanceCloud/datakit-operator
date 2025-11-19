@@ -13,7 +13,7 @@ image:
   ## @param tag - string - required
   ## Define the Cluster-Agent version to use.
   #
-  tag: ""
+  tag: (@APP_VERSION)
 
   ## @param pullPolicy - string - optional
   ## The Kubernetes [imagePullPolicy][] value
