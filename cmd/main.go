@@ -1,7 +1,15 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package main
 
 import (
-	"sync"
+	"context"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis"
@@ -11,7 +19,7 @@ import (
 
 var log = logger.DefaultSLogger("main")
 
-func initlogger() {
+func initLogger() {
 	lopt := &logger.Option{
 		Flags: logger.OPT_DEFAULT | logger.OPT_STDOUT,
 		Level: config.Cfg.LogLevel,
@@ -31,16 +39,17 @@ func main() {
 	}
 	log.Info("parse configuration successfully")
 
-	initlogger()
-	log.Info("datakit-operator start..")
+	initLogger()
+	log.Info("datakit-operator start")
 	log.Infof("buildAt: %s, version: %s, commit: %s, branch: %s",
 		git.BuildAt, git.Version, git.Commit, git.Branch)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		apis.Run(config.Cfg.ServerListen)
-	}()
-	wg.Wait()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if err := apis.Run(ctx, config.Cfg.ServerListen); err != nil {
+		log.Error(err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
 }

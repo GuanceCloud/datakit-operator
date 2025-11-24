@@ -18,7 +18,7 @@ truewatch_repository="pubrepo.truewatch.com/truewatch/datakit-operator"
 testing_brand_domain="guance.com"
 testing_brand_repo_datakit_operator="pubrepo.guance.com/datakit-operator"
 testing_brand_repo_datakit="pubrepo.guance.com/datakit"
-testing_repository="registry.jiagouyun.com/datakit-operator"
+testing_repository="registry.jiagouyun.com/datakit-operator/datakit-operator"
 
 
 # check input parameters
@@ -42,7 +42,8 @@ if [ "$brand" = "guance" ]; then
 		-e "s,(@BRAND_DOMAIN),$guance_brand_domain,g" \
 		templates/charts-Chart.template.yaml > charts/datakit-operator/Chart.yaml
 
-	sed -e "s,(@REPOSITORY),$guance_repository,g" \
+	sed -e "s,(@APP_VERSION),$app_version,g" \
+		-e "s,(@REPOSITORY),$guance_repository,g" \
 		-e "s,(@BRAND_REPO_DATAKIT_OPERATOR),$guance_brand_repo_datakit_operator,g" \
 		-e "s,(@BRAND_REPO_DATAKIT),$guance_brand_repo_datakit,g" \
 	       	-e "s/(@CABUNDLE)/`cat $cert_dir/tls.crt | base64 | tr -d "\n"`/g" \
@@ -63,7 +64,8 @@ elif [ "$brand" = "truewatch" ]; then
 		-e "s,(@BRAND_DOMAIN),$truewatch_brand_domain,g" \
 		templates/charts-Chart.template.yaml > charts/datakit-operator/Chart.yaml
 
-	sed -e "s,(@REPOSITORY),$truewatch_repository,g" \
+	sed -e "s,(@APP_VERSION),$app_version,g" \
+	        -e "s,(@REPOSITORY),$truewatch_repository,g" \
 		-e "s,(@BRAND_REPO_DATAKIT_OPERATOR),$truewatch_brand_repo_datakit_operator,g" \
 		-e "s,(@BRAND_REPO_DATAKIT),$truewatch_brand_repo_datakit,g" \
 	       	-e "s/(@CABUNDLE)/`cat $cert_dir/tls.crt | base64 | tr -d "\n"`/g" \
@@ -84,7 +86,8 @@ elif [ "$brand" = "testing" ]; then
 		-e "s,(@BRAND_DOMAIN),$testing_brand_domain,g" \
 		templates/charts-Chart.template.yaml > charts/datakit-operator/Chart.yaml
 
-	sed -e "s,(@REPOSITORY),$testing_repository,g" \
+	sed -e "s,(@APP_VERSION),$app_version,g" \
+	        -e "s,(@REPOSITORY),$testing_repository,g" \
 		-e "s,(@BRAND_REPO_DATAKIT_OPERATOR),$testing_brand_repo_datakit_operator,g" \
 		-e "s,(@BRAND_REPO_DATAKIT),$testing_brand_repo_datakit,g" \
 	       	-e "s/(@CABUNDLE)/`cat $cert_dir/tls.crt | base64 | tr -d "\n"`/g" \
@@ -100,4 +103,3 @@ else
     echo "Fatal：unreachable!"
     exit 1
 fi
-
