@@ -37,14 +37,22 @@ func newLoggingConfigWatcher(client client.Client) *loggingConfigWatcher {
 func (w *loggingConfigWatcher) start(ctx context.Context) {
 	log.Info("starting logging config watcher")
 
-	// RBAC 预检：尝试进行一次最小化的 List 调用，若无权限则退出
+	// RBAC 预检：尝试进行一次最小化的 List 调用，若无权限或 CRD 不存在则退出
 	if clientset := w.client.Logging(); clientset != nil {
 		_, err := clientset.LoggingV1alpha1().ClusterLoggingConfigs().List(ctx, metav1.ListOptions{Limit: 1})
-		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
-			log.Errorf("missing RBAC to access ClusterLoggingConfig: %v; exit logging config watcher", err)
+		if err != nil {
+			if apierrors.IsForbidden(err) {
+				log.Warnf("missing RBAC permission to access ClusterLoggingConfig: %v; exit logging config watcher", err)
+			} else if apierrors.IsNotFound(err) {
+				log.Warnf("ClusterLoggingConfig CRD resource type not found: %v; exit logging config watcher", err)
+			} else {
+				log.Warnf("failed to access ClusterLoggingConfig: %v; exit logging config watcher", err)
+			}
 			return
 		}
 	}
+
+	log.Info("starting CRD informer for ClusterLoggingConfig")
 
 	w.setupInformer()
 
