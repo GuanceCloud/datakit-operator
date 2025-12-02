@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.6.1] - 2025-12-02
+
+- 优化对 Kubernetes ClusterLoggingConfig CRD 的错误检查，当资源不存在时会打印日志并停止该功能（#71）
+
 ## [1.6.0] - 2025-11-19
 
 - 新增对 Kubernetes ClusterLoggingConfig CRD 的支持，新增 HTTP 接口返回日志采集配置（#70）
