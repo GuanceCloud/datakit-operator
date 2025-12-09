@@ -12,55 +12,87 @@ var (
 	log = logger.DefaultSLogger("config")
 )
 
-const (
-	DDTraceJavaImageKey   = "java_agent_image"
-	DDTracePythonImageKey = "python_agent_image"
-	DDTraceNodejsImageKey = "js_agent_image"
-
-	LogfwdImageKey            = "logfwd_image"
-	LogfwdReuseExistVolumeOpt = "reuse_exist_volume"
-
-	FlameshotImageKey = "flameshot_image"
-
-	ProfilerJavaImageKey   = "java_profiler_image"
-	ProfilerPythonImageKey = "python_profiler_image"
-	ProfilerGolangImageKey = "golang_profiler_image"
-)
-
-type Configuration struct {
-	ServerListen    string                `json:"server_listen"`
-	LogLevel        string                `json:"log_level"`
-	AdmissionInject AdmissionInjectConfig `json:"admission_inject"`
-	AdmissionMutate AdmissionMutateConfig `json:"admission_mutate"`
-}
-
 func initLog() {
 	log = logger.SLogger("config")
+}
+
+type Configuration struct {
+	ServerListen              string                 `json:"server_listen"`
+	LogLevel                  string                 `json:"log_level"`
+	AdmissionInject           AdmissionInjectConfig  `json:"admission_inject_v2"`
+	AdmissionMutate           AdmissionMutateConfig  `json:"admission_mutate"`
+	DeprecatedAdmissionInject DeprecatedInjectConfig `json:"admission_inject"`
+}
+
+func (c *Configuration) Setup() error {
+	// 检查旧配置是否有效，如果有效则转换为新结构并替换
+	if hasValidDeprecatedConfig(c) {
+		log.Info("deprecated admission_inject config detected, converting to new structure and replacing admission_inject_v2")
+		log.Info("priority: deprecated config takes precedence over new config, if deprecated config exists, it will be used")
+
+		converted := convertDeprecatedToAdmissionInject(&c.DeprecatedAdmissionInject)
+
+		// 替换 DDTraces 和 Logfwds（旧版优先）
+		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTraces) {
+			c.AdmissionInject.DDTraces = converted.DDTraces
+			log.Info("replaced admission_inject_v2.ddtrace with converted deprecated config")
+		}
+		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwds) {
+			c.AdmissionInject.Logfwds = converted.Logfwds
+			log.Info("replaced admission_inject_v2.logfwd with converted deprecated config")
+		}
+	}
+
+	if err := c.AdmissionInject.Setup(); err != nil {
+		return err
+	}
+	if err := c.AdmissionMutate.Setup(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func hasValidDeprecatedConfig(c *Configuration) bool {
+	return isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTraces) ||
+		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwds)
+}
+
+func isValidDeprecatedRule(rule *DeprecatedInjectRule) bool {
+	if rule == nil {
+		return false
+	}
+
+	hasImages := rule.Images != nil && len(rule.Images) > 0
+	hasEnvironments := rule.Environments != nil && len(rule.Environments) > 0
+
+	return hasImages || hasEnvironments
 }
 
 func initDefaultConfiguration() *Configuration {
 	return &Configuration{
 		ServerListen: ":9543",
 		LogLevel:     "info",
-		AdmissionInject: AdmissionInjectConfig{
-			DDTrace:  newContainerConfig(),
-			Logfwd:   newContainerConfig(),
-			Profiler: newContainerConfig(),
-		},
 	}
 }
 
-// Validate performs basic sanity checks after loading configuration.
-func (c *Configuration) Validate() error {
-	// ensure image maps are always initialized
-	if c.AdmissionInject.DDTrace.Images == nil {
-		c.AdmissionInject.DDTrace.Images = make(map[string]string)
-	}
-	if c.AdmissionInject.Logfwd.Images == nil {
-		c.AdmissionInject.Logfwd.Images = make(map[string]string)
-	}
-	if c.AdmissionInject.Profiler.Images == nil {
-		c.AdmissionInject.Profiler.Images = make(map[string]string)
-	}
+type AdmissionInjectConfig struct {
+	DDTraces   InjectRules `json:"ddtraces"`
+	Logfwds    InjectRules `json:"logfwds"`
+	Flameshots InjectRules `json:"flameshots"`
+}
+
+func (c *AdmissionInjectConfig) Setup() error {
+	c.DDTraces.Setup()
+	c.Logfwds.Setup()
+	c.Flameshots.Setup()
+	return nil
+}
+
+type AdmissionMutateConfig struct {
+	Loggings MutateRules `json:"loggings"`
+}
+
+func (c *AdmissionMutateConfig) Setup() error {
+	c.Loggings.Setup()
 	return nil
 }

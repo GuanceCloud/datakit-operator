@@ -11,36 +11,6 @@ import (
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/labels"
 )
 
-type AdmissionMutateConfig struct {
-	Loggings LoggingConfigs `json:"loggings"`
-}
-
-func (c *AdmissionMutateConfig) Setup() error {
-	for idx := range c.Loggings {
-		c.Loggings[idx].Selector.Setup()
-	}
-	return nil
-}
-
-type LoggingConfigs []LoggingConfig
-
-type LoggingConfig struct {
-	Selector
-	Config string `json:"config"`
-}
-
-func (cfgs LoggingConfigs) Matches(ns string, labels map[string]string) string {
-	for _, cfg := range cfgs {
-		if matched := cfg.Selector.matchNamespace(ns); matched {
-			return cfg.Config
-		}
-		if matched := cfg.Selector.matchLabels(labels); matched {
-			return cfg.Config
-		}
-	}
-	return ""
-}
-
 type Selector struct {
 	Namespaces         []string `json:"namespace_selectors"`
 	Labels             []string `json:"label_selectors"`
@@ -70,6 +40,9 @@ func (s *Selector) Setup() {
 }
 
 func (s *Selector) matchNamespace(ns string) bool {
+	if len(s.namespaceSelectors == 0) {
+		return true
+	}
 	for _, re := range s.namespaceSelectors {
 		if re.MatchString(ns) {
 			return true
@@ -79,10 +52,21 @@ func (s *Selector) matchNamespace(ns string) bool {
 }
 
 func (s *Selector) matchLabels(m map[string]string) bool {
+	if len(s.labelSelectors == 0) {
+		return true
+	}
 	for _, se := range s.labelSelectors {
 		if se.Matches(labels.Set(m)) {
 			return true
 		}
 	}
 	return false
+}
+
+// replaceAsteriskWithDotAsterisk is syntactic sugar that simplifies the syntax.
+func replaceAsteriskWithDotAsterisk(s string) string {
+	if s == "*" {
+		return ".*"
+	}
+	return s
 }
