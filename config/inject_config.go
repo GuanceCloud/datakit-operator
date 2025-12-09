@@ -13,9 +13,10 @@ import (
 )
 
 type AdmissionInjectConfig struct {
-	DDTrace  ContainerConfig `json:"ddtrace"`
-	Logfwd   ContainerConfig `json:"logfwd"`
-	Profiler ContainerConfig `json:"profiler"`
+	DDTrace   ContainerConfig `json:"ddtrace"`
+	Logfwd    ContainerConfig `json:"logfwd"`
+	Flameshot ContainerConfig `json:"flameshot"`
+	Profiler  ContainerConfig `json:"profiler"`
 }
 
 func (c *AdmissionInjectConfig) Setup() error {
@@ -23,6 +24,9 @@ func (c *AdmissionInjectConfig) Setup() error {
 		return err
 	}
 	if err := c.Logfwd.Setup(); err != nil {
+		return err
+	}
+	if err := c.Flameshot.Setup(); err != nil {
 		return err
 	}
 	if err := c.Profiler.Setup(); err != nil {
