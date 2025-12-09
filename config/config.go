@@ -20,6 +20,8 @@ const (
 	LogfwdImageKey            = "logfwd_image"
 	LogfwdReuseExistVolumeOpt = "reuse_exist_volume"
 
+	FlameshotImageKey = "flameshot_image"
+
 	ProfilerJavaImageKey   = "java_profiler_image"
 	ProfilerPythonImageKey = "python_profiler_image"
 	ProfilerGolangImageKey = "golang_profiler_image"

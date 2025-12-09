@@ -25,6 +25,9 @@ const (
 const enableEnvFieldRef = true
 
 var (
+	///
+	// ddtrace
+	//
 	ddtraceGetLanguageFromNamespace = func(ns string) string {
 		return config.Cfg.AdmissionInject.DDTrace.GetLanguageFromNamespace(ns)
 	}
@@ -53,6 +56,9 @@ var (
 		return config.Cfg.AdmissionInject.DDTrace.ResourceLimits()
 	}
 
+	///
+	// logfwd
+	//
 	logfwdImage = func() string {
 		return config.Cfg.AdmissionInject.Logfwd.Image(config.LogfwdImageKey)
 	}
@@ -65,6 +71,24 @@ var (
 		return config.Cfg.AdmissionInject.Logfwd.ResourceLimits()
 	}
 
+	///
+	// flameshot
+	//
+	flameshotImage = func() string {
+		return config.Cfg.AdmissionInject.Flameshot.Image(config.FlameshotImageKey)
+	}
+
+	flameshotResourceRequests = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Flameshot.ResourceRequests()
+	}
+
+	flameshotResourceLimits = func() (cpu string, memory string) {
+		return config.Cfg.AdmissionInject.Flameshot.ResourceLimits()
+	}
+
+	///
+	// profiler
+	//
 	profilerGetLanguageFromNamespace = func(ns string) string {
 		return config.Cfg.AdmissionInject.Profiler.GetLanguageFromNamespace(ns)
 	}
@@ -120,5 +144,9 @@ var (
 	logfwdEnvObjects = func() []corev1.EnvVar {
 		envs := logfwdEnvs()
 		return envbuilder.BuildEnvs(envs, enableEnvFieldRef)
+	}
+
+	flameshotEnvs = func() []struct{ Key, Value string } {
+		return config.Cfg.AdmissionInject.Flameshot.Envs()
 	}
 )
