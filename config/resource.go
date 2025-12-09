@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func defaultResourceRequirements() *ResourceRequirements {
-	return &ResourceRequirements{
+func defaultResourceRequirements() ResourceRequirements {
+	return ResourceRequirements{
 		Requests: ResourceQuotaConfig{"100m", "64Mi"},
 		Limits:   ResourceQuotaConfig{"500m", "512Mi"},
 	}
@@ -26,6 +26,11 @@ type ResourceRequirements struct {
 type ResourceQuotaConfig struct {
 	CPU    string
 	Memory string
+}
+
+func (r ResourceRequirements) Nil() bool {
+	return r.Requests.CPU == "" && r.Requests.Memory == "" &&
+		r.Limits.CPU == "" && r.Limits.Memory == ""
 }
 
 func (r ResourceRequirements) Verify() error {
