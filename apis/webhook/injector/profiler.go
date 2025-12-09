@@ -70,7 +70,7 @@ func (r *profilerResource) process() {
 	log.Infof("profiler use_image=%s lang=%s pod=%s", image, lang, r.parent)
 
 	r.resetSpec()
-	r.injectContainer(image, profilerEnvObjects())
+	r.injectContainer(image)
 	r.injectVolume()
 	r.injectVolumeMount()
 }
@@ -183,7 +183,7 @@ func (r *profilerResource) injectVolumeMount() {
 	}
 }
 
-func (r *profilerResource) injectContainer(image string, envs []corev1.EnvVar) {
+func (r *profilerResource) injectContainer(image string) {
 	container := corev1.Container{
 		Name:            profilerContainerName,
 		Image:           image,
@@ -219,7 +219,7 @@ func (r *profilerResource) injectContainer(image string, envs []corev1.EnvVar) {
 		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
 	}
 
-	container.Env = append(container.Env, envs...)
+	container.Env = append(container.Env, profilerEnvObjects()...)
 
 	manager.NewContainerManager(r.pod).AddContainer(&container)
 }
