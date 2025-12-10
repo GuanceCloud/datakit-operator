@@ -40,7 +40,7 @@ func (s *Selector) Setup() {
 }
 
 func (s *Selector) matchNamespace(ns string) bool {
-	if len(s.namespaceSelectors == 0) {
+	if len(s.namespaceSelectors) == 0 {
 		return true
 	}
 	for _, re := range s.namespaceSelectors {
@@ -52,7 +52,7 @@ func (s *Selector) matchNamespace(ns string) bool {
 }
 
 func (s *Selector) matchLabels(m map[string]string) bool {
-	if len(s.labelSelectors == 0) {
+	if len(s.labelSelectors) == 0 {
 		return true
 	}
 	for _, se := range s.labelSelectors {

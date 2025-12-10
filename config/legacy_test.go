@@ -14,7 +14,7 @@ import (
 
 func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 	input := &DeprecatedInjectConfig{
-		DDTraces: DeprecatedInjectRule{
+		DDTrace: DeprecatedInjectRule{
 			EnabledNamespaces: []struct {
 				Namespace string
 				Language  string
@@ -41,7 +41,7 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 				Limits:   ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
 			},
 		},
-		Logfwds: DeprecatedInjectRule{
+		Logfwd: DeprecatedInjectRule{
 			Images: map[string]string{
 				"logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.5.8",
 			},

@@ -12,21 +12,21 @@ import (
 type language string
 
 const (
-	null language = ""
 	java language = "java"
+
+	enableEnvFieldRef = true
 )
 
 var (
 	ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		found, rule := config.Cfg.AdmissionInject.DDTrace.Matches(ns, labels)
-		if !found || rule == nil {
-			return ""
-		}
+		return config.Cfg.AdmissionInject.DDTraces.Matches(ns, labels)
 	}
 
 	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels)
 	}
 
 	flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+		return config.Cfg.AdmissionInject.Flameshots.Matches(ns, labels)
 	}
 )

@@ -19,23 +19,27 @@ type (
 		Images       string               `json:"images"`
 		Environments mapslice.MapSlice    `json:"envs"`
 		Resources    ResourceRequirements `json:"resources"`
-		Envs         Envs                 `json:"-"`
+
+		// only use for logfwd
+		LogConfigs     string   `json:"log_configs"`
+		LogVolumePaths []string `json:"log_volume_path"`
+
+		Envs Envs `json:"-"`
 	}
 )
 
-func (rs InjectRules) Setup() error {
+func (rs InjectRules) Setup() {
 	for idx := range rs {
 		if rs[idx].Resources.Nil() {
 			rs[idx].Resources = defaultResourceRequirements()
 		} else if err := rs[idx].Resources.Verify(); err != nil {
-			log.Warnf("invalid resource requirements: %v", err)
+			log.Warnf("invalid resource requirements: rule_index=%d, error=%v, using default", idx, err)
 			rs[idx].Resources = defaultResourceRequirements()
 		}
 
 		rs[idx].Selector.Setup()
 		rs[idx].setupEnvs()
 	}
-	return nil
 }
 
 func (rs InjectRules) Matches(ns string, labels map[string]string) (bool, *InjectRule) {
@@ -74,11 +78,10 @@ type (
 	}
 )
 
-func (rs MutateRules) Setup() error {
+func (rs MutateRules) Setup() {
 	for idx := range rs {
 		rs[idx].Selector.Setup()
 	}
-	return nil
 }
 
 func (rs MutateRules) Matches(ns string, labels map[string]string) (bool, *MutateRule) {

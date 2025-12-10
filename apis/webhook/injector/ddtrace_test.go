@@ -9,28 +9,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// setupDDTraceTestFunctions sets up test function variables for ddtrace tests
-func setupDDTraceTestFunctions() {
-	// Test constants
-	const testDDTraceImage = "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1"
-	testDDTraceEnvs := []struct{ Key, Value string }{
-		{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-		{"DD_TAGS", "host:node-02,system:linux"},
-		{"POD_NAME", "{fieldRef:metadata.name}"},
-		{"SERVICE_NOT", "{fieldRef:metadata.annotations['hello-$$$']}"},
-	}
-
-	ddtraceJavaAgentImage = func() string { return testDDTraceImage }
-	ddtraceResourceRequests = func() (string, string) { return "100m", "64Mi" }
-	ddtraceResourceLimits = func() (string, string) { return "200m", "128Mi" }
-	ddtraceEnvs = func() []struct{ Key, Value string } {
-		return testDDTraceEnvs
-	}
-}
 
 // createTestPodWithContainers creates a test pod with specified containers
 func createTestPodWithContainers(name string, annotations map[string]string, containers []corev1.Container) *corev1.Pod {
@@ -47,10 +29,29 @@ func createTestPodWithContainers(name string, annotations map[string]string, con
 
 func TestInjectDDTrace(t *testing.T) {
 	t.Run("inject ddtrace to single container", func(t *testing.T) {
-		setupDDTraceTestFunctions()
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language: "java",
+				Images:   "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+					{"DD_TAGS", "host:node-02,system:linux"},
+					{"POD_NAME", "{fieldRef:metadata.name}"},
+					{"SERVICE_NOT", "{fieldRef:metadata.annotations['hello-$$$']}"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		pod := createTestPodWithContainers("test-ddtrace-single", map[string]string{
-			"admission.datakit/java-lib.version": "latest",
+			ddtraceEnabledAnnotationKey: "true",
 		}, []corev1.Container{
 			{Name: "app", Image: "nginx:1.22"},
 		})
@@ -82,7 +83,9 @@ func TestInjectDDTrace(t *testing.T) {
 		assert.Len(t, pod.Spec.InitContainers, 1)
 		initContainer := pod.Spec.InitContainers[0]
 		assert.Equal(t, "datakit-lib-init", initContainer.Name)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:latest", initContainer.Image)
+		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1", initContainer.Image)
+		assert.NotEmpty(t, initContainer.Resources.Requests)
+		assert.NotEmpty(t, initContainer.Resources.Limits)
 
 		// Check volumes
 		assert.Len(t, pod.Spec.Volumes, 1)
@@ -90,10 +93,29 @@ func TestInjectDDTrace(t *testing.T) {
 	})
 
 	t.Run("inject ddtrace to multiple containers with merged DD_TAGS", func(t *testing.T) {
-		setupDDTraceTestFunctions()
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language: "java",
+				Images:   "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+					{"DD_TAGS", "host:node-02,system:linux"},
+					{"POD_NAME", "{fieldRef:metadata.name}"},
+					{"SERVICE_NOT", "{fieldRef:metadata.annotations['hello-$$$']}"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		pod := createTestPodWithContainers("test-ddtrace-multi", map[string]string{
-			"admission.datakit/java-lib.version": "latest",
+			ddtraceEnabledAnnotationKey: "true",
 		}, []corev1.Container{
 			{
 				Name:  "app1",
