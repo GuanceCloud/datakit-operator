@@ -33,11 +33,11 @@ func (c *Configuration) Setup() error {
 		converted := convertDeprecatedToAdmissionInject(&c.DeprecatedAdmissionInject)
 
 		// 替换 DDTraces 和 Logfwds（旧版优先）
-		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTraces) {
+		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTrace) {
 			c.AdmissionInject.DDTraces = converted.DDTraces
 			log.Info("replaced admission_inject_v2.ddtrace with converted deprecated config")
 		}
-		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwds) {
+		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwd) {
 			c.AdmissionInject.Logfwds = converted.Logfwds
 			log.Info("replaced admission_inject_v2.logfwd with converted deprecated config")
 		}
@@ -53,8 +53,8 @@ func (c *Configuration) Setup() error {
 }
 
 func hasValidDeprecatedConfig(c *Configuration) bool {
-	return isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTraces) ||
-		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwds)
+	return isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTrace) ||
+		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwd)
 }
 
 func isValidDeprecatedRule(rule *DeprecatedInjectRule) bool {

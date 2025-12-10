@@ -31,9 +31,9 @@ type DeprecatedInjectRule struct {
 		Language      string
 	} `json:"enabled_labelselectors,omitempty"`
 
-	Images       map[string]string     `json:"images"`
-	Environments mapslice.MapSlice     `json:"envs"`
-	Resources    *ResourceRequirements `json:"resources,omitempty"`
+	Images       map[string]string    `json:"images"`
+	Environments mapslice.MapSlice    `json:"envs"`
+	Resources    ResourceRequirements `json:"resources,omitempty"`
 }
 
 func convertDeprecatedToAdmissionInject(cfg *DeprecatedInjectConfig) AdmissionInjectConfig {
@@ -42,9 +42,9 @@ func convertDeprecatedToAdmissionInject(cfg *DeprecatedInjectConfig) AdmissionIn
 	}
 
 	result := AdmissionInjectConfig{
-		DDTrace:   convertDeprecatedToInjectRules(&cfg.DDTrace, "java", DeprecatedDDTraceJavaImageKey),
-		Logfwd:    convertDeprecatedToInjectRules(&cfg.Logfwd, "", DeprecatedLogfwdImageKey),
-		Flameshot: InjectRules{},
+		DDTraces:   convertDeprecatedToInjectRules(&cfg.DDTrace, "java", DeprecatedDDTraceJavaImageKey),
+		Logfwds:    convertDeprecatedToInjectRules(&cfg.Logfwd, "", DeprecatedLogfwdImageKey),
+		Flameshots: InjectRules{},
 	}
 
 	return result
@@ -78,7 +78,7 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 	// 如果没有 namespace 和 label selector，但存在其他配置（image, envs, resources），
 	// 仍然创建一个 InjectRule 以保持兼容性
 	if len(namespaces) == 0 && len(labels) == 0 &&
-		(image != "" || deprecated.Environments != nil || deprecated.Resources != nil) {
+		(image != "" || deprecated.Environments != nil) {
 		// 创建一个空的 InjectRule，只包含 image, envs, resources
 		rule := &InjectRule{
 			Selector: Selector{

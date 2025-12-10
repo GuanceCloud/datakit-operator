@@ -9,40 +9,39 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// setupFlameshotTestFunctions sets up test function variables for flameshot tests
-func setupFlameshotTestFunctions() {
-	// Test constants
-	const testFlameshotImage = "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0"
-	testFlameshotEnvs := []struct{ Key, Value string }{
-		{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-		{"DK_AGENT_PORT", "9529"},
-		{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-		{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
-	}
-
-	flameshotImage = func() string { return testFlameshotImage }
-	flameshotResourceRequests = func() (string, string) { return "100m", "64Mi" }
-	flameshotResourceLimits = func() (string, string) { return "200m", "128Mi" }
-	flameshotEnvs = func() []struct{ Key, Value string } {
-		return testFlameshotEnvs
-	}
-}
-
 func TestInjectFlameshot(t *testing.T) {
 	t.Run("inject flameshot with basic configuration", func(t *testing.T) {
-		setupFlameshotTestFunctions()
+		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Images: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+				Envs: []struct{ Key, Value string }{
+					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+					{"DK_AGENT_PORT", "9529"},
+					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			flameshotMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-flameshot-pod",
 				Annotations: map[string]string{
-					"admission.datakit/flameshot.enabled":   "true",
-					"admission.datakit/flameshot.processes": "nginx,app",
+					flameshotEnabledAnnotationKey: "true",
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -87,17 +86,47 @@ func TestInjectFlameshot(t *testing.T) {
 		// Check resources
 		assert.Equal(t, resource.MustParse("200m"), flameshotContainer.Resources.Limits[corev1.ResourceCPU])
 		assert.Equal(t, resource.MustParse("128Mi"), flameshotContainer.Resources.Limits[corev1.ResourceMemory])
+		assert.Equal(t, resource.MustParse("100m"), flameshotContainer.Resources.Requests[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("64Mi"), flameshotContainer.Resources.Requests[corev1.ResourceMemory])
+
+		// Check environment variables
+		assert.GreaterOrEqual(t, len(flameshotContainer.Env), 4)
+		envMap := make(map[string]string)
+		for _, env := range flameshotContainer.Env {
+			envMap[env.Name] = env.Value
+		}
+		assert.Equal(t, "datakit-service.datakit.svc", envMap["DK_AGENT_HOST"])
+		assert.Equal(t, "9529", envMap["DK_AGENT_PORT"])
+		assert.Equal(t, "/flameshot-data", envMap["FLAMESHOT_PROFILING_PATH"])
+		assert.Equal(t, "0.0.0.0:8089", envMap["FLAMESHOT_HTTP_LOCAL_ADDRESS"])
 	})
 
 	t.Run("verify volume creation and mounting", func(t *testing.T) {
-		setupFlameshotTestFunctions()
+		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Images: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+				Envs: []struct{ Key, Value string }{
+					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+					{"DK_AGENT_PORT", "9529"},
+					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			flameshotMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-volumes-pod",
 				Annotations: map[string]string{
-					"admission.datakit/flameshot.enabled":   "true",
-					"admission.datakit/flameshot.processes": "app",
+					flameshotEnabledAnnotationKey: "true",
 				},
 			},
 			Spec: corev1.PodSpec{

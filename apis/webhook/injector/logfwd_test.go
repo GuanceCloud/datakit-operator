@@ -9,23 +9,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // setupTestFunctions sets up the test function variables for logfwd injection tests
 func setupTestFunctions() {
-	logfwdImage = func() string { return "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1" }
-	logfwdResourceRequests = func() (string, string) { return "100m", "64Mi" }
-	logfwdResourceLimits = func() (string, string) { return "200m", "128Mi" }
-
-	logfwdEnvs = func() []struct{ Key, Value string } {
-		return []struct{ Key, Value string }{
-			{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
-			{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
-			{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
-		}
-	}
+	// This function is kept for backward compatibility but no longer needed
+	// Tests now use mock functions directly
 }
 
 // createTestPod creates a basic test pod with given name and annotations
@@ -46,6 +38,26 @@ func createTestPod(name string, annotations map[string]string) *corev1.Pod {
 func TestInjectLogfwd(t *testing.T) {
 	t.Run("inject with instances config and volume reuse", func(t *testing.T) {
 		setupTestFunctions()
+
+		// 设置 rule 配置（用于 instances 测试）
+		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Images: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
+					{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
+					{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			logfwdMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		const instancesConfig = `[
     {
@@ -115,7 +127,7 @@ func TestInjectLogfwd(t *testing.T) {
 		assert.Equal(t, "/etc/podinfo", pod.Spec.Containers[1].VolumeMounts[2].MountPath)
 	})
 
-	t.Run("inject with log_configs", func(t *testing.T) {
+	t.Run("inject with log_configs from rule", func(t *testing.T) {
 		setupTestFunctions()
 
 		const logConfigsConfig = `[
@@ -125,9 +137,29 @@ func TestInjectLogfwd(t *testing.T) {
 ]`
 		const logConfigsCompact = `[{"path":"/var/log/app/*.log"}]`
 
+		// 设置 rule 配置
+		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Images:     "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				LogConfigs: logConfigsConfig,
+				Envs: []struct{ Key, Value string }{
+					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
+					{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
+					{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			logfwdMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
 		pod := createTestPod("test-log-configs-pod", map[string]string{
-			logfwdEnabledAnnotationKey:    "true",
-			logfwdLogConfigsAnnotationKey: logConfigsConfig,
+			logfwdEnabledAnnotationKey: "true",
 		})
 
 		err := InjectLogfwdToPod("", pod.Name, pod)
@@ -160,7 +192,20 @@ func TestInjectLogfwdEdgeCases(t *testing.T) {
 	})
 
 	t.Run("skip injection when no config provided", func(t *testing.T) {
-		setupTestFunctions()
+		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			// Return a rule without LogConfigs and no instances annotation
+			return true, &config.InjectRule{
+				Images: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			logfwdMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
 
 		originalPod := createTestPod("test-pod-no-config", map[string]string{logfwdEnabledAnnotationKey: "true"})
 		expectedPod := *originalPod
