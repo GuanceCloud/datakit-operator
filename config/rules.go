@@ -16,7 +16,7 @@ type (
 	InjectRule  struct {
 		Selector
 		Language     string               `json:"language"`
-		Images       string               `json:"images"`
+		Image        string               `json:"image"`
 		Environments mapslice.MapSlice    `json:"envs"`
 		Resources    ResourceRequirements `json:"resources"`
 
@@ -44,10 +44,9 @@ func (rs InjectRules) Setup() {
 
 func (rs InjectRules) Matches(ns string, labels map[string]string) (bool, *InjectRule) {
 	for idx := range rs {
-		if matched := rs[idx].Selector.matchNamespace(ns); matched {
-			return true, rs[idx]
-		}
-		if matched := rs[idx].Selector.matchLabels(labels); matched {
+		namespaceMatched := rs[idx].Selector.matchNamespace(ns)
+		selectMatched := rs[idx].Selector.matchLabels(labels)
+		if namespaceMatched && selectMatched {
 			return true, rs[idx]
 		}
 	}
