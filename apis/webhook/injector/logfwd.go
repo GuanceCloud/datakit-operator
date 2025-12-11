@@ -101,9 +101,9 @@ func (r *logfwdResource) process() {
 	r.injectVolume(volumeNames)
 	r.injectVolumeMount(volumeNames, volumeMountPaths)
 
-	r.injectContainer(rule.Images, envs, volumeNames, volumeMountPaths, rule.Resources)
+	r.injectContainer(rule.Image, envs, volumeNames, volumeMountPaths, rule.Resources)
 
-	log.Infof("logfwd injection completed: pod=%s, image=%s", r.parent, rule.Images)
+	log.Infof("logfwd injection completed: pod=%s, image=%s", r.parent, rule.Image)
 }
 
 func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
@@ -131,7 +131,7 @@ func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
 		if rule.LogConfigs != "" {
 			configType = "log_configs"
 		}
-		log.Infof("logfwd rule matched: pod=%s, config_type=%s, image=%s", r.parent, configType, rule.Images)
+		log.Infof("logfwd rule matched: pod=%s, config_type=%s, image=%s", r.parent, configType, rule.Image)
 		return true, rule
 	}
 

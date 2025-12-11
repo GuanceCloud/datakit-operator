@@ -79,12 +79,12 @@ func (r *flameshotResource) process() {
 	}
 
 	r.resetSpec()
-	r.injectContainer(rule.Images, envs, port, rule.Resources)
+	r.injectContainer(rule.Image, envs, port, rule.Resources)
 	r.injectVolume()
 	r.injectVolumeMount(profilingPath)
-	log.Debugf("flameshot container created: pod=%s, image=%s, port=%d", r.parent, rule.Images, port)
+	log.Debugf("flameshot container created: pod=%s, image=%s, port=%d", r.parent, rule.Image, port)
 
-	log.Infof("flameshot injection completed: pod=%s, image=%s", r.parent, rule.Images)
+	log.Infof("flameshot injection completed: pod=%s, image=%s", r.parent, rule.Image)
 }
 
 func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
@@ -100,7 +100,7 @@ func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
 
 	matched, rule := flameshotMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
 	if matched && rule != nil {
-		log.Infof("flameshot rule matched: pod=%s, image=%s", r.parent, rule.Images)
+		log.Infof("flameshot rule matched: pod=%s, image=%s", r.parent, rule.Image)
 	} else {
 		log.Debugf("flameshot no matching rule: pod=%s, namespace=%s", r.parent, r.namespace)
 	}

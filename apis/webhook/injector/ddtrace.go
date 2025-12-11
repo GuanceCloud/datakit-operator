@@ -70,7 +70,7 @@ func (r *ddtraceResource) process() {
 		return
 	}
 
-	r.injectInitContainer(rule.Images, rule.Resources)
+	r.injectInitContainer(rule.Image, rule.Resources)
 
 	if err := lib.injectConfig(r.pod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
@@ -83,7 +83,7 @@ func (r *ddtraceResource) process() {
 	r.injectGlobalEnvs(envs)
 	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(r.pod.Spec.Containers))
 
-	log.Infof("ddtrace injection completed: pod=%s, image=%s", r.parent, rule.Images)
+	log.Infof("ddtrace injection completed: pod=%s, image=%s", r.parent, rule.Image)
 }
 
 func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
@@ -99,7 +99,7 @@ func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
 
 	matched, rule := ddtraceMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
 	if matched && rule != nil {
-		log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Images)
+		log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
 	}
 	return matched, rule
 }
@@ -119,9 +119,7 @@ func (r *ddtraceResource) injectInitContainer(image string, resources config.Res
 	}
 
 	setContainerResources(&container, resources.Requests.CPU, resources.Requests.Memory, resources.Limits.CPU, resources.Limits.Memory)
-
 	manager.NewContainerManager(r.pod).AddInitContainer(&container)
-	log.Debugf("ddtrace init container created: pod=%s, image=%s", r.parent, image)
 }
 
 func (r *ddtraceResource) injectGlobalVolume() {
