@@ -22,7 +22,7 @@ type (
 
 		// only use for logfwd
 		LogConfigs     string   `json:"log_configs"`
-		LogVolumePaths []string `json:"log_volume_path"`
+		LogVolumePaths []string `json:"log_volume_paths"`
 
 		Envs Envs `json:"-"`
 	}
