@@ -135,7 +135,7 @@ func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
 		return true, rule
 	}
 
-	log.Debugf("logfwd no valid config found: pod=%s", r.parent)
+	log.Warnf("logfwd injection skipped: pod=%s, reason=no_valid_config (instances annotation missing and log_configs empty)", r.parent)
 	return false, nil
 }
 

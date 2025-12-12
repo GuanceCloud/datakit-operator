@@ -24,6 +24,9 @@ type (
 		LogConfigs     string   `json:"log_configs"`
 		LogVolumePaths []string `json:"log_volume_paths"`
 
+		// only use for flameshot
+		Processes string `json:"processes"`
+
 		Envs Envs `json:"-"`
 	}
 )
