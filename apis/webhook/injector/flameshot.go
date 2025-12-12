@@ -26,6 +26,7 @@ const (
 
 	flameshotHTTPPortName        = "datakit-flameshot-http-port"
 	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDRESS"
+	flameshotProcessesKey        = "FLAMESHOT_PROCESSES"
 )
 
 func InjectFlameshotToPod(namespace, parent string, pod *corev1.Pod) error {
@@ -62,9 +63,18 @@ func (r *flameshotResource) process() {
 		return
 	}
 
+	// 如果 Processes 为空，跳过注入
+	if rule.Processes == "" {
+		log.Warnf("flameshot injection skipped: pod=%s, reason=flameshot_processes_empty", r.parent)
+		return
+	}
+
 	log.Infof("flameshot injection started: pod=%s, namespace=%s", r.parent, r.namespace)
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+
+	// 添加 FLAMESHOT_PROCESSES 环境变量（如果已存在会被后面的值覆盖）
+	envs = append(envs, corev1.EnvVar{Name: flameshotProcessesKey, Value: rule.Processes})
 
 	profilingPath := getFlameshotProfilingPath(envs)
 	if profilingPath == "" {

@@ -55,86 +55,81 @@ data:
     {
         "server_listen": "0.0.0.0:9543",
         "log_level":     "info",
-        "admission_inject": {
-            "ddtrace": {
-                "enabled_namespaces":     [],
-                "enabled_labelselectors": [],
-                "images": {
-                    "java_agent_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest"
-                },
-                "envs": {
-                    "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
-                    "DD_TRACE_AGENT_PORT":     "9529",
-                    "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc.cluster.local",
-                    "DD_JMXFETCH_STATSD_PORT": "8125",
-                    "DD_SERVICE":              "{fieldRef:metadata.labels['app']}",
-                    "POD_NAME":                "{fieldRef:metadata.name}",
-                    "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
-                    "NODE_NAME":               "{fieldRef:spec.nodeName}",
-                    "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
-                },
-                "resources": {
-                    "requests": {
-                        "cpu":    "100m",
-                        "memory": "64Mi"
-                    },
-                    "limits": {
-                       "cpu":    "200m",
-                       "memory": "128Mi"
+        "admission_inject_v2": {
+            "ddtraces": [
+                {
+                    "namespace_selectors": [],
+                    "label_selectors":     [],
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
+                    "language": "java",
+                    "envs": {
+                        "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
+                        "DD_TRACE_AGENT_PORT":     "9529",
+                        "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc.cluster.local",
+                        "DD_JMXFETCH_STATSD_PORT": "8125",
+                        "DD_SERVICE":              "{fieldRef:metadata.labels['app']}",
+                        "POD_NAME":                "{fieldRef:metadata.name}",
+                        "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
+                        "NODE_NAME":               "{fieldRef:spec.nodeName}",
+                        "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
                     }
                 }
-            },
-            "profiler": {
-                "enabled_namespaces":     [],
-                "enabled_labelselectors": [],
-                "images": {
-                    "java_profiler_image":   "(@BRAND_REPO_DATAKIT_OPERATOR)/async-profiler:0.5.0",
-                    "python_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/py-spy:0.1.0",
-                    "golang_profiler_image": "(@BRAND_REPO_DATAKIT_OPERATOR)/pprof:0.1.0"
-                },
-                "envs": {
-                    "DK_AGENT_HOST":       "datakit-service.datakit.svc.cluster.local",
-                    "DK_AGENT_PORT":       "9529",
-                    "DK_PROFILE_VERSION":  "1.2.333",
-                    "DK_PROFILE_ENV":      "prod",
-                    "DK_PROFILE_DURATION": "240",
-                    "DK_PROFILE_SCHEDULE": "*/20 * * * *"
-                },
-                "resources": {
-                    "requests": {
-                        "cpu":    "100m",
-                        "memory": "64Mi"
+            ],
+            "logfwds": [
+                {
+                    "namespace_selectors": [],
+                    "label_selectors":     [],
+                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.86.0",
+                    "envs": {
+                        "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
+                        "LOGFWD_DATAKIT_PORT":              "9533",
+                        "LOGFWD_DATAKIT_OPERATOR_ENDPOINT": "datakit-operator.datakit.svc:443",
+                        "LOGFWD_GLOBAL_SERVICE":            "{fieldRef:metadata.labels['app']}",
+                        "LOGFWD_POD_NAME":                  "{fieldRef:metadata.name}",
+                        "LOGFWD_POD_NAMESPACE":             "{fieldRef:metadata.namespace}",
+                        "LOGFWD_POD_IP":                    "{fieldRef:status.podIP}"
                     },
-                    "limits": {
-                       "cpu":    "500m",
-                       "memory": "512Mi"
-                    }
-                }
-            },
-            "logfwd": {
-                "images": {
-                    "logfwd_image": "(@BRAND_REPO_DATAKIT)/logfwd:1.86.0"
-                },
-                "envs": {
-                    "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
-                    "LOGFWD_DATAKIT_PORT":              "9533",
-                    "LOGFWD_DATAKIT_OPERATOR_ENDPOINT": "datakit-operator.datakit.svc:443",
-                    "LOGFWD_GLOBAL_SERVICE":            "{fieldRef:metadata.labels['app']}",
-                    "LOGFWD_POD_NAME":                  "{fieldRef:metadata.name}",
-                    "LOGFWD_POD_NAMESPACE":             "{fieldRef:metadata.namespace}",
-                    "LOGFWD_POD_IP":                    "{fieldRef:status.podIP}"
-                },
-                "resources": {
-                    "requests": {
-                        "cpu":    "100m",
-                        "memory": "64Mi"
+                    "resources": {
+                        "requests": {
+                            "cpu":    "100m",
+                            "memory": "128Mi"
+                        },
+                        "limits": {
+                           "cpu":    "200m",
+                           "memory": "256Mi"
+                        }
                     },
-                    "limits": {
-                       "cpu":    "500m",
-                       "memory": "512Mi"
-                    }
+                    "log_configs": "",
+                    "log_volume_paths": []
                 }
-            }
+            ],
+            "flameshots": [
+                {
+                    "namespace_selectors": [],
+                    "label_selectors":     [],
+                    "image": "(@BRAND_REPO_DATAKIT)/flameshot:latest",
+                    "envs": {
+                        "FLAMESHOT_DATAKIT_ADDR":     "http://datakit-service.datakit:9529/profiling/v1/input",
+                        "FLAMESHOT_MONITOR_INTERVAL": "10s",
+                        "FLAMESHOT_LOG_LEVEL":        "info",
+                        "FLAMESHOT_PROFILING_PATH":   "/flameshot-data",
+                        "FLAMESHOT_LOG_PATH":         "/var/log/flameshot.log",
+                        "FLAMESHOT_HTTP_LOCAL_IP":    "{fieldRef:status.podIP}",
+                        "FLAMESHOT_HTTP_LOCAL_ADDR":  "$(FLAMESHOT_HTTP_LOCAL_IP):8089"
+                    },
+                    "resources": {
+                        "requests": {
+                            "cpu":    "100m",
+                            "memory": "128Mi"
+                        },
+                        "limits": {
+                           "cpu":    "200m",
+                           "memory": "256Mi"
+                        }
+                    },
+                    "processes": ""
+                }
+            ]
         },
         "admission_mutate": {
             "loggings": [
