@@ -20,13 +20,14 @@ func TestInjectFlameshot(t *testing.T) {
 		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
 		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
-				Images: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
 				Envs: []struct{ Key, Value string }{
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
 					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
 				},
+				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
 					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
 					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
@@ -105,13 +106,14 @@ func TestInjectFlameshot(t *testing.T) {
 		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
 		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
-				Images: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
 				Envs: []struct{ Key, Value string }{
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
 					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
 				},
+				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
 					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
 					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
