@@ -11,6 +11,10 @@ import (
 
 var (
 	loggingMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) string {
-		return config.Cfg.AdmissionMutate.Loggings.Matches(ns, labels)
+		found, rule := config.Cfg.AdmissionMutate.Loggings.Matches(ns, labels)
+		if !found || rule == nil {
+			return ""
+		}
+		return rule.Config
 	}
 )
