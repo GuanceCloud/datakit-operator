@@ -11,23 +11,22 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
-	flameshotContainerName = "datakit-flameshot"
+	flameshotContainerName        = "datakit-flameshot"
+	flameshotEnabledAnnotationKey = "admission.datakit/flameshot.enabled"
 
 	flameshotProfilingVolumeName = "datakit-flameshot-volume"
 	flameshotProfilingPathKey    = "FLAMESHOT_PROFILING_PATH"
 
 	flameshotHTTPPortName        = "datakit-flameshot-http-port"
 	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDRESS"
-
-	flameshotEnabledAnnotationKey   = "admission.datakit/flameshot.enabled"
-	flameshotProcessesAnnotationKey = "admission.datakit/flameshot.processes"
+	flameshotProcessesKey        = "FLAMESHOT_PROCESSES"
 )
 
 func InjectFlameshotToPod(namespace, parent string, pod *corev1.Pod) error {
@@ -59,51 +58,63 @@ func (r *flameshotResource) process() {
 		r.namespace = r.pod.Namespace
 	}
 
-	should, processes := r.shouldInject()
-	if !should || processes == "" {
+	should, rule := r.getMatchingRule()
+	if !should || rule == nil {
 		return
 	}
 
-	image := flameshotImage()
-	log.Infof("flameshot use_image=%s pod=%s", image, r.parent)
+	// 如果 Processes 为空，跳过注入
+	if rule.Processes == "" {
+		log.Warnf("flameshot injection skipped: pod=%s, reason=flameshot_processes_empty", r.parent)
+		return
+	}
 
-	envs, profilingPath, port := buildFlameshotEnvs()
+	log.Infof("flameshot injection started: pod=%s, namespace=%s", r.parent, r.namespace)
+
+	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+
+	// 添加 FLAMESHOT_PROCESSES 环境变量（如果已存在会被后面的值覆盖）
+	envs = append(envs, corev1.EnvVar{Name: flameshotProcessesKey, Value: rule.Processes})
+
+	profilingPath := getFlameshotProfilingPath(envs)
 	if profilingPath == "" {
-		log.Warnf("flameshot missing required env key=%s pod=%s", flameshotProfilingPathKey, r.parent)
+		log.Warnf("flameshot missing required env: key=%s pod=%s", flameshotProfilingPathKey, r.parent)
 		return
 	}
+
+	port := getFlameshotPort(envs)
 	if port == 0 {
-		log.Warnf("flameshot missing required env key=%s pod=%s", flameshotHTTPLocalAddressKey, r.parent)
+		log.Warnf("flameshot missing required env: key=%s pod=%s", flameshotHTTPLocalAddressKey, r.parent)
 		return
 	}
-	log.Infof("flameshot profilingPath=%s port=%d pod=%s", profilingPath, port, r.parent)
 
 	r.resetSpec()
-	r.injectContainer(image, envs, port)
+	r.injectContainer(rule.Image, envs, port, rule.Resources)
 	r.injectVolume()
 	r.injectVolumeMount(profilingPath)
+	log.Debugf("flameshot container created: pod=%s, image=%s, port=%d", r.parent, rule.Image, port)
+
+	log.Infof("flameshot injection completed: pod=%s, image=%s", r.parent, rule.Image)
 }
 
-func (r *flameshotResource) shouldInject() (bool, string) {
+func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), flameshotEnabledAnnotationKey) {
-		return false, ""
+		log.Debugf("flameshot annotation disabled: pod=%s", r.parent)
+		return false, nil
 	}
 
 	if manager.NewContainerManager(r.pod).ContainsContainer(flameshotContainerName) {
-		return false, ""
+		log.Debugf("flameshot container already exists: pod=%s", r.parent)
+		return false, nil
 	}
 
-	annotations := r.pod.GetAnnotations()
-	if processes, found := annotations[flameshotProcessesAnnotationKey]; found {
-		if processes == "" {
-			log.Warnf("flameshot processes is empty for pod=%s", r.parent)
-		} else {
-			log.Debugf("flameshot_find_annotation processes=%s pod=%s", processes, r.parent)
-			return true, processes
-		}
+	matched, rule := flameshotMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
+	if matched && rule != nil {
+		log.Infof("flameshot rule matched: pod=%s, image=%s", r.parent, rule.Image)
+	} else {
+		log.Debugf("flameshot no matching rule: pod=%s, namespace=%s", r.parent, r.namespace)
 	}
-
-	return false, ""
+	return matched, rule
 }
 
 func (r *flameshotResource) resetSpec() {
@@ -133,7 +144,7 @@ func (r *flameshotResource) injectVolumeMount(path string) {
 	manager.AddVolumeMount(&profilingDir)
 }
 
-func (r *flameshotResource) injectContainer(image string, envs []corev1.EnvVar, port int32) {
+func (r *flameshotResource) injectContainer(image string, envs []corev1.EnvVar, port int32, resources config.ResourceRequirements) {
 	container := corev1.Container{
 		Name:            flameshotContainerName,
 		Image:           image,
@@ -144,10 +155,6 @@ func (r *flameshotResource) injectContainer(image string, envs []corev1.EnvVar, 
 				Add: []corev1.Capability{"SYS_PTRACE"},
 			},
 		},
-		Resources: corev1.ResourceRequirements{
-			Requests: map[corev1.ResourceName]resource.Quantity{},
-			Limits:   map[corev1.ResourceName]resource.Quantity{},
-		},
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          flameshotHTTPPortName,
@@ -157,48 +164,31 @@ func (r *flameshotResource) injectContainer(image string, envs []corev1.EnvVar, 
 		},
 	}
 
-	// set requests
-	cpuRequest, memoryRequest := flameshotResourceRequests()
-	if cpuRequest != "" {
-		container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cpuRequest)
-	}
-	if memoryRequest != "" {
-		container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(memoryRequest)
-	}
-
-	// set limits
-	cpuLimit, memoryLimit := flameshotResourceLimits()
-	if cpuLimit != "" {
-		container.Resources.Limits[corev1.ResourceCPU] = resource.MustParse(cpuLimit)
-	}
-	if memoryLimit != "" {
-		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
-	}
+	setContainerResources(&container, resources.Requests.CPU, resources.Requests.Memory, resources.Limits.CPU, resources.Limits.Memory)
 
 	container.Env = append(container.Env, envs...)
-
 	manager.NewContainerManager(r.pod).AddContainer(&container)
 }
 
-func buildFlameshotEnvs() (envs []corev1.EnvVar, path string, port int32) {
-	envs = envbuilder.BuildEnvs(flameshotEnvs(), enableEnvFieldRef)
-
-	var profilingPath string
-	var httpPort int32
-
+func getFlameshotProfilingPath(envs []corev1.EnvVar) string {
 	for _, env := range envs {
 		if env.Name == flameshotProfilingPathKey {
-			profilingPath = filepath.Clean(env.Value)
+			return filepath.Clean(env.Value)
 		}
+	}
+	return ""
+}
+
+func getFlameshotPort(envs []corev1.EnvVar) int32 {
+	for _, env := range envs {
 		if env.Name == flameshotHTTPLocalAddressKey {
 			parsedPort, err := parsePortFromAddress(env.Value)
 			if err == nil {
-				httpPort = parsedPort
+				return parsedPort
 			}
 		}
 	}
-
-	return envs, profilingPath, httpPort
+	return 0
 }
 
 func parsePortFromAddress(address string) (int32, error) {

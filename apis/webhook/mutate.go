@@ -38,13 +38,10 @@ func mutatePod(namespace, parent string, pod *corev1.Pod) error {
 	if err := injector.InjectFlameshotToPod(namespace, parent, pod); err != nil {
 		return err
 	}
-	if err := injector.InjectProfilerToPod(namespace, parent, pod); err != nil {
-		return err
-	}
-
 	if err := mutator.MutateLoggingToPod(namespace, parent, pod); err != nil {
 		return err
 	}
+
 	return nil
 }
 
