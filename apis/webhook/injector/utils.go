@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func clearSlice[S ~[]E, E any](s S) {
@@ -156,4 +159,25 @@ func getMountPath(path string) string {
 		return filepath.Clean(filepath.Dir(arr[0]))
 	}
 	return ""
+}
+
+// setContainerResources 设置容器的资源请求和限制
+func setContainerResources(container *corev1.Container, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) {
+	container.Resources = corev1.ResourceRequirements{
+		Requests: make(map[corev1.ResourceName]resource.Quantity),
+		Limits:   make(map[corev1.ResourceName]resource.Quantity),
+	}
+
+	if cpuRequest != "" {
+		container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cpuRequest)
+	}
+	if memoryRequest != "" {
+		container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(memoryRequest)
+	}
+	if cpuLimit != "" {
+		container.Resources.Limits[corev1.ResourceCPU] = resource.MustParse(cpuLimit)
+	}
+	if memoryLimit != "" {
+		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
+	}
 }

@@ -10,7 +10,7 @@ Currently, Datakit-Operator provides the following functions:
 
 - [x] Injection DDTrace Java Agent and related environments.
 - [x] Injection Sidecar logfwd to collect Pod logging.
-- [x] Injection Profiler (Java/Python/Golang) and related environments.
+- [x] Injection Flameshot and related environments.
 - [x] Support task distribution for Datakit plugins.
    
 Prerequisites:
