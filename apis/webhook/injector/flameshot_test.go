@@ -25,7 +25,7 @@ func TestInjectFlameshot(t *testing.T) {
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
+					{"FLAMESHOT_HTTP_LOCAL_ADDR", "0.0.0.0:8089"},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
@@ -99,7 +99,7 @@ func TestInjectFlameshot(t *testing.T) {
 		assert.Equal(t, "datakit-service.datakit.svc", envMap["DK_AGENT_HOST"])
 		assert.Equal(t, "9529", envMap["DK_AGENT_PORT"])
 		assert.Equal(t, "/flameshot-data", envMap["FLAMESHOT_PROFILING_PATH"])
-		assert.Equal(t, "0.0.0.0:8089", envMap["FLAMESHOT_HTTP_LOCAL_ADDRESS"])
+		assert.Equal(t, "0.0.0.0:8089", envMap["FLAMESHOT_HTTP_LOCAL_ADDR"])
 	})
 
 	t.Run("verify volume creation and mounting", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestInjectFlameshot(t *testing.T) {
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_ADDRESS", "0.0.0.0:8089"},
+					{"FLAMESHOT_HTTP_LOCAL_ADDR", "0.0.0.0:8089"},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
