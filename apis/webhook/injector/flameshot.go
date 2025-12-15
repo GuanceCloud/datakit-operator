@@ -25,7 +25,7 @@ const (
 	flameshotProfilingPathKey    = "FLAMESHOT_PROFILING_PATH"
 
 	flameshotHTTPPortName        = "datakit-flameshot-http-port"
-	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDRESS"
+	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDR"
 	flameshotProcessesKey        = "FLAMESHOT_PROCESSES"
 )
 
