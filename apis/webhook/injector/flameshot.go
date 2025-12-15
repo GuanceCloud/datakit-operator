@@ -21,10 +21,10 @@ const (
 	flameshotContainerName        = "datakit-flameshot"
 	flameshotEnabledAnnotationKey = "admission.datakit/flameshot.enabled"
 
-	flameshotProfilingVolumeName = "datakit-flameshot-volume"
+	flameshotProfilingVolumeName = "flameshot-volume"
 	flameshotProfilingPathKey    = "FLAMESHOT_PROFILING_PATH"
 
-	flameshotHTTPPortName        = "datakit-flameshot-http-port"
+	flameshotHTTPPortName        = "flameshot-port"
 	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDR"
 	flameshotProcessesKey        = "FLAMESHOT_PROCESSES"
 )
