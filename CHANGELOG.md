@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0] - 2025-12-12
+
+- 新增 `admission_inject_v2` 配置项，替代原有的 `admission_inject`，同时保持向后兼容（#73）
+- 新增 Flameshot 注入，替换原有的 Profiler 注入（#72）
+- 选择器 `namespace_selectors` 和 `label_selectors` 同时配置时，两者的关系由 “或” 改为 “且”
+- 移除对 Annotation `admission.datakit/logfwd.log_configs` 和 `admission.datakit/logfwd.volume_paths` 的支持（仅 v1.6.X 版本支持）
+- 移除对 Annotation `admission.datakit/java-lib.version` 的支持（仍可通过 `admission.datakit/ddtrace.enabled:"false"` 禁用注入）
+
 ## [1.6.1] - 2025-12-02
 
 - 优化对 Kubernetes ClusterLoggingConfig CRD 的错误检查，当资源不存在时会打印日志并停止该功能（#71）
