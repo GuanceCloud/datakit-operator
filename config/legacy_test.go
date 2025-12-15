@@ -63,7 +63,7 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 					Labels:     []string{"app=myapp"},
 				},
 				Language: "java",
-				Images:   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
+				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
 				Environments: mapslice.MapSlice{
 					{Key: "DD_AGENT_HOST", Value: "datakit-service.datakit.svc"},
 					{Key: "DD_TRACE_AGENT_PORT", Value: "9529"},
@@ -81,7 +81,7 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 					Labels:     []string{},
 				},
 				Language: "",
-				Images:   "pubrepo.guance.com/datakit/logfwd:1.5.8",
+				Image:    "pubrepo.guance.com/datakit/logfwd:1.5.8",
 				Environments: mapslice.MapSlice{
 					{Key: "LOGFWD_ENV", Value: "test"},
 				},

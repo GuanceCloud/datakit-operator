@@ -33,7 +33,7 @@ func TestInjectDDTrace(t *testing.T) {
 		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
 				Language: "java",
-				Images:   "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 				Envs: []struct{ Key, Value string }{
 					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DD_TAGS", "host:node-02,system:linux"},
@@ -97,7 +97,7 @@ func TestInjectDDTrace(t *testing.T) {
 		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
 				Language: "java",
-				Images:   "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
 				Envs: []struct{ Key, Value string }{
 					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DD_TAGS", "host:node-02,system:linux"},

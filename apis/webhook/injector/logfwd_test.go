@@ -43,7 +43,7 @@ func TestInjectLogfwd(t *testing.T) {
 		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
 		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
-				Images: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
 				Envs: []struct{ Key, Value string }{
 					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
 					{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
@@ -141,7 +141,7 @@ func TestInjectLogfwd(t *testing.T) {
 		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
 		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			return true, &config.InjectRule{
-				Images:     "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				Image:      "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
 				LogConfigs: logConfigsConfig,
 				Envs: []struct{ Key, Value string }{
 					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
@@ -196,7 +196,7 @@ func TestInjectLogfwdEdgeCases(t *testing.T) {
 		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
 			// Return a rule without LogConfigs and no instances annotation
 			return true, &config.InjectRule{
-				Images: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+				Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
 				Resources: config.ResourceRequirements{
 					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
 					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
