@@ -70,7 +70,7 @@ define build_k8s_charts
 	@bash brand.sh $(1) $(VERSION)
 
 	@helm package charts/datakit-operator --version `echo $(VERSION) | cut -d'-' -f1` --app-version `echo $(VERSION)`
-	@helm cm-push datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz $(2)
+	@helm cm-push --force datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz $(2)
 	@rm -f datakit-operator-`echo $(VERSION) | cut -d'-' -f1`.tgz
 endef
 
