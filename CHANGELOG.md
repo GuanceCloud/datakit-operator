@@ -2,13 +2,14 @@
 
 ## [1.7.1] - 2025-12-17
 
-- 注入 Flameshot 新增配置项 `enable_prometheus_annotations` 允许添加 Prometheus.io Annotations（#74）
-- 调整 Flameshot 配置端口的方式，从环境变量 `FLAMESHOT_HTTP_LOCAL_ADDR` 改成 `FLAMESHOT_HTTP_LOCAL_PORT（#75）
+- 注入 flameshot 新增配置项 `enable_prometheus_annotations` 允许添加 Prometheus.io Annotations（#74）
+- 调整 flameshot 配置端口的方式，从环境变量 `FLAMESHOT_HTTP_LOCAL_ADDR` 改成 `FLAMESHOT_HTTP_LOCAL_PORT（#75）
+- 修复注入 logfwd 时必须配置 `log_configs` 的错误问题，因为 logfwd 可以使用 CRD 配置源（#76）
 
 ## [1.7.0] - 2025-12-12
 
 - 新增 `admission_inject_v2` 配置项，替代原有的 `admission_inject`，同时保持向后兼容（#73）
-- 新增 Flameshot 注入，替换原有的 Profiler 注入（#72）
+- 新增 flameshot 注入，替换原有的 Profiler 注入（#72）
 - 选择器 `namespace_selectors` 和 `label_selectors` 同时配置时，两者的关系由 “或” 改为 “且”
 - 移除对 Annotation `admission.datakit/logfwd.log_configs` 和 `admission.datakit/logfwd.volume_paths` 的支持（仅 v1.6.X 版本支持）
 - 移除对 Annotation `admission.datakit/java-lib.version` 的支持（仍可通过 `admission.datakit/ddtrace.enabled:"false"` 禁用注入）
