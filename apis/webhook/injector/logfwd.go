@@ -120,6 +120,15 @@ func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
 		return false, nil
 	}
 
+	// 兼容旧版配置：如果 rule.Legacy 为 true，需要验证是否存在 logfwd.instances Annotation
+	if rule.Legacy {
+		annotations := r.pod.GetAnnotations()
+		if _, exists := annotations[logfwdInstancesAnnotationKey]; !exists {
+			log.Debugf("logfwd legacy rule requires logfwd.instances annotation: pod=%s", r.parent)
+			return false, nil
+		}
+	}
+
 	return true, rule
 }
 

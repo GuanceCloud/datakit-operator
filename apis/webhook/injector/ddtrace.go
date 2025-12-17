@@ -17,6 +17,8 @@ import (
 const (
 	ddtraceInitContainerName    = "datakit-lib-init"
 	ddtraceEnabledAnnotationKey = "admission.datakit/ddtrace.enabled"
+	// javaLibVersionAnnotationKey 用于兼容旧版配置，Legacy 规则需要此 Annotation 才注入
+	javaLibVersionAnnotationKey = "admission.datakit/java-lib.version"
 
 	ddtraceVolumeName = "datakit-auto-instrument"
 	ddtraceMountPath  = "/datadog-lib"
@@ -98,10 +100,21 @@ func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
 	}
 
 	matched, rule := ddtraceMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
-	if matched && rule != nil {
-		log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
+	if !matched || rule == nil {
+		return false, nil
 	}
-	return matched, rule
+
+	// 兼容旧版配置：如果 rule.Legacy 为 true，需要验证是否存在 java-lib.version Annotation
+	if rule.Legacy {
+		annotations := r.pod.GetAnnotations()
+		if _, exists := annotations[javaLibVersionAnnotationKey]; !exists {
+			log.Debugf("ddtrace legacy rule requires java-lib.version annotation: pod=%s", r.parent)
+			return false, nil
+		}
+	}
+
+	log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
+	return true, rule
 }
 
 func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements) {
