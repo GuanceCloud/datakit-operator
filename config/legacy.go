@@ -76,13 +76,14 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 	}
 
 	// 如果没有 namespace 和 label selector，但存在其他配置（image, envs, resources），
-	// 仍然创建一个 InjectRule 以保持兼容性
+	// 仍然创建一个 InjectRule 以保持兼容性，设置 Legacy: true 表示这是旧版配置转换而来
 	if len(namespaces) == 0 && len(labels) == 0 &&
 		(image != "" || deprecated.Environments != nil) {
-		// 创建一个空的 InjectRule，只包含 image, envs, resources
+		// 创建一个 InjectRule，设置 Legacy: true，Namespaces 为 [".*"] 以匹配所有 namespace
 		rule := &InjectRule{
+			Legacy: true,
 			Selector: Selector{
-				Namespaces: []string{},
+				Namespaces: []string{".*"},
 				Labels:     []string{},
 			},
 			Language:     language,
@@ -100,6 +101,7 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 
 	// 创建一个 InjectRule，包含所有的 namespace 和 label selector
 	rule := &InjectRule{
+		Legacy: false,
 		Selector: Selector{
 			Namespaces: namespaces,
 			Labels:     labels,
