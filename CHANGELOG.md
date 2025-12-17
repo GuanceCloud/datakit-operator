@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.1] - 2025-12-17
+
+- 注入 Flameshot 新增配置项 `enable_prometheus_annotations` 允许添加 Prometheus.io Annotations（#74）
+- 调整 Flameshot 配置端口的方式，从环境变量 `FLAMESHOT_HTTP_LOCAL_ADDR` 改成 `FLAMESHOT_HTTP_LOCAL_PORT（#75）
+
 ## [1.7.0] - 2025-12-12
 
 - 新增 `admission_inject_v2` 配置项，替代原有的 `admission_inject`，同时保持向后兼容（#73）

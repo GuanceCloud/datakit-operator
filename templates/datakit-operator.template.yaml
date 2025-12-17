@@ -114,8 +114,7 @@ data:
                         "FLAMESHOT_LOG_LEVEL":        "info",
                         "FLAMESHOT_PROFILING_PATH":   "/flameshot-data",
                         "FLAMESHOT_LOG_PATH":         "/var/log/flameshot.log",
-                        "FLAMESHOT_HTTP_LOCAL_IP":    "{fieldRef:status.podIP}",
-                        "FLAMESHOT_HTTP_LOCAL_ADDR":  "$(FLAMESHOT_HTTP_LOCAL_IP):8089"
+                        "FLAMESHOT_HTTP_LOCAL_PORT":  "8089"
                     },
                     "resources": {
                         "requests": {
@@ -127,7 +126,8 @@ data:
                            "memory": "256Mi"
                         }
                     },
-                    "processes": ""
+                    "processes": "",
+                    "enable_prometheus_annotations": true
                 }
             ]
         },
