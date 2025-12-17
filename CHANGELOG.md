@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.1] - 2025-12-17
+
+- 注入 Flameshot 新增配置项 `enable_prometheus_annotations` 允许添加 Prometheus.io Annotations（#74）
+
 ## [1.7.0] - 2025-12-12
 
 - 新增 `admission_inject_v2` 配置项，替代原有的 `admission_inject`，同时保持向后兼容（#73）
