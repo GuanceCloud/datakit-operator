@@ -58,6 +58,7 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 	expected := AdmissionInjectConfig{
 		DDTraces: InjectRules{
 			&InjectRule{
+				Legacy: false,
 				Selector: Selector{
 					Namespaces: []string{"default", "production"},
 					Labels:     []string{"app=myapp"},
@@ -76,8 +77,9 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 		},
 		Logfwds: InjectRules{
 			&InjectRule{
+				Legacy: true,
 				Selector: Selector{
-					Namespaces: []string{},
+					Namespaces: []string{".*"},
 					Labels:     []string{},
 				},
 				Language: "",
