@@ -25,7 +25,8 @@ type (
 		LogVolumePaths []string `json:"log_volume_paths"`
 
 		// only use for flameshot
-		Processes string `json:"processes"`
+		Processes                   string `json:"processes"`
+		EnablePrometheusAnnotations bool   `json:"enable_prometheus_annotations,omitempty"`
 
 		Envs Envs `json:"-"`
 	}
