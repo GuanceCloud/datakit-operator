@@ -7,9 +7,9 @@ package injector
 
 import (
 	"fmt"
-	"net"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
@@ -24,9 +24,9 @@ const (
 	flameshotProfilingVolumeName = "flameshot-volume"
 	flameshotProfilingPathKey    = "FLAMESHOT_PROFILING_PATH"
 
-	flameshotHTTPPortName        = "flameshot-port"
-	flameshotHTTPLocalAddressKey = "FLAMESHOT_HTTP_LOCAL_ADDR"
-	flameshotProcessesKey        = "FLAMESHOT_PROCESSES"
+	flameshotHTTPPortName     = "flameshot-port"
+	flameshotHTTPLocalPortKey = "FLAMESHOT_HTTP_LOCAL_PORT"
+	flameshotProcessesKey     = "FLAMESHOT_PROCESSES"
 )
 
 func InjectFlameshotToPod(namespace, parent string, pod *corev1.Pod) error {
@@ -84,7 +84,7 @@ func (r *flameshotResource) process() {
 
 	port := getFlameshotPort(envs)
 	if port == 0 {
-		log.Warnf("flameshot missing required env: key=%s pod=%s", flameshotHTTPLocalAddressKey, r.parent)
+		log.Warnf("flameshot missing required env: key=%s pod=%s", flameshotHTTPLocalPortKey, r.parent)
 		return
 	}
 
@@ -93,6 +93,11 @@ func (r *flameshotResource) process() {
 	r.injectVolume()
 	r.injectVolumeMount(profilingPath)
 	log.Debugf("flameshot container created: pod=%s, image=%s, port=%d", r.parent, rule.Image, port)
+
+	// 如果配置启用，则添加 Prometheus 相关 Annotation
+	if rule.EnablePrometheusAnnotations {
+		r.addPrometheusAnnotations(port)
+	}
 
 	log.Infof("flameshot injection completed: pod=%s, image=%s", r.parent, rule.Image)
 }
@@ -181,26 +186,42 @@ func getFlameshotProfilingPath(envs []corev1.EnvVar) string {
 
 func getFlameshotPort(envs []corev1.EnvVar) int32 {
 	for _, env := range envs {
-		if env.Name == flameshotHTTPLocalAddressKey {
-			parsedPort, err := parsePortFromAddress(env.Value)
+		if env.Name == flameshotHTTPLocalPortKey {
+			port, err := strconv.ParseInt(env.Value, 10, 32)
 			if err == nil {
-				return parsedPort
+				return int32(port)
 			}
 		}
 	}
 	return 0
 }
 
-func parsePortFromAddress(address string) (int32, error) {
-	_, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return 0, err
+func hasPrometheusAnnotation(annotations map[string]string) bool {
+	if annotations == nil {
+		return false
+	}
+	for key := range annotations {
+		if strings.HasPrefix(key, "prometheus.io/") {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *flameshotResource) addPrometheusAnnotations(port int32) {
+	// 检查 Pod 是否已有 prometheus.io 开头的 Annotation
+	if hasPrometheusAnnotation(r.pod.GetAnnotations()) {
+		log.Debugf("flameshot prometheus annotations skipped: pod=%s, reason=prometheus_annotation_exists", r.parent)
+		return
 	}
 
-	port, err := strconv.ParseInt(portStr, 10, 32)
-	if err != nil {
-		return 0, err
+	if r.pod.Annotations == nil {
+		r.pod.Annotations = make(map[string]string)
 	}
 
-	return int32(port), nil
+	r.pod.Annotations["prometheus.io/scrape"] = "true"
+	r.pod.Annotations["prometheus.io/port"] = strconv.FormatInt(int64(port), 10)
+	r.pod.Annotations["prometheus.io/scheme"] = "http"
+	r.pod.Annotations["prometheus.io/path"] = "/metrics"
+	r.pod.Annotations["prometheus.io/param_measurement"] = "flameshot"
 }

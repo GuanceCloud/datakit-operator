@@ -25,7 +25,7 @@ func TestInjectFlameshot(t *testing.T) {
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_ADDR", "0.0.0.0:8089"},
+					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
@@ -99,7 +99,7 @@ func TestInjectFlameshot(t *testing.T) {
 		assert.Equal(t, "datakit-service.datakit.svc", envMap["DK_AGENT_HOST"])
 		assert.Equal(t, "9529", envMap["DK_AGENT_PORT"])
 		assert.Equal(t, "/flameshot-data", envMap["FLAMESHOT_PROFILING_PATH"])
-		assert.Equal(t, "0.0.0.0:8089", envMap["FLAMESHOT_HTTP_LOCAL_ADDR"])
+		assert.Equal(t, "8089", envMap["FLAMESHOT_HTTP_LOCAL_PORT"])
 	})
 
 	t.Run("verify volume creation and mounting", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestInjectFlameshot(t *testing.T) {
 					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
 					{"DK_AGENT_PORT", "9529"},
 					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_ADDR", "0.0.0.0:8089"},
+					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
 				Resources: config.ResourceRequirements{
@@ -151,6 +151,43 @@ func TestInjectFlameshot(t *testing.T) {
 		assert.Len(t, flameshotContainer.VolumeMounts, 1)
 		assert.Equal(t, flameshotProfilingVolumeName, flameshotContainer.VolumeMounts[0].Name)
 		assert.Equal(t, "/flameshot-data", flameshotContainer.VolumeMounts[0].MountPath)
+	})
+
+	t.Run("add prometheus annotations when enabled", func(t *testing.T) {
+		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+				Envs: []struct{ Key, Value string }{
+					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+				},
+				Processes:                   "[{\"service\":\"jfr-parser\"}]",
+				EnablePrometheusAnnotations: true,
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() { flameshotMatchNamespaceOrLabelsForConfig = originalFunc }()
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-prometheus-pod",
+				Annotations: map[string]string{flameshotEnabledAnnotationKey: "true"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "app", Image: "app:1.0"}},
+			},
+		}
+
+		assert.NoError(t, InjectFlameshotToPod("", pod.Name, pod))
+		assert.Equal(t, "true", pod.Annotations["prometheus.io/scrape"])
+		assert.Equal(t, "8089", pod.Annotations["prometheus.io/port"])
+		assert.Equal(t, "http", pod.Annotations["prometheus.io/scheme"])
+		assert.Equal(t, "/metrics", pod.Annotations["prometheus.io/path"])
+		assert.Equal(t, "flameshot", pod.Annotations["prometheus.io/param_measurement"])
 	})
 }
 
