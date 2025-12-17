@@ -2,6 +2,8 @@
 
 ## [1.7.1] - 2025-12-17
 
+- 修复了对旧配置的兼容问题（#77）
+- 如果 `admission_inject_v2` 配置项 `namespace_selectors` 和 `label_selectors` 都为空，就不执行注入（#77）
 - 注入 flameshot 新增配置项 `enable_prometheus_annotations` 允许添加 Prometheus.io Annotations（#74）
 - 调整 flameshot 配置端口的方式，从环境变量 `FLAMESHOT_HTTP_LOCAL_ADDR` 改成 `FLAMESHOT_HTTP_LOCAL_PORT（#75）
 - 修复注入 logfwd 时必须配置 `log_configs` 的错误问题，因为 logfwd 可以使用 CRD 配置源（#76）

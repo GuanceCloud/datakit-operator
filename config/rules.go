@@ -14,6 +14,7 @@ type (
 
 	InjectRules []*InjectRule
 	InjectRule  struct {
+		Legacy bool `json:"-"`
 		Selector
 		Language     string               `json:"language"`
 		Image        string               `json:"image"`
@@ -48,8 +49,20 @@ func (rs InjectRules) Setup() {
 
 func (rs InjectRules) Matches(ns string, labels map[string]string) (bool, *InjectRule) {
 	for idx := range rs {
-		namespaceMatched := rs[idx].Selector.matchNamespace(ns)
-		selectMatched := rs[idx].Selector.matchLabels(labels)
+		if len(rs[idx].Selector.namespaceSelectors) == 0 && len(rs[idx].Selector.labelSelectors) == 0 {
+			return false, nil
+		}
+
+		var namespaceMatched = true
+		var selectMatched = true
+
+		if len(rs[idx].Selector.namespaceSelectors) != 0 {
+			namespaceMatched = rs[idx].Selector.matchNamespace(ns)
+		}
+		if len(rs[idx].Selector.labelSelectors) != 0 {
+			selectMatched = rs[idx].Selector.matchLabels(labels)
+		}
+
 		if namespaceMatched && selectMatched {
 			return true, rs[idx]
 		}
