@@ -58,7 +58,7 @@ configmap:
                 {
                     "namespace_selectors": [],
                     "label_selectors":     [],
-                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.86.0",
+                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.87.0",
                     "envs": {
                         "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
                         "LOGFWD_DATAKIT_PORT":              "9533",
