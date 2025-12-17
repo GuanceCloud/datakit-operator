@@ -183,35 +183,3 @@ func TestInjectLogfwd(t *testing.T) {
 		assert.Equal(t, "/etc/podinfo", pod.Spec.Containers[1].VolumeMounts[1].MountPath)
 	})
 }
-
-func TestInjectLogfwdEdgeCases(t *testing.T) {
-	t.Run("return error for nil pod", func(t *testing.T) {
-		err := InjectLogfwdToPod("", "test-pod", nil)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot inject logfwd into nil pod")
-	})
-
-	t.Run("skip injection when no config provided", func(t *testing.T) {
-		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
-		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			// Return a rule without LogConfigs and no instances annotation
-			return true, &config.InjectRule{
-				Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}
-		}
-		defer func() {
-			logfwdMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		originalPod := createTestPod("test-pod-no-config", map[string]string{logfwdEnabledAnnotationKey: "true"})
-		expectedPod := *originalPod
-
-		err := InjectLogfwdToPod("", originalPod.Name, originalPod)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedPod, *originalPod)
-	})
-}

@@ -75,10 +75,7 @@ func (r *logfwdResource) process() {
 	instancesConfig, instancesVolumePaths, hasInstancesConfig := r.extractInstancesConfig()
 	logConfigsConfig, logConfigsVolumePaths, hasLogConfigsConfig := r.extractLogConfigsConfig(rule)
 
-	if !(hasInstancesConfig || hasLogConfigsConfig) {
-		log.Warnf("logfwd injection skipped: pod=%s, reason=no_valid_config", r.parent)
-		return
-	}
+	// 即使没有 instances 和 log_configs 也要注入，因为 logfwd 还可以通过网络获取配置
 
 	// 设置环境变量
 	if hasInstancesConfig {
@@ -123,20 +120,7 @@ func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
 		return false, nil
 	}
 
-	// 检查 Annotation 中的 instances 或 rule 中的 LogConfigs
-	annotations := r.pod.GetAnnotations()
-	_, foundInstances := annotations[logfwdInstancesAnnotationKey]
-	if foundInstances || rule.LogConfigs != "" {
-		configType := "instances"
-		if rule.LogConfigs != "" {
-			configType = "log_configs"
-		}
-		log.Infof("logfwd rule matched: pod=%s, config_type=%s, image=%s", r.parent, configType, rule.Image)
-		return true, rule
-	}
-
-	log.Warnf("logfwd injection skipped: pod=%s, reason=no_valid_config (instances annotation missing and log_configs empty)", r.parent)
-	return false, nil
+	return true, rule
 }
 
 // extractInstancesConfig 从 Annotation 中提取 instances config（兼容旧版）
@@ -211,9 +195,6 @@ func (r *logfwdResource) extractLogConfigsConfig(rule *config.InjectRule) (strin
 }
 
 func (r *logfwdResource) injectVolume(volumeNames []string) {
-	if len(volumeNames) == 0 {
-		return
-	}
 	manager := manager.NewVolumeManager(r.pod)
 	for _, name := range volumeNames {
 		volume := corev1.Volume{
@@ -225,6 +206,8 @@ func (r *logfwdResource) injectVolume(volumeNames []string) {
 		manager.AddVolume(&volume)
 	}
 
+	// pod-info volume 必须始终创建，用于将 Pod labels 注入到容器中
+	// labels 将被挂载到 /etc/podinfo/labels，供 logfwd 识别和标记日志
 	podInfoVolume := corev1.Volume{
 		Name: "datakit-pod-info",
 		VolumeSource: corev1.VolumeSource{
