@@ -44,3 +44,44 @@ func TestAppendKVPairs(t *testing.T) {
 		assert.Equal(t, tc.output, res)
 	}
 }
+
+func TestGetMountPath(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "path with wildcard",
+			input:    "/data/logs/**/123",
+			expected: "/data/logs",
+		},
+		{
+			name:     "path without wildcard",
+			input:    "/data/logs",
+			expected: "/data/logs",
+		},
+		{
+			name:     "root path",
+			input:    "/",
+			expected: "/",
+		},
+		{
+			name:     "single level path",
+			input:    "/data",
+			expected: "/data",
+		},
+		{
+			name:     "wildcard at beginning",
+			input:    "*/logs",
+			expected: ".",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := getMountPath(tc.input)
+			assert.Equal(t, tc.expected, res)
+		})
+	}
+}
