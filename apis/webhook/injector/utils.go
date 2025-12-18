@@ -154,11 +154,20 @@ func getMountPaths(paths []string) []string {
 }
 
 func getMountPath(path string) string {
-	arr := strings.Split(path, "*")
-	if len(arr) != 0 {
-		return filepath.Clean(filepath.Dir(arr[0]))
+	// 如果路径中包含通配符，取第一个通配符之前的部分的目录
+	if strings.Contains(path, "*") {
+		arr := strings.Split(path, "*")
+		if len(arr) != 0 {
+			if arr[0] != "" {
+				return filepath.Clean(filepath.Dir(arr[0]))
+			}
+			// 如果通配符在开头，返回当前目录
+			return "."
+		}
+		return ""
 	}
-	return ""
+	// 如果路径中不包含通配符，直接返回清理后的路径
+	return filepath.Clean(path)
 }
 
 // setContainerResources 设置容器的资源请求和限制
