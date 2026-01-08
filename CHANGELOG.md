@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.3] - 2026-01-08
+
+- 新增支持 ClusterLoggingConfig CRD 的from_beginning_threshold_size 配置项（#80）
+
 ## [1.7.2] - 2025-12-18
 
 - 修复了注入 logfwd 可能存在的挂载错误问题（#78）
