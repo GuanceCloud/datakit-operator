@@ -37,7 +37,7 @@ configmap:
         "admission_inject_v2": {
             "ddtraces": [
                 {
-                    "namespace_selectors": [],
+                    "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
                     "language": "java",
@@ -56,7 +56,7 @@ configmap:
             ],
             "logfwds": [
                 {
-                    "namespace_selectors": [],
+                    "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.87.0",
                     "envs": {
@@ -84,7 +84,7 @@ configmap:
             ],
             "flameshots": [
                 {
-                    "namespace_selectors": [],
+                    "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "image": "(@BRAND_REPO_DATAKIT)/flameshot:latest",
                     "envs": {
