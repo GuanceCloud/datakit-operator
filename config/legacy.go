@@ -12,6 +12,10 @@ const (
 	DeprecatedDDTraceJavaImageKey = "java_agent_image"
 	// DeprecatedLogfwdImageKey 用于从旧配置的 Images map 中提取 Logfwd image
 	DeprecatedLogfwdImageKey = "logfwd_image"
+
+	DeprecatedProfilerJavaImageKey   = "java_profiler_image"
+	DeprecatedProfilerPythonImageKey = "python_profiler_image"
+	DeprecatedProfilerGolangImageKey = "golang_profiler_image"
 )
 
 type DeprecatedInjectConfig struct {
@@ -44,6 +48,7 @@ func convertDeprecatedToAdmissionInject(cfg *DeprecatedInjectConfig) AdmissionIn
 	result := AdmissionInjectConfig{
 		DDTraces:   convertDeprecatedToInjectRules(&cfg.DDTrace, "java", DeprecatedDDTraceJavaImageKey),
 		Logfwds:    convertDeprecatedToInjectRules(&cfg.Logfwd, "", DeprecatedLogfwdImageKey),
+		Profilers:  convertDeprecatedToInjectRules(&cfg.Profiler, "", ""),
 		Flameshots: InjectRules{},
 	}
 
@@ -75,21 +80,27 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 		image = deprecated.Images[imageKey]
 	}
 
-	// 如果没有 namespace 和 label selector，但存在其他配置（image, envs, resources），
-	// 仍然创建一个 InjectRule 以保持兼容性，设置 Legacy: true 表示这是旧版配置转换而来
-	if len(namespaces) == 0 && len(labels) == 0 &&
-		(image != "" || deprecated.Environments != nil) {
-		// 创建一个 InjectRule，设置 Legacy: true，Namespaces 为 [".*"] 以匹配所有 namespace
-		rule := &InjectRule{
-			Legacy: true,
-			Selector: Selector{
-				Namespaces: []string{".*"},
-				Labels:     []string{},
-			},
-			Language:     language,
-			Image:        image,
-			Environments: deprecated.Environments,
-			Resources:    deprecated.Resources,
+	// 创建一个 InjectRule，包含所有的 namespace 和 label selector
+	rule := &InjectRule{
+		Name:            "Used InjectV1 Config",
+		CheckAnnotation: true,
+		Selector: Selector{
+			Namespaces: namespaces,
+			Labels:     labels,
+		},
+		Language:     language,
+		Image:        image,
+		Images:       deprecated.Images,
+		Environments: deprecated.Environments,
+		Resources:    deprecated.Resources,
+	}
+
+	// 如果没有 namespace 和 label selector，但存在其他配置（image, envs, resources）
+	// InjectRule 的 Namespaces 为 [".*"] 以匹配所有 namespace
+	if len(namespaces) == 0 && len(labels) == 0 && (image != "" || deprecated.Environments != nil) {
+		rule.Selector = Selector{
+			Namespaces: []string{".*"},
+			Labels:     []string{},
 		}
 		return InjectRules{rule}
 	}
@@ -97,19 +108,6 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 	// 如果没有任何配置，返回空数组
 	if len(namespaces) == 0 && len(labels) == 0 {
 		return InjectRules{}
-	}
-
-	// 创建一个 InjectRule，包含所有的 namespace 和 label selector
-	rule := &InjectRule{
-		Legacy: false,
-		Selector: Selector{
-			Namespaces: namespaces,
-			Labels:     labels,
-		},
-		Language:     language,
-		Image:        image,
-		Environments: deprecated.Environments,
-		Resources:    deprecated.Resources,
 	}
 
 	return InjectRules{rule}

@@ -6,6 +6,7 @@
 package injector
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -189,4 +190,12 @@ func setContainerResources(container *corev1.Container, cpuRequest, memoryReques
 	if memoryLimit != "" {
 		container.Resources.Limits[corev1.ResourceMemory] = resource.MustParse(memoryLimit)
 	}
+}
+
+func replaceImageVersion(image, imageVersion string) string {
+	if imageVersion == "" {
+		return image
+	}
+	imageName, _, _ := ParseImage(image)
+	return fmt.Sprintf("%s:%s", imageName, imageVersion)
 }

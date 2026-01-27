@@ -58,13 +58,18 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 	expected := AdmissionInjectConfig{
 		DDTraces: InjectRules{
 			&InjectRule{
-				Legacy: false,
+				Name:            "Used InjectV1 Config",
+				CheckAnnotation: true,
 				Selector: Selector{
 					Namespaces: []string{"default", "production"},
 					Labels:     []string{"app=myapp"},
 				},
 				Language: "java",
 				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
+				Images: map[string]string{
+					"java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
+					"python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
+				},
 				Environments: mapslice.MapSlice{
 					{Key: "DD_AGENT_HOST", Value: "datakit-service.datakit.svc"},
 					{Key: "DD_TRACE_AGENT_PORT", Value: "9529"},
@@ -77,13 +82,17 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 		},
 		Logfwds: InjectRules{
 			&InjectRule{
-				Legacy: true,
+				Name:            "Used InjectV1 Config",
+				CheckAnnotation: true,
 				Selector: Selector{
 					Namespaces: []string{".*"},
 					Labels:     []string{},
 				},
 				Language: "",
 				Image:    "pubrepo.guance.com/datakit/logfwd:1.5.8",
+				Images: map[string]string{
+					"logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.5.8",
+				},
 				Environments: mapslice.MapSlice{
 					{Key: "LOGFWD_ENV", Value: "test"},
 				},
@@ -94,6 +103,7 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 			},
 		},
 		Flameshots: InjectRules{},
+		Profilers:  InjectRules{},
 	}
 
 	result := convertDeprecatedToAdmissionInject(input)

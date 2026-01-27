@@ -66,7 +66,7 @@ func (r *logfwdResource) process() {
 		return
 	}
 
-	log.Infof("logfwd injection started: pod=%s, namespace=%s", r.parent, r.pod.Namespace)
+	log.Infof("logfwd injection started: pod=%s, namespace=%s, rule=%s", r.parent, r.pod.Namespace, rule.Name)
 
 	// Then create a logfwd container, the container needs to be ReadOnly.
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
@@ -100,7 +100,7 @@ func (r *logfwdResource) process() {
 
 	r.injectContainer(rule.Image, envs, volumeNames, volumeMountPaths, rule.Resources)
 
-	log.Infof("logfwd injection completed: pod=%s, image=%s", r.parent, rule.Image)
+	log.Infof("logfwd injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
 
 func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
@@ -120,8 +120,8 @@ func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
 		return false, nil
 	}
 
-	// 兼容旧版配置：如果 rule.Legacy 为 true，需要验证是否存在 logfwd.instances Annotation
-	if rule.Legacy {
+	// 兼容旧版配置：如果 rule.CheckAnnotation 为 true，需要验证是否存在 logfwd.instances Annotation
+	if rule.CheckAnnotation {
 		annotations := r.pod.GetAnnotations()
 		if _, exists := annotations[logfwdInstancesAnnotationKey]; !exists {
 			log.Debugf("logfwd legacy rule requires logfwd.instances annotation: pod=%s", r.parent)
