@@ -79,12 +79,14 @@ type AdmissionInjectConfig struct {
 	DDTraces   InjectRules `json:"ddtraces"`
 	Logfwds    InjectRules `json:"logfwds"`
 	Flameshots InjectRules `json:"flameshots"`
+	Profilers  InjectRules `json:"profilers"`
 }
 
 func (c *AdmissionInjectConfig) Setup() error {
 	c.DDTraces.Setup()
 	c.Logfwds.Setup()
 	c.Flameshots.Setup()
+	c.Profilers.Setup()
 	return nil
 }
 

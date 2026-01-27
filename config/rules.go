@@ -14,10 +14,13 @@ type (
 
 	InjectRules []*InjectRule
 	InjectRule  struct {
-		Legacy bool `json:"-"`
+		Name            string `json:"name"`
+		CheckAnnotation bool   `json:"check_annotation"`
 		Selector
+
 		Language     string               `json:"language"`
 		Image        string               `json:"image"`
+		Images       map[string]string    `json:"-"`
 		Environments mapslice.MapSlice    `json:"envs"`
 		Resources    ResourceRequirements `json:"resources"`
 
@@ -47,7 +50,7 @@ func (rs InjectRules) Setup() {
 	}
 }
 
-func (rs InjectRules) Matches(ns string, labels map[string]string) (bool, *InjectRule) {
+func (rs InjectRules) Matches(ns string, labels map[string]string, language string) (bool, *InjectRule) {
 	for idx := range rs {
 		if len(rs[idx].Selector.namespaceSelectors) == 0 && len(rs[idx].Selector.labelSelectors) == 0 {
 			return false, nil
