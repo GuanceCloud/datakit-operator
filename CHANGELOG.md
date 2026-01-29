@@ -1,8 +1,13 @@
 # Changelog
 
+## [1.8.0] - 2026-01-29
+
+- `admission_inject_v2` 配置项新增 `check_annotation` 字段，用来兼容 `admission.datakit/java-lib.version` 用法（#81）
+- 兼容旧配置 `admission_inject.profiler` 注入 Profiler 的功能（#81）
+
 ## [1.7.3] - 2026-01-08
 
-- 新增支持 ClusterLoggingConfig CRD 的from_beginning_threshold_size 配置项（#80）
+- 新增支持 ClusterLoggingConfig CRD 的 `from_beginning_threshold_size` 配置项（#80）
 
 ## [1.7.2] - 2025-12-18
 

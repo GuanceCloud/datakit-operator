@@ -168,4 +168,116 @@ func TestInjectDDTraceEdgeCases(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot inject ddtrace-lib into nil pod")
 	})
+
+	t.Run("inject ddtrace with CheckAnnotation=true and java-lib.version annotation", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "java",
+				CheckAnnotation: true,
+				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPodWithContainers("test-ddtrace-check-annotation", map[string]string{
+			ddtraceEnabledAnnotationKey: "true",
+			javaLibVersionAnnotationKey: "v2.0.0",
+		}, []corev1.Container{
+			{Name: "app", Image: "nginx:1.22"},
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+
+		// Check init container image version is replaced
+		assert.Len(t, pod.Spec.InitContainers, 1)
+		initContainer := pod.Spec.InitContainers[0]
+		assert.Equal(t, "datakit-lib-init", initContainer.Name)
+		// Image version should be replaced with annotation value
+		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v2.0.0", initContainer.Image)
+	})
+
+	t.Run("skip injection when CheckAnnotation=true but java-lib.version annotation missing", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "java",
+				CheckAnnotation: true,
+				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPodWithContainers("test-ddtrace-no-annotation", map[string]string{
+			ddtraceEnabledAnnotationKey: "true",
+			// java-lib.version annotation is missing
+		}, []corev1.Container{
+			{Name: "app", Image: "nginx:1.22"},
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+
+		// Should not inject because CheckAnnotation=true requires java-lib.version annotation
+		assert.Len(t, pod.Spec.InitContainers, 0)
+		assert.Len(t, pod.Spec.Volumes, 0)
+	})
+
+	t.Run("inject ddtrace with CheckAnnotation=false (normal flow)", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "java",
+				CheckAnnotation: false,
+				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
+				Envs: []struct{ Key, Value string }{
+					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+				},
+				Resources: config.ResourceRequirements{
+					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+				},
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPodWithContainers("test-ddtrace-no-check", map[string]string{
+			ddtraceEnabledAnnotationKey: "true",
+			// Even if java-lib.version exists, it should be ignored when CheckAnnotation=false
+			javaLibVersionAnnotationKey: "v2.0.0",
+		}, []corev1.Container{
+			{Name: "app", Image: "nginx:1.22"},
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+
+		// Should inject normally, using original image version
+		assert.Len(t, pod.Spec.InitContainers, 1)
+		initContainer := pod.Spec.InitContainers[0]
+		assert.Equal(t, "datakit-lib-init", initContainer.Name)
+		// Image version should remain as configured (not replaced)
+		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1", initContainer.Image)
+	})
 }
