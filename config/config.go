@@ -27,19 +27,23 @@ type Configuration struct {
 func (c *Configuration) Setup() error {
 	// 检查旧配置是否有效，如果有效则转换为新结构并替换
 	if hasValidDeprecatedConfig(c) {
-		log.Info("deprecated admission_inject config detected, converting to new structure and replacing admission_inject_v2")
-		log.Info("priority: deprecated config takes precedence over new config, if deprecated config exists, it will be used")
+		log.Info("Deprecated admission_inject configuration detected, converting to admission_inject_v2 structure")
+		log.Info("Conversion policy: deprecated configuration takes precedence over new configuration")
 
 		converted := convertDeprecatedToAdmissionInject(&c.DeprecatedAdmissionInject)
 
-		// 替换 DDTraces 和 Logfwds（旧版优先）
+		// 替换 DDTraces、Profilers 和 Logfwds（旧版优先）
 		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTrace) {
 			c.AdmissionInject.DDTraces = converted.DDTraces
-			log.Info("replaced admission_inject_v2.ddtrace with converted deprecated config")
+			log.Info("Converted deprecated ddtrace configuration to admission_inject_v2.ddtraces")
 		}
 		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwd) {
 			c.AdmissionInject.Logfwds = converted.Logfwds
-			log.Info("replaced admission_inject_v2.logfwd with converted deprecated config")
+			log.Info("Converted deprecated logfwd configuration to admission_inject_v2.logfwds")
+		}
+		if isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Profiler) {
+			c.AdmissionInject.Profilers = converted.Profilers
+			log.Info("Converted deprecated profiler configuration to admission_inject_v2.profilers")
 		}
 	}
 
@@ -54,7 +58,8 @@ func (c *Configuration) Setup() error {
 
 func hasValidDeprecatedConfig(c *Configuration) bool {
 	return isValidDeprecatedRule(&c.DeprecatedAdmissionInject.DDTrace) ||
-		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwd)
+		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Logfwd) ||
+		isValidDeprecatedRule(&c.DeprecatedAdmissionInject.Profiler)
 }
 
 func isValidDeprecatedRule(rule *DeprecatedInjectRule) bool {
