@@ -17,7 +17,6 @@ import (
 const (
 	ddtraceInitContainerName    = "datakit-lib-init"
 	ddtraceEnabledAnnotationKey = "admission.datakit/ddtrace.enabled"
-	// javaLibVersionAnnotationKey 用于兼容旧版配置，Legacy 规则需要此 Annotation 才注入
 	javaLibVersionAnnotationKey = "admission.datakit/java-lib.version"
 
 	ddtraceVolumeName = "datakit-auto-instrument"
@@ -61,7 +60,7 @@ func (r *ddtraceResource) process() {
 		return
 	}
 
-	log.Infof("ddtrace injection started: pod=%s, namespace=%s, language=%s", r.parent, r.namespace, rule.Language)
+	log.Infof("ddtrace injection started: pod=%s, namespace=%s, language=%s, rule=%s", r.parent, r.namespace, rule.Language, rule.Name)
 
 	var lib ddtraceLibrary
 	switch language(rule.Language) {
@@ -72,7 +71,14 @@ func (r *ddtraceResource) process() {
 		return
 	}
 
-	r.injectInitContainer(rule.Image, rule.Resources)
+	// 如果 CheckAnnotation 为 true，尝试从 annotation 中获取版本并替换
+	image := rule.Image
+	if rule.CheckAnnotation {
+		if imageVersion := r.pod.GetAnnotations()[javaLibVersionAnnotationKey]; imageVersion != "" {
+			image = replaceImageVersion(image, imageVersion)
+		}
+	}
+	r.injectInitContainer(image, rule.Resources)
 
 	if err := lib.injectConfig(r.pod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
@@ -85,7 +91,7 @@ func (r *ddtraceResource) process() {
 	r.injectGlobalEnvs(envs)
 	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(r.pod.Spec.Containers))
 
-	log.Infof("ddtrace injection completed: pod=%s, image=%s", r.parent, rule.Image)
+	log.Infof("ddtrace injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 }
 
 func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
@@ -104,11 +110,11 @@ func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
 		return false, nil
 	}
 
-	// 兼容旧版配置：如果 rule.Legacy 为 true，需要验证是否存在 java-lib.version Annotation
-	if rule.Legacy {
+	// 如果 rule.CheckAnnotation 为 true，必须存在 java-lib.version Annotation
+	if rule.CheckAnnotation {
 		annotations := r.pod.GetAnnotations()
 		if _, exists := annotations[javaLibVersionAnnotationKey]; !exists {
-			log.Debugf("ddtrace legacy rule requires java-lib.version annotation: pod=%s", r.parent)
+			log.Debugf("ddtrace rule requires java-lib.version annotation but not found: pod=%s", r.parent)
 			return false, nil
 		}
 	}

@@ -37,7 +37,8 @@ configmap:
         "admission_inject_v2": {
             "ddtraces": [
                 {
-                    "namespace_selectors": ["default"],
+                    "check_annotation":    true,
+                    "namespace_selectors": ["*"],
                     "label_selectors":     [],
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
                     "language": "java",
