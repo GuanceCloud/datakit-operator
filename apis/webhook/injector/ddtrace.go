@@ -88,6 +88,7 @@ func (r *ddtraceResource) process() {
 	r.injectGlobalVolume()
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
 	r.injectGlobalEnvs(envs)
 	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(r.pod.Spec.Containers))
 
