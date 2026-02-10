@@ -47,17 +47,17 @@ func DefaultConfigInCluster() (*rest.Config, error) {
 }
 
 type Client interface {
-	Kubernetes() *kubernetes.Clientset
+	Clientset() *kubernetes.Clientset
 	Logging() *loggingclientv1.Clientset
 }
 
 type client struct {
-	Clientset     *kubernetes.Clientset
-	LoggingClient *loggingclientv1.Clientset
+	clientset     *kubernetes.Clientset
+	loggingClient *loggingclientv1.Clientset
 }
 
-func (c *client) Kubernetes() *kubernetes.Clientset   { return c.Clientset }
-func (c *client) Logging() *loggingclientv1.Clientset { return c.LoggingClient }
+func (c *client) Clientset() *kubernetes.Clientset    { return c.clientset }
+func (c *client) Logging() *loggingclientv1.Clientset { return c.loggingClient }
 
 func NewClient(restConfig *rest.Config) (Client, error) {
 	clientset, err := kubernetes.NewForConfig(restConfig)
@@ -71,8 +71,8 @@ func NewClient(restConfig *rest.Config) (Client, error) {
 	}
 
 	return &client{
-		Clientset:     clientset,
-		LoggingClient: loggingClient,
+		clientset:     clientset,
+		loggingClient: loggingClient,
 	}, nil
 }
 
