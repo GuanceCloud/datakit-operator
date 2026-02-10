@@ -5,6 +5,9 @@ kind: ClusterRole
 metadata:
   name: datakit-operator
 rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["logging.datakits.io"]
   resources: ["clusterloggingconfigs"]
   verbs: ["get", "list", "watch"]

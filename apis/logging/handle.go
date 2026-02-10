@@ -6,10 +6,15 @@
 package logging
 
 import (
-	"encoding/json"
+	"context"
+	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/logging/config"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/kubernetes/client"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Response struct {
@@ -19,28 +24,39 @@ type Response struct {
 	Error           string   `json:"error,omitempty"`
 }
 
-func HandleConfigs(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("config request received: method=%s, namespace=%s, pod_name=%s", r.Method, r.URL.Query().Get("namespace"), r.URL.Query().Get("pod_name"))
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		if err := json.NewEncoder(w).Encode(Response{Error: "method not allowed"}); err != nil {
-			log.Warnf("failed to encode response: %v", err)
+// CheckClusterLoggingConfigRBAC 检查是否有 ClusterLoggingConfig 的 RBAC 权限
+func CheckClusterLoggingConfigRBAC(k8sClient client.Client) error {
+	ctx := context.Background()
+	if clientset := k8sClient.Logging(); clientset != nil {
+		_, err := clientset.LoggingV1alpha1().ClusterLoggingConfigs().List(ctx, metav1.ListOptions{Limit: 1})
+		if errors.IsForbidden(err) || errors.IsUnauthorized(err) {
+			return fmt.Errorf("missing RBAC permissions to access ClusterLoggingConfig: %w", err)
 		}
-		return
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("ClusterLoggingConfig CRD resource type not found: %w", err)
+		}
+		if err != nil {
+			return fmt.Errorf("cannot list ClusterLoggingConfig: %w", err)
+		}
+		return nil
 	}
+	return fmt.Errorf("logging client is nil")
+}
 
-	namespace := r.URL.Query().Get("namespace")
-	podName := r.URL.Query().Get("pod_name")
-	podLabelsStr := r.URL.Query().Get("pod_labels")
+// StartLoggingConfigWatcher 启动 logging config watcher
+func StartLoggingConfigWatcher(ctx context.Context, k8sClient client.Client) {
+	config.StartLoggingConfigWatcher(ctx, k8sClient)
+}
+
+func HandleConfigs(c *gin.Context) {
+	namespace := c.Query("namespace")
+	podName := c.Query("pod_name")
+	podLabelsStr := c.Query("pod_labels")
+
+	log.Debugf("config request received: method=%s, namespace=%s, pod_name=%s", c.Request.Method, namespace, podName)
 
 	if namespace == "" || podName == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(Response{Error: "namespace, pod_name parameters are required"}); err != nil {
-			log.Warnf("failed to encode response: %v", err)
-		}
+		c.JSON(http.StatusBadRequest, Response{Error: "namespace, pod_name parameters are required"})
 		return
 	}
 
@@ -49,16 +65,10 @@ func HandleConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if configs == "" {
 		log.Infof("no matching config found: namespace=%s, pod_name=%s", namespace, podName)
-		w.WriteHeader(http.StatusNotFound)
-		if err := json.NewEncoder(w).Encode(Response{Error: "no matching config found"}); err != nil {
-			log.Warnf("failed to encode response: %v", err)
-		}
+		c.JSON(http.StatusNotFound, Response{Error: "no matching config found"})
 		return
 	}
 
 	log.Infof("matching config found: name=%s", name)
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(Response{Name: name, PodTargetLabels: podTargetLabels, Configs: configs}); err != nil {
-		log.Warnf("failed to encode response: %v", err)
-	}
+	c.JSON(http.StatusOK, Response{Name: name, PodTargetLabels: podTargetLabels, Configs: configs})
 }
