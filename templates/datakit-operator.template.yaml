@@ -61,11 +61,29 @@ data:
         "admission_inject_v2": {
             "ddtraces": [
                 {
+                    "language": "java",
                     "check_annotation":    true,
                     "namespace_selectors": ["*"],
                     "label_selectors":     [],
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
-                    "language": "java",
+                    "envs": {
+                        "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
+                        "DD_TRACE_AGENT_PORT":     "9529",
+                        "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc.cluster.local",
+                        "DD_JMXFETCH_STATSD_PORT": "8125",
+                        "DD_SERVICE":              "{fieldRef:metadata.labels['app']}",
+                        "POD_NAME":                "{fieldRef:metadata.name}",
+                        "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
+                        "NODE_NAME":               "{fieldRef:spec.nodeName}",
+                        "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                    }
+                },
+                {
+                    "language": "python",
+                    "check_annotation":    true,
+                    "namespace_selectors": ["*"],
+                    "label_selectors":     [],
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-python-init:v1.6.2",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                         "DD_TRACE_AGENT_PORT":     "9529",
