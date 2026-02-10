@@ -15,6 +15,4 @@ var log = logger.DefaultSLogger("logging-config")
 
 func Setup(ctx context.Context) {
 	log = logger.SLogger("logging-config")
-
-	startLoggingConfigWatcher(ctx)
 }
