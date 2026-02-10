@@ -69,7 +69,7 @@ func (r *flameshotResource) process() {
 		return
 	}
 
-	log.Infof("flameshot injection started: pod=%s, namespace=%s", r.parent, r.namespace)
+	log.Infof("flameshot injection started: pod=%s, namespace=%s, rule=%s", r.parent, r.namespace, rule.Name)
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 
@@ -99,7 +99,7 @@ func (r *flameshotResource) process() {
 		r.addPrometheusAnnotations(port)
 	}
 
-	log.Infof("flameshot injection completed: pod=%s, image=%s", r.parent, rule.Image)
+	log.Infof("flameshot injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
 
 func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
