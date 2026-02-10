@@ -70,6 +70,7 @@ func (r *logfwdResource) process() {
 
 	// Then create a logfwd container, the container needs to be ReadOnly.
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
 
 	// 提取配置：instances（Annotation）或 log_configs（rule）
 	instancesConfig, instancesVolumePaths, hasInstancesConfig := r.extractInstancesConfig()

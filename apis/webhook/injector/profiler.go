@@ -82,13 +82,14 @@ func (r *profilerResource) process() {
 
 	r.resetSpec()
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
 	r.injectContainer(image, rule.Resources, envs)
 	r.injectVolume()
 	r.injectVolumeMount()
 	log.Infof("profiler injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 }
 
-func (r *profilerResource) getMatchingRule() (bool, *config.InjectRule, language, string) {
+func (r *profilerResource) getMatchingRule() (matched bool, ruleConfig *config.InjectRule, lang language, imageVersion string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), profilerEnabledAnnotationKey) {
 		log.Debugf("profiler annotation disabled: pod=%s", r.parent)
 		return false, nil, "", ""
@@ -104,40 +105,29 @@ func (r *profilerResource) getMatchingRule() (bool, *config.InjectRule, language
 		return false, nil, "", ""
 	}
 
-	// 如果 rule.CheckAnnotation 为 true，必须存在对应 language 的 profiler version Annotation
-	annotations := r.pod.GetAnnotations()
-	var lang language
-	var imageVersion string
-
-	// 遍历支持的 language，查找对应的 annotation
-	for _, l := range supportedLanguagesForProfiler {
-		profilerVersionAnnotation := fmt.Sprintf(profilerVersionAnnotationKeyFormat, l)
-		if version, exists := annotations[profilerVersionAnnotation]; exists {
-			lang = l
-			imageVersion = version
-			break
+	if rule.CheckAnnotation {
+		annotations := r.pod.GetAnnotations()
+		for _, l := range supportedLanguagesForProfiler {
+			profilerVersionAnnotation := fmt.Sprintf(profilerVersionAnnotationKeyFormat, l)
+			if version, exists := annotations[profilerVersionAnnotation]; exists {
+				log.Infof("profiler rule matched for annotation %s-profiler.version: pod=%s", l, r.parent)
+				return true, rule, l, version
+			}
 		}
-	}
-
-	// language 只能从 annotation 中获取
-	if lang == "" {
-		if rule.CheckAnnotation {
-			log.Debugf("profiler rule requires profiler version annotation but not found: pod=%s", r.parent)
-		} else {
-			log.Debugf("profiler version annotation not found: pod=%s", r.parent)
-		}
+		log.Debugf("profiler rule requires profiler version annotation but not found: pod=%s", r.parent)
 		return false, nil, "", ""
 	}
 
-	if rule.CheckAnnotation {
-		log.Infof("profiler rule matched for annotation %s-profiler.version: pod=%s", lang, r.parent)
+	lang = language(rule.Language)
+	if lang == "" {
+		log.Debugf("profiler language not specified in rule: pod=%s", r.parent)
+		return false, nil, "", ""
 	}
 
-	// 验证 language 是否支持
 	switch lang {
 	case java, python, golang:
 		log.Infof("profiler rule matched: pod=%s, language=%s, image=%s", r.parent, lang, rule.Image)
-		return true, rule, lang, imageVersion
+		return true, rule, lang, ""
 	default:
 		log.Debugf("profiler language not supported: lang=%s pod=%s", lang, r.parent)
 		return false, nil, "", ""
