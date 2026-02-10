@@ -14,89 +14,85 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type refType string
-
-const (
-	refTypeFieldRef         refType = "fieldRef"
-	refTypeResourceFieldRef refType = "resourceFieldRef"
-)
-
-var valuefroms = []struct {
-	key   string
-	keyRe *regexp.Regexp
-	fn    func(args string) (string, refType)
+var fieldRefValuefroms = []struct {
+	key         string
+	keyRe       *regexp.Regexp
+	toFieldPath func(args string) string
 }{
-	// fieldRef
 	{
-		key: "{fieldRef:metadata.name}",
-		fn:  func(_ string) (string, refType) { return "metadata.name", refTypeFieldRef },
+		key:         "{fieldRef:metadata.name}",
+		toFieldPath: func(_ string) string { return "metadata.name" },
 	},
 	{
-		key: "{fieldRef:metadata.namespace}",
-		fn:  func(_ string) (string, refType) { return "metadata.namespace", refTypeFieldRef },
+		key:         "{fieldRef:metadata.namespace}",
+		toFieldPath: func(_ string) string { return "metadata.namespace" },
 	},
 	{
-		key: "{fieldRef:metadata.uid}",
-		fn:  func(_ string) (string, refType) { return "metadata.uid", refTypeFieldRef },
+		key:         "{fieldRef:metadata.uid}",
+		toFieldPath: func(_ string) string { return "metadata.uid" },
 	},
 	{
-		key: "{fieldRef:spec.serviceAccountName}",
-		fn:  func(_ string) (string, refType) { return "spec.serviceAccountName", refTypeFieldRef },
+		key:         "{fieldRef:spec.serviceAccountName}",
+		toFieldPath: func(_ string) string { return "spec.serviceAccountName" },
 	},
 	{
-		key: "{fieldRef:spec.nodeName}",
-		fn:  func(_ string) (string, refType) { return "spec.nodeName", refTypeFieldRef },
+		key:         "{fieldRef:spec.nodeName}",
+		toFieldPath: func(_ string) string { return "spec.nodeName" },
 	},
 	{
-		key: "{fieldRef:status.hostIP}",
-		fn:  func(_ string) (string, refType) { return "status.hostIP", refTypeFieldRef },
+		key:         "{fieldRef:status.hostIP}",
+		toFieldPath: func(_ string) string { return "status.hostIP" },
 	},
 	{
-		key: "{fieldRef:status.hostIPs}",
-		fn:  func(_ string) (string, refType) { return "status.hostIPs", refTypeFieldRef },
+		key:         "{fieldRef:status.hostIPs}",
+		toFieldPath: func(_ string) string { return "status.hostIPs" },
 	},
 	{
-		key: "{fieldRef:status.podIP}",
-		fn:  func(_ string) (string, refType) { return "status.podIP", refTypeFieldRef },
+		key:         "{fieldRef:status.podIP}",
+		toFieldPath: func(_ string) string { return "status.podIP" },
 	},
 	{
 		// e.g. {fieldRef:metadata.labels['app']}
 		keyRe: regexp.MustCompile(`{fieldRef:metadata.labels\['(.+)'\]}`),
-		fn: func(s string) (string, refType) {
-			return fmt.Sprintf("metadata.labels['%s']", s), refTypeFieldRef
+		toFieldPath: func(s string) string {
+			return fmt.Sprintf("metadata.labels['%s']", s)
 		},
 	},
 	{
 		// e.g. {fieldRef:metadata.annotations['app']}
 		keyRe: regexp.MustCompile(`{fieldRef:metadata.annotations\['(.+)'\]}`),
-		fn: func(s string) (string, refType) {
-			return fmt.Sprintf("metadata.annotations['%s']", s), refTypeFieldRef
+		toFieldPath: func(s string) string {
+			return fmt.Sprintf("metadata.annotations['%s']", s)
 		},
-	},
-
-	// resourceFieldRef
-	{
-		key: "{resourceFieldRef:limits.cpu}",
-		fn:  func(_ string) (string, refType) { return "limits.cpu", refTypeResourceFieldRef },
-	},
-	{
-		key: "{resourceFieldRef:limits.memory}",
-		fn:  func(_ string) (string, refType) { return "limits.memory", refTypeResourceFieldRef },
-	},
-	{
-		key: "{resourceFieldRef:requests.cpu}",
-		fn:  func(_ string) (string, refType) { return "requests.cpu", refTypeResourceFieldRef },
-	},
-	{
-		key: "{resourceFieldRef:requests.memory}",
-		fn:  func(_ string) (string, refType) { return "requests.memory", refTypeResourceFieldRef },
 	},
 }
 
-func converFieldPath(s string) (string, refType) {
-	for _, v := range valuefroms {
+var resourceFieldRefValuefroms = []struct {
+	key         string
+	toFieldPath func(args string) string
+}{
+	{
+		key:         "{resourceFieldRef:limits.cpu}",
+		toFieldPath: func(_ string) string { return "limits.cpu" },
+	},
+	{
+		key:         "{resourceFieldRef:limits.memory}",
+		toFieldPath: func(_ string) string { return "limits.memory" },
+	},
+	{
+		key:         "{resourceFieldRef:requests.cpu}",
+		toFieldPath: func(_ string) string { return "requests.cpu" },
+	},
+	{
+		key:         "{resourceFieldRef:requests.memory}",
+		toFieldPath: func(_ string) string { return "requests.memory" },
+	},
+}
+
+func converFieldRefPath(s string) string {
+	for _, v := range fieldRefValuefroms {
 		if v.key == s {
-			return v.fn("")
+			return v.toFieldPath("")
 		}
 
 		if v.keyRe != nil && v.keyRe.MatchString(s) {
@@ -107,32 +103,44 @@ func converFieldPath(s string) (string, refType) {
 			if !IsQualifiedName(args[1]) {
 				break
 			}
-			return v.fn(args[1])
+			return v.toFieldPath(args[1])
 		}
 	}
-	return "", ""
+	return ""
+}
+
+func converResourceFieldRefPath(s string) string {
+	for _, v := range resourceFieldRefValuefroms {
+		if v.key == s {
+			return v.toFieldPath("")
+		}
+	}
+	return ""
 }
 
 func newEnvVarSource(v string) *corev1.EnvVarSource {
-	fieldPath, rt := converFieldPath(v)
+	// 先尝试 fieldRef
+	fieldPath := converFieldRefPath(v)
 	if fieldPath != "" {
-		switch rt {
-		case refTypeFieldRef:
-			return &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: fieldPath},
-			}
-		case refTypeResourceFieldRef:
-			var divisor resource.Quantity
-			if strings.Contains(fieldPath, "cpu") {
-				divisor = resource.MustParse("1m")
-			} else if strings.Contains(fieldPath, "memory") {
-				divisor = resource.MustParse("1Mi")
-			}
-			return &corev1.EnvVarSource{
-				ResourceFieldRef: &corev1.ResourceFieldSelector{ContainerName: "", Resource: fieldPath, Divisor: divisor},
-			}
+		return &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: fieldPath},
 		}
 	}
+
+	// 再尝试 resourceFieldRef
+	resourcePath := converResourceFieldRefPath(v)
+	if resourcePath != "" {
+		var divisor resource.Quantity
+		if strings.Contains(resourcePath, "cpu") {
+			divisor = resource.MustParse("1m")
+		} else if strings.Contains(resourcePath, "memory") {
+			divisor = resource.MustParse("1Mi")
+		}
+		return &corev1.EnvVarSource{
+			ResourceFieldRef: &corev1.ResourceFieldSelector{ContainerName: "", Resource: resourcePath, Divisor: divisor},
+		}
+	}
+
 	return nil
 }
 

@@ -112,7 +112,9 @@ configmap:
                         "FLAMESHOT_LOG_LEVEL":        "info",
                         "FLAMESHOT_PROFILING_PATH":   "/flameshot-data",
                         "FLAMESHOT_LOG_PATH":         "/var/log/flameshot.log",
-                        "FLAMESHOT_HTTP_LOCAL_PORT":  "8089"
+                        "FLAMESHOT_HTTP_LOCAL_PORT":  "8089",
+                        "FLAMESHOT_POD_CPU_LIMIT":    "{resourceFieldRef:limits.cpu}",
+                        "FLAMESHOT_POD_MEM_LIMIT":    "{resourceFieldRef:limits.memory}"
                     },
                     "resources": {
                         "requests": {

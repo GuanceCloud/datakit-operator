@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.1] - 2026-02-11
+
+- 支持以 `resourceFieldRef` 格式注入环境变量，现可引用容器资源限制与请求值，包括 limits.cpu、limits.memory、requests.cpu、requests.memory（#84）
+- 支持注入 Python ddtrace agent（#81）
+- 提供代理 API 接口，用于获取本集群内 Pod 的相关数据（#79）
+
 ## [1.8.0] - 2026-01-29
 
 - `admission_inject_v2` 配置项新增 `check_annotation` 字段，用来兼容 `admission.datakit/java-lib.version` 用法（#81）
