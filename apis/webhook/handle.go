@@ -8,9 +8,9 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/mattbaird/jsonpatch"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -25,18 +25,19 @@ const (
 
 var podResource = metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
-func HandleInject(w http.ResponseWriter, r *http.Request) {
-	var body []byte
-	if r.Body != nil {
-		if data, err := io.ReadAll(r.Body); err == nil {
-			body = data
-		}
-	}
-
+func HandleInject(c *gin.Context) {
 	// verify the content type is accurate
-	contentType := r.Header.Get("Content-Type")
+	contentType := c.GetHeader("Content-Type")
 	if contentType != jsonContentType {
 		log.Errorf("content_type=%s expect %s", contentType, jsonContentType)
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	body, err := c.GetRawData()
+	if err != nil {
+		log.Errorf("failed to read request body: %v", err)
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -47,7 +48,7 @@ func HandleInject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("Request could not be decoded: %v", err)
 		log.Error(msg)
-		http.Error(w, msg, http.StatusBadRequest)
+		c.String(http.StatusBadRequest, msg)
 		return
 	}
 
@@ -57,6 +58,7 @@ func HandleInject(w http.ResponseWriter, r *http.Request) {
 		requestedAdmissionReview, ok := obj.(*admissionv1.AdmissionReview)
 		if !ok {
 			log.Errorf("expect=AdmissionReview got=%T", obj)
+			c.Status(http.StatusBadRequest)
 			return
 		}
 		responseAdmissionReview := &admissionv1.AdmissionReview{}
@@ -70,23 +72,20 @@ func HandleInject(w http.ResponseWriter, r *http.Request) {
 	default:
 		msg := fmt.Sprintf("unsupported_gvk=%v", gvk)
 		log.Error(msg)
-		http.Error(w, msg, http.StatusBadRequest)
+		c.String(http.StatusBadRequest, msg)
 		return
 	}
 
 	respBytes, err := json.Marshal(responseObj)
 	if err != nil {
 		log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	log.Debugf("response_body=%s", respBytes)
 
-	w.Header().Set("Content-Type", jsonContentType)
-	if _, err := w.Write(respBytes); err != nil {
-		log.Error(err)
-	}
+	c.Data(http.StatusOK, jsonContentType, respBytes)
 }
 
 func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {

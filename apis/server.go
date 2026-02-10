@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/cluster"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/logging"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/webhook"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/kubernetes/client"
 )
 
 var log = logger.DefaultSLogger("apis")
@@ -25,17 +28,53 @@ const (
 func Run(ctx context.Context, addr string) error {
 	log = logger.SLogger("apis")
 
-	mux := http.NewServeMux()
+	// 创建 k8s client，这是核心功能，失败则退出
+	k8sClient, err := client.NewClientInCluster()
+	if err != nil {
+		log.Errorf("failed to create k8s client: %v", err)
+		return err
+	}
+
 	webhook.Setup(ctx)
 	logging.Setup(ctx)
+	cluster.Setup(ctx)
 
-	// 路由由上层统一决定
-	mux.HandleFunc("/v1/webhooks/inject", webhook.HandleInject)
-	mux.HandleFunc("/v1/logging/configs", logging.HandleConfigs)
+	gin.SetMode(gin.ReleaseMode)
+
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(ginLogger())
+
+	// 注册路由
+	router.GET("/v1/ping", handlePing)
+	router.POST("/v1/webhooks/inject", webhook.HandleInject)
+
+	if err := logging.CheckClusterLoggingConfigRBAC(k8sClient); err != nil {
+		log.Errorf("RBAC check failed for logging: %v, logging API will be disabled", err)
+	} else {
+		router.GET("/v1/logging/configs", logging.HandleConfigs)
+	}
+
+	if err := cluster.CheckPodRBAC(k8sClient); err != nil {
+		log.Errorf("RBAC check failed: %v, cluster API will be disabled", err)
+	} else {
+		clusterHandler := cluster.NewHandler(k8sClient)
+
+		if err := clusterHandler.Start(ctx); err != nil {
+			log.Errorf("failed to start cluster handler: %v, cluster API will be disabled", err)
+		} else {
+			coreV1Group := router.Group("/v1/cluster/api/v1")
+			{
+				coreV1Group.GET("/pods", clusterHandler.ListAllPods)
+				coreV1Group.GET("/namespaces/:namespace/pods", clusterHandler.ListPods)
+				coreV1Group.GET("/namespaces/:namespace/pods/:name", clusterHandler.GetPod)
+			}
+		}
+	}
 
 	server := &http.Server{
 		Addr:    addr,
-		Handler: mux,
+		Handler: router,
 	}
 
 	log.Infof("server listening on %s", addr)
@@ -66,5 +105,45 @@ func Run(ctx context.Context, addr string) error {
 			return err
 		}
 		return nil
+	}
+}
+
+// PingResponse ping 接口的响应结构
+type PingResponse struct {
+	Status string `json:"status"`
+}
+
+// handlePing 处理 ping 请求，返回 operator 运行状态
+func handlePing(c *gin.Context) {
+	c.JSON(http.StatusOK, PingResponse{
+		Status: "ok",
+	})
+}
+
+func ginLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
+
+		c.Next()
+
+		latency := time.Since(start)
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+
+		if raw != "" {
+			path = path + "?" + raw
+		}
+
+		log.Debugf("[%s] %s %s %d %v %s",
+			clientIP,
+			method,
+			path,
+			statusCode,
+			latency,
+			c.Request.UserAgent(),
+		)
 	}
 }
