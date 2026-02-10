@@ -12,21 +12,27 @@ import (
 type language string
 
 const (
-	java language = "java"
+	java   language = "java"
+	python language = "python"
+	golang language = "golang"
 
 	enableEnvFieldRef = true
 )
 
 var (
 	ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.DDTraces.Matches(ns, labels)
+		return config.Cfg.AdmissionInject.DDTraces.Matches(ns, labels, "")
 	}
 
 	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels)
+		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels, "")
 	}
 
 	flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.Flameshots.Matches(ns, labels)
+		return config.Cfg.AdmissionInject.Flameshots.Matches(ns, labels, "")
+	}
+
+	profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+		return config.Cfg.AdmissionInject.Profilers.Matches(ns, labels, "")
 	}
 )
