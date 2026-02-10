@@ -15,13 +15,17 @@ import (
 )
 
 const (
-	ddtraceInitContainerName    = "datakit-lib-init"
-	ddtraceEnabledAnnotationKey = "admission.datakit/ddtrace.enabled"
-	javaLibVersionAnnotationKey = "admission.datakit/java-lib.version"
+	ddtraceInitContainerName          = "datakit-lib-init"
+	ddtraceEnabledAnnotationKey       = "admission.datakit/ddtrace.enabled"
+	ddtraceVersionAnnotationKeyFormat = "admission.datakit/%s-lib.version"
 
 	ddtraceVolumeName = "datakit-auto-instrument"
 	ddtraceMountPath  = "/datadog-lib"
 	ddtraceDDTagsKey  = "DD_TAGS"
+)
+
+var (
+	supportedLanguagesForDDTrace = []language{java, python}
 )
 
 func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) error {
@@ -55,7 +59,7 @@ func (r *ddtraceResource) process() {
 		r.namespace = r.pod.Namespace
 	}
 
-	should, rule := r.getMatchingRule()
+	should, rule, imageVersion := r.getMatchingRule()
 	if !should || rule == nil {
 		return
 	}
@@ -66,18 +70,19 @@ func (r *ddtraceResource) process() {
 	switch language(rule.Language) {
 	case java:
 		lib = &ddtraceJava{}
+	case python:
+		lib = &ddtracePython{}
 	default:
 		log.Warnf("ddtrace language not supported: lang=%s pod=%s", rule.Language, r.parent)
 		return
 	}
 
-	// 如果 CheckAnnotation 为 true，尝试从 annotation 中获取版本并替换
 	image := rule.Image
-	if rule.CheckAnnotation {
-		if imageVersion := r.pod.GetAnnotations()[javaLibVersionAnnotationKey]; imageVersion != "" {
-			image = replaceImageVersion(image, imageVersion)
-		}
+	// 如果 annotation 中有版本信息，替换 image 版本
+	if imageVersion != "" {
+		image = replaceImageVersion(image, imageVersion)
 	}
+
 	r.injectInitContainer(image, rule.Resources)
 
 	if err := lib.injectConfig(r.pod); err != nil {
@@ -94,33 +99,37 @@ func (r *ddtraceResource) process() {
 	log.Infof("ddtrace injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 }
 
-func (r *ddtraceResource) getMatchingRule() (bool, *config.InjectRule) {
+func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.InjectRule, imageVersion string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), ddtraceEnabledAnnotationKey) {
 		log.Debugf("ddtrace annotation disabled: pod=%s", r.parent)
-		return false, nil
+		return false, nil, ""
 	}
 
 	if manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName) {
 		log.Debugf("ddtrace init container already exists: pod=%s", r.parent)
-		return false, nil
+		return false, nil, ""
 	}
 
 	matched, rule := ddtraceMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
 	if !matched || rule == nil {
-		return false, nil
+		return false, nil, ""
 	}
 
-	// 如果 rule.CheckAnnotation 为 true，必须存在 java-lib.version Annotation
-	if rule.CheckAnnotation {
-		annotations := r.pod.GetAnnotations()
-		if _, exists := annotations[javaLibVersionAnnotationKey]; !exists {
-			log.Debugf("ddtrace rule requires java-lib.version annotation but not found: pod=%s", r.parent)
-			return false, nil
+	if !rule.CheckAnnotation {
+		log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
+		return true, rule, ""
+	}
+
+	annotations := r.pod.GetAnnotations()
+	for _, lang := range supportedLanguagesForDDTrace {
+		versionAnnotation := fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang)
+		if version, exists := annotations[versionAnnotation]; exists {
+			log.Debugf("ddtrace found %s-lib.version annotation: pod=%s", lang, r.parent)
+			return true, rule, version
 		}
 	}
 
-	log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
-	return true, rule
+	return false, nil, ""
 }
 
 func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements) {
@@ -193,7 +202,6 @@ func (r *ddtraceResource) specialDDTagsEnv(newEnv *corev1.EnvVar) {
 		if oldDDTagsIndex != -1 {
 			env := DeleteSlice(r.pod.Spec.Containers[cIdx].Env, oldDDTagsIndex, oldDDTagsIndex+1)
 			r.pod.Spec.Containers[cIdx].Env = env
-
 		}
 
 		m.AddEnvVarToContainer(container.Name, newEnvWithContainer)
@@ -219,10 +227,10 @@ func (d *ddtraceJava) injectConfig(pod *corev1.Pod) error {
 	return injectDDTraceConfig(pod, javaToolOptionsKey, envValFunc)
 }
 
-/*
 type ddtracePython struct{}
 
 func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
+	// Python config
 	const (
 		pythonPathKey   = "PYTHONPATH"
 		pythonPathValue = "/datadog-lib/"
@@ -237,6 +245,7 @@ func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
 	return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
 }
 
+/*
 type ddtraceNodejs struct{}
 
 func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
