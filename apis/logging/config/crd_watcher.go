@@ -157,14 +157,8 @@ func (w *loggingConfigWatcher) processNextItem() bool {
 	return true
 }
 
-func startLoggingConfigWatcher(ctx context.Context) {
-	client, err := client.NewClientInCluster()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	watcher := newLoggingConfigWatcher(client)
+func StartLoggingConfigWatcher(ctx context.Context, k8sClient client.Client) {
+	watcher := newLoggingConfigWatcher(k8sClient)
 	go func() {
 		watcher.start(ctx)
 	}()
