@@ -72,6 +72,7 @@ func (r *flameshotResource) process() {
 	log.Infof("flameshot injection started: pod=%s, namespace=%s, rule=%s", r.parent, r.namespace, rule.Name)
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
+	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
 
 	// 添加 FLAMESHOT_PROCESSES 环境变量（如果已存在会被后面的值覆盖）
 	envs = append(envs, corev1.EnvVar{Name: flameshotProcessesKey, Value: rule.Processes})
