@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.2] - 2026-03-04
+
+- 优化日志打印细节
+
 ## [1.8.1] - 2026-02-11
 
 - 支持以 `resourceFieldRef` 格式注入环境变量，现可引用容器资源限制与请求值，包括 limits.cpu、limits.memory、requests.cpu、requests.memory（#84）
