@@ -102,6 +102,13 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		if err != nil {
 			break
 		}
+
+		podName := pod.Name
+		if podName == "" {
+			podName = pod.GenerateName
+		}
+		log.Infof("received pod request: namespace=%s, name=%s", requ.Namespace, podName)
+
 		err = mutatePod(requ.Namespace, getGenerateName(pod.GenerateName), &pod)
 		resource = pod
 
