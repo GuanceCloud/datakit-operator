@@ -38,9 +38,9 @@ configmap:
             "ddtraces": [
                 {
                     "language": "java",
-                    "check_annotation":    true,
-                    "namespace_selectors": ["*"],
+                    "namespace_selectors": ["default"],
                     "label_selectors":     [],
+                    "check_annotation":    false,
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
@@ -56,9 +56,9 @@ configmap:
                 },
                 {
                     "language": "python",
-                    "check_annotation":    true,
-                    "namespace_selectors": ["*"],
+                    "namespace_selectors": ["default"],
                     "label_selectors":     [],
+                    "check_annotation":    false,
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-python-init:v1.6.2",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
