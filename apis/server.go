@@ -47,21 +47,26 @@ func Run(ctx context.Context, addr string) error {
 
 	// 注册路由
 	router.GET("/v1/ping", handlePing)
+	log.Info("route registered /v1/ping")
+
 	router.POST("/v1/webhooks/inject", webhook.HandleInject)
+	log.Info("route registered /v1/webhook/inject")
 
 	if err := logging.CheckClusterLoggingConfigRBAC(k8sClient); err != nil {
-		log.Errorf("RBAC check failed for logging: %v, logging API will be disabled", err)
+		log.Warnf("RBAC check failed for logging: %v, logging API will be disabled", err)
 	} else {
+		logging.StartLoggingConfigWatcher(ctx, k8sClient)
 		router.GET("/v1/logging/configs", logging.HandleConfigs)
+		log.Info("route registered /v1/logging/configs")
 	}
 
 	if err := cluster.CheckPodRBAC(k8sClient); err != nil {
-		log.Errorf("RBAC check failed: %v, cluster API will be disabled", err)
+		log.Warnf("RBAC check failed: %v, cluster API will be disabled", err)
 	} else {
 		clusterHandler := cluster.NewHandler(k8sClient)
 
 		if err := clusterHandler.Start(ctx); err != nil {
-			log.Errorf("failed to start cluster handler: %v, cluster API will be disabled", err)
+			log.Warnf("failed to start cluster handler: %v, cluster API will be disabled", err)
 		} else {
 			coreV1Group := router.Group("/v1/cluster/api/v1")
 			{
@@ -69,6 +74,7 @@ func Run(ctx context.Context, addr string) error {
 				coreV1Group.GET("/namespaces/:namespace/pods", clusterHandler.ListPods)
 				coreV1Group.GET("/namespaces/:namespace/pods/:name", clusterHandler.GetPod)
 			}
+			log.Info("route registered /v1/clusters/:path")
 		}
 	}
 
