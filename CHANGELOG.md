@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.3] - 2026-03-20
+
+- 支持注入 PHP ddtrace agent（#82）
+
 ## [1.8.2] - 2026-03-10
 
 - 修复 `/logging/configs` 接口异常的问题（#85）
@@ -8,7 +12,7 @@
 ## [1.8.1] - 2026-02-11
 
 - 支持以 `resourceFieldRef` 格式注入环境变量，现可引用容器资源限制与请求值，包括 limits.cpu、limits.memory、requests.cpu、requests.memory（#84）
-- 支持注入 Python ddtrace agent（#81）
+- 支持注入 Python ddtrace agent（#82）
 - 提供代理 API 接口，用于获取本集群内 Pod 的相关数据（#79）
 
 ## [1.8.0] - 2026-01-29

@@ -95,6 +95,23 @@ data:
                         "NODE_NAME":               "{fieldRef:spec.nodeName}",
                         "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
                     }
+                },
+                {
+                    "language": "php",
+                    "php_loader_flavor": "linux-gnu",
+                    "namespace_selectors": ["default"],
+                    "label_selectors":     [],
+                    "check_annotation":    false,
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-php-init:latest",
+                    "envs": {
+                        "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
+                        "DD_TRACE_AGENT_PORT":     "9529",
+                        "DD_SERVICE":              "{fieldRef:metadata.labels['app']}",
+                        "POD_NAME":                "{fieldRef:metadata.name}",
+                        "POD_NAMESPACE":           "{fieldRef:metadata.namespace}",
+                        "NODE_NAME":               "{fieldRef:spec.nodeName}",
+                        "DD_TAGS":                 "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                    }
                 }
             ],
             "logfwds": [
