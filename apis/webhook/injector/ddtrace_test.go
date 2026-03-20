@@ -79,6 +79,31 @@ func TestInjectDDTrace(t *testing.T) {
 		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v2.0.0", pod.Spec.InitContainers[0].Image)
 	})
 
+	t.Run("CheckAnnotation=true with php annotation", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "php",
+				CheckAnnotation: true,
+				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-ddtrace-check-annotation-php", map[string]string{
+			ddtraceEnabledAnnotationKey:         "true",
+			"admission.datakit/php-lib.version": "v2.0.0",
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+
+		assert.Len(t, pod.Spec.InitContainers, 1)
+		assert.Equal(t, "pubrepo.guance.com/datakit-operator/php-lib-testing:v2.0.0", pod.Spec.InitContainers[0].Image)
+	})
+
 	t.Run("CheckAnnotation=true without annotation", func(t *testing.T) {
 		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
 		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
@@ -162,6 +187,62 @@ func TestInjectDDTrace(t *testing.T) {
 
 		assert.Len(t, pod.Spec.InitContainers, 0)
 		assert.Len(t, pod.Spec.Volumes, 0)
+	})
+
+	t.Run("php basic injection", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "php",
+				PHPLoaderFlavor: "linux-musl",
+				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-ddtrace-php", map[string]string{
+			ddtraceEnabledAnnotationKey: "true",
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+
+		assert.Len(t, pod.Spec.InitContainers, 1)
+		assert.Equal(t, "datakit-lib-init", pod.Spec.InitContainers[0].Name)
+		assert.Equal(t, []string{"sh", "-c"}, pod.Spec.InitContainers[0].Command[:2])
+		assert.Contains(t, pod.Spec.InitContainers[0].Command[2], "/datadog-lib/linux-musl/loader/dd_library_loader.ini")
+
+		envMap := map[string]string{}
+		for _, env := range pod.Spec.Containers[0].Env {
+			envMap[env.Name] = env.Value
+		}
+		assert.Equal(t, "/datadog-lib", envMap["DD_LOADER_PACKAGE_PATH"])
+		assert.Equal(t, "/usr/local/etc/php/conf.d:/datadog-lib", envMap["PHP_INI_SCAN_DIR"])
+	})
+
+	t.Run("php invalid flavor fallback to linux-gnu", func(t *testing.T) {
+		originalFunc := ddtraceMatchNamespaceOrLabelsForConfig
+		ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
+			return true, &config.InjectRule{
+				Language:        "php",
+				PHPLoaderFlavor: "invalid",
+				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
+			}
+		}
+		defer func() {
+			ddtraceMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-ddtrace-php-loader-default", map[string]string{
+			ddtraceEnabledAnnotationKey: "true",
+		})
+
+		err := InjectDDTraceToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.Len(t, pod.Spec.InitContainers, 1)
+		assert.Contains(t, pod.Spec.InitContainers[0].Command[2], "/datadog-lib/linux-gnu/loader/dd_library_loader.ini")
 	})
 
 	t.Run("skip when init container already exists", func(t *testing.T) {
