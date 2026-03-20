@@ -78,7 +78,7 @@ configmap:
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "check_annotation":    false,
-                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-php-init:latest",
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-php-init:1.13.1",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                         "DD_TRACE_AGENT_PORT":     "9529",
@@ -94,7 +94,7 @@ configmap:
                 {
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
-                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.87.0",
+                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.90.1",
                     "envs": {
                         "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
                         "LOGFWD_DATAKIT_PORT":              "9533",
