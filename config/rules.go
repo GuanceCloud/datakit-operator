@@ -18,11 +18,12 @@ type (
 		CheckAnnotation bool   `json:"check_annotation"`
 		Selector
 
-		Language     string               `json:"language"`
-		Image        string               `json:"image"`
-		Images       map[string]string    `json:"-"`
-		Environments mapslice.MapSlice    `json:"envs"`
-		Resources    ResourceRequirements `json:"resources"`
+		Language        string               `json:"language"`
+		PHPLoaderFlavor string               `json:"php_loader_flavor,omitempty"`
+		Image           string               `json:"image"`
+		Images          map[string]string    `json:"-"`
+		Environments    mapslice.MapSlice    `json:"envs"`
+		Resources       ResourceRequirements `json:"resources"`
 
 		// only use for logfwd
 		LogConfigs     string   `json:"log_configs"`

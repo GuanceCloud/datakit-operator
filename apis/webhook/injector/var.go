@@ -14,6 +14,7 @@ type language string
 const (
 	java   language = "java"
 	python language = "python"
+	php    language = "php"
 	golang language = "golang"
 
 	enableEnvFieldRef = true

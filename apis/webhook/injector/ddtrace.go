@@ -22,10 +22,15 @@ const (
 	ddtraceVolumeName = "datakit-auto-instrument"
 	ddtraceMountPath  = "/datadog-lib"
 	ddtraceDDTagsKey  = "DD_TAGS"
+
+	phpDefaultINIPath   = "/usr/local/etc/php/conf.d"
+	phpLoaderFileName   = "dd_library_loader.ini"
+	phpLoaderFlavorGNU  = "linux-gnu"
+	phpLoaderFlavorMusl = "linux-musl"
 )
 
 var (
-	supportedLanguagesForDDTrace = []language{java, python}
+	supportedLanguagesForDDTrace = []language{java, python, php}
 )
 
 func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) error {
@@ -72,6 +77,8 @@ func (r *ddtraceResource) process() {
 		lib = &ddtraceJava{}
 	case python:
 		lib = &ddtracePython{}
+	case php:
+		lib = &ddtracePHP{}
 	default:
 		log.Warnf("ddtrace language not supported: lang=%s pod=%s", rule.Language, r.parent)
 		return
@@ -83,7 +90,8 @@ func (r *ddtraceResource) process() {
 		image = replaceImageVersion(image, imageVersion)
 	}
 
-	r.injectInitContainer(image, rule.Resources)
+	phpLoaderFlavor := r.getPHPLoaderFlavor(rule)
+	r.injectInitContainer(image, rule.Resources, language(rule.Language), phpLoaderFlavor)
 
 	if err := lib.injectConfig(r.pod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
@@ -133,11 +141,20 @@ func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.In
 	return false, nil, ""
 }
 
-func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements) {
+func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements, lang language, phpLoaderFlavor string) {
+	command := []string{"sh", "copy-lib.sh", ddtraceMountPath}
+	if lang == php {
+		copyCmd := fmt.Sprintf(
+			"/datadog-init/copy-lib.sh %s && cp %s/%s/loader/%s %s/%s",
+			ddtraceMountPath, ddtraceMountPath, phpLoaderFlavor, phpLoaderFileName, ddtraceMountPath, phpLoaderFileName,
+		)
+		command = []string{"sh", "-c", copyCmd}
+	}
+
 	container := corev1.Container{
 		Name:            ddtraceInitContainerName,
 		Image:           image,
-		Command:         []string{"sh", "copy-lib.sh", ddtraceMountPath},
+		Command:         command,
 		ImagePullPolicy: corev1.PullAlways,
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -149,6 +166,29 @@ func (r *ddtraceResource) injectInitContainer(image string, resources config.Res
 
 	setContainerResources(&container, resources.Requests.CPU, resources.Requests.Memory, resources.Limits.CPU, resources.Limits.Memory)
 	manager.NewContainerManager(r.pod).AddInitContainer(&container)
+}
+
+func (r *ddtraceResource) getPHPLoaderFlavor(rule *config.InjectRule) string {
+	if language(rule.Language) != php {
+		return ""
+	}
+
+	if isValidPHPLoaderFlavor(rule.PHPLoaderFlavor) {
+		return rule.PHPLoaderFlavor
+	}
+	if rule.PHPLoaderFlavor != "" {
+		log.Warnf("invalid php_loader_flavor in rule: pod=%s, flavor=%s, fallback=%s", r.parent, rule.PHPLoaderFlavor, phpLoaderFlavorGNU)
+	}
+	return phpLoaderFlavorGNU
+}
+
+func isValidPHPLoaderFlavor(flavor string) bool {
+	switch flavor {
+	case phpLoaderFlavorGNU, phpLoaderFlavorMusl:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *ddtraceResource) injectGlobalVolume() {
@@ -244,6 +284,34 @@ func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
 		return fmt.Sprintf("%s:%s", pythonPathValue, predefinedVal)
 	}
 	return injectDDTraceConfig(pod, pythonPathKey, envValFunc)
+}
+
+type ddtracePHP struct{}
+
+func (d *ddtracePHP) injectConfig(pod *corev1.Pod) error {
+	// PHP config
+	const (
+		phpIniScanDirKey          = "PHP_INI_SCAN_DIR"
+		phpLoaderPackagePathKey   = "DD_LOADER_PACKAGE_PATH"
+		phpLoaderPackagePathValue = ddtraceMountPath
+	)
+
+	if err := injectDDTraceConfig(pod, phpLoaderPackagePathKey, func(predefinedVal string) string {
+		if predefinedVal != "" {
+			return predefinedVal
+		}
+		return phpLoaderPackagePathValue
+	}); err != nil {
+		return err
+	}
+
+	envValFunc := func(predefinedVal string) string {
+		if predefinedVal == "" {
+			return fmt.Sprintf("%s:%s", phpDefaultINIPath, ddtraceMountPath)
+		}
+		return fmt.Sprintf("%s:%s", predefinedVal, ddtraceMountPath)
+	}
+	return injectDDTraceConfig(pod, phpIniScanDirKey, envValFunc)
 }
 
 /*
