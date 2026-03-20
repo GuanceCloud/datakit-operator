@@ -8,7 +8,7 @@ The details refer to [document](https://docs.guance.com/en/datakit/datakit-opera
 
 Currently, Datakit-Operator provides the following functions:
 
-- [x] Injection DDTrace Java/Python Agent and related environments.
+- [x] Injection DDTrace Java/Python/PHP Agent and related environments.
 - [x] Injection Sidecar logfwd to collect Pod logging.
 - [x] Injection Flameshot and related environments.
 - [x] Support task distribution for Datakit plugins.
@@ -29,4 +29,3 @@ $ kubectl get pod -n datakit
 NAME                               READY   STATUS    RESTARTS   AGE
 datakit-operator-f948897fb-5w5nm   1/1     Running   0          15s
 ```
-
