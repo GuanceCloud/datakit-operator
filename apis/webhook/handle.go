@@ -125,6 +125,13 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		return nil, fmt.Errorf("failed to encode the mutated object: %v", err)
 	}
 
+	// Preserve restartPolicy for existing initContainers. This field may exist in
+	// newer Kubernetes versions but be unknown to our vendored corev1.Container type.
+	newRaw, err = preserveInitContainerRestartPolicy(raw, newRaw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to preserve init container restartPolicy: %v", err)
+	}
+
 	log.Debugf("response=%s", string(newRaw))
 
 	patchs, err := jsonpatch.CreatePatch(raw, newRaw)
@@ -133,6 +140,71 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 	}
 
 	return json.Marshal(patchs)
+}
+
+func preserveInitContainerRestartPolicy(oldRaw, newRaw []byte) ([]byte, error) {
+	var oldObj map[string]interface{}
+	if err := json.Unmarshal(oldRaw, &oldObj); err != nil {
+		return nil, err
+	}
+
+	var newObj map[string]interface{}
+	if err := json.Unmarshal(newRaw, &newObj); err != nil {
+		return nil, err
+	}
+
+	oldSpec, ok := oldObj["spec"].(map[string]interface{})
+	if !ok {
+		return newRaw, nil
+	}
+	newSpec, ok := newObj["spec"].(map[string]interface{})
+	if !ok {
+		return newRaw, nil
+	}
+
+	oldInitContainers, ok := oldSpec["initContainers"].([]interface{})
+	if !ok || len(oldInitContainers) == 0 {
+		return newRaw, nil
+	}
+	newInitContainers, ok := newSpec["initContainers"].([]interface{})
+	if !ok || len(newInitContainers) == 0 {
+		return newRaw, nil
+	}
+
+	restartPolicyByName := map[string]interface{}{}
+	for _, c := range oldInitContainers {
+		container, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := container["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+		if policy, ok := container["restartPolicy"]; ok {
+			restartPolicyByName[name] = policy
+		}
+	}
+
+	if len(restartPolicyByName) == 0 {
+		return newRaw, nil
+	}
+
+	for _, c := range newInitContainers {
+		container, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := container["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+		if policy, ok := restartPolicyByName[name]; ok {
+			container["restartPolicy"] = policy
+		}
+	}
+
+	return json.Marshal(newObj)
 }
 
 func getGenerateName(name string) string {
