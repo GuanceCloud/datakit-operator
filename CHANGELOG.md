@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.4] - 2026-04-03
+
+- 修复注入资源时会丢弃 initContainer RestartPolicy 配置项的问题（#86）
+
 ## [1.8.3] - 2026-03-20
 
 - 支持注入 PHP ddtrace agent（#82）
