@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/podcompare"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -19,14 +20,15 @@ const (
 	loggingAnnotationKey = "datakit/logs"
 )
 
-func MutateLoggingToPod(namespace, parent string, pod *corev1.Pod) error {
+func MutateLoggingToPod(namespace, parent string, pod *corev1.Pod) (bool, error) {
 	if pod == nil {
-		return fmt.Errorf("cannot inject ddtrace-lib into nil pod")
+		return false, fmt.Errorf("cannot inject ddtrace-lib into nil pod")
 	}
 
+	before := pod.DeepCopy()
 	r := newLoggingResource(namespace, parent, pod)
 	r.process()
-	return nil
+	return podcompare.Changed(before, pod), nil
 }
 
 type loggingResource struct {

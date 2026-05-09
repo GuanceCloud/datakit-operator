@@ -52,7 +52,7 @@ func TestInjectFlameshot(t *testing.T) {
 			},
 		}
 
-		err := InjectFlameshotToPod("", pod.Name, pod)
+		_, err := InjectFlameshotToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Verify pod spec modifications
@@ -138,7 +138,7 @@ func TestInjectFlameshot(t *testing.T) {
 			},
 		}
 
-		err := InjectFlameshotToPod("", pod.Name, pod)
+		_, err := InjectFlameshotToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Check volumes are created correctly
@@ -182,7 +182,8 @@ func TestInjectFlameshot(t *testing.T) {
 			},
 		}
 
-		assert.NoError(t, InjectFlameshotToPod("", pod.Name, pod))
+		_, err := InjectFlameshotToPod("", pod.Name, pod)
+		assert.NoError(t, err)
 		assert.Equal(t, "true", pod.Annotations["prometheus.io/scrape"])
 		assert.Equal(t, "8089", pod.Annotations["prometheus.io/port"])
 		assert.Equal(t, "http", pod.Annotations["prometheus.io/scheme"])
@@ -193,7 +194,7 @@ func TestInjectFlameshot(t *testing.T) {
 
 func TestInjectFlameshotEdgeCases(t *testing.T) {
 	t.Run("return error for nil pod", func(t *testing.T) {
-		err := InjectFlameshotToPod("", "test-pod", nil)
+		_, err := InjectFlameshotToPod("", "test-pod", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot inject flameshot into nil pod")
 	})
