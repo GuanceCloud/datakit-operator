@@ -101,7 +101,7 @@ func TestInjectLogfwd(t *testing.T) {
 			},
 		}
 
-		err := InjectLogfwdToPod("", pod.Name, pod)
+		_, err := InjectLogfwdToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Verify container injection
@@ -162,7 +162,7 @@ func TestInjectLogfwd(t *testing.T) {
 			logfwdEnabledAnnotationKey: "true",
 		})
 
-		err := InjectLogfwdToPod("", pod.Name, pod)
+		_, err := InjectLogfwdToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Verify container injection

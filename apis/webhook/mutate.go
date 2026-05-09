@@ -22,30 +22,41 @@ func shouldInject(annotations map[string]string) bool {
 	return injector.CheckAnnotationIsTrue(annotations, injectEnabled)
 }
 
-func mutatePod(namespace, parent string, pod *corev1.Pod) error {
+func mutatePod(namespace, parent string, pod *corev1.Pod) (bool, error) {
 	if !shouldInject(pod.GetAnnotations()) {
-		return nil
+		return false, nil
 	}
 
 	log.Debug("mutated pod")
 
-	if err := injector.InjectDDTraceToPod(namespace, parent, pod); err != nil {
-		return err
+	changed := false
+	if ok, err := injector.InjectDDTraceToPod(namespace, parent, pod); err != nil {
+		return changed, err
+	} else {
+		changed = changed || ok
 	}
-	if err := injector.InjectLogfwdToPod(namespace, parent, pod); err != nil {
-		return err
+	if ok, err := injector.InjectLogfwdToPod(namespace, parent, pod); err != nil {
+		return changed, err
+	} else {
+		changed = changed || ok
 	}
-	if err := injector.InjectFlameshotToPod(namespace, parent, pod); err != nil {
-		return err
+	if ok, err := injector.InjectFlameshotToPod(namespace, parent, pod); err != nil {
+		return changed, err
+	} else {
+		changed = changed || ok
 	}
-	if err := injector.InjectProfilerToPod(namespace, parent, pod); err != nil {
-		return err
+	if ok, err := injector.InjectProfilerToPod(namespace, parent, pod); err != nil {
+		return changed, err
+	} else {
+		changed = changed || ok
 	}
-	if err := mutator.MutateLoggingToPod(namespace, parent, pod); err != nil {
-		return err
+	if ok, err := mutator.MutateLoggingToPod(namespace, parent, pod); err != nil {
+		return changed, err
+	} else {
+		changed = changed || ok
 	}
 
-	return nil
+	return changed, nil
 }
 
 func mutationResponsev1(jsonPatch []byte, err error) *admissionv1.AdmissionResponse {
