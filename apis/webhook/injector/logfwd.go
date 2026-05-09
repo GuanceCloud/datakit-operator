@@ -13,6 +13,7 @@ import (
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/manager"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/podcompare"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -38,14 +39,15 @@ type logConfig struct {
 	Path string `json:"path"`
 }
 
-func InjectLogfwdToPod(_, parent string, pod *corev1.Pod) error {
+func InjectLogfwdToPod(_, parent string, pod *corev1.Pod) (bool, error) {
 	if pod == nil {
-		return fmt.Errorf("cannot inject logfwd into nil pod")
+		return false, fmt.Errorf("cannot inject logfwd into nil pod")
 	}
 
+	before := pod.DeepCopy()
 	r := newLogfwdResource(parent, pod)
 	r.process()
-	return nil
+	return podcompare.Changed(before, pod), nil
 }
 
 type logfwdResource struct {

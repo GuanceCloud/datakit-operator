@@ -41,7 +41,7 @@ func TestInjectProfiler(t *testing.T) {
 			"admission.datakit/java-profiler.version": "v2.0.0",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 2)
@@ -70,7 +70,7 @@ func TestInjectProfiler(t *testing.T) {
 			profilerEnabledAnnotationKey: "true",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 1)
@@ -103,7 +103,7 @@ func TestInjectProfiler(t *testing.T) {
 			profilerEnabledAnnotationKey: "true",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 2)
@@ -137,7 +137,7 @@ func TestInjectProfiler(t *testing.T) {
 			"admission.datakit/python-profiler.version": "latest",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 2)
@@ -162,7 +162,7 @@ func TestInjectProfiler(t *testing.T) {
 			profilerEnabledAnnotationKey: "false",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 1)
@@ -191,7 +191,7 @@ func TestInjectProfiler(t *testing.T) {
 			Image: "existing-profiler-image",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 2)
@@ -217,7 +217,7 @@ func TestInjectProfiler(t *testing.T) {
 			profilerEnabledAnnotationKey: "true",
 		})
 
-		err := InjectProfilerToPod("", pod.Name, pod)
+		_, err := InjectProfilerToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.Containers, 1)
@@ -225,7 +225,7 @@ func TestInjectProfiler(t *testing.T) {
 	})
 
 	t.Run("nil pod error", func(t *testing.T) {
-		err := InjectProfilerToPod("", "test-pod", nil)
+		_, err := InjectProfilerToPod("", "test-pod", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot inject profiler into nil pod")
 	})
