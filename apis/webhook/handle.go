@@ -90,17 +90,14 @@ func HandleInject(c *gin.Context) {
 
 func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 	var raw = requ.Object.Raw
-	var resource interface{}
-	var err error
 
 	log.Debugf("request=%s", string(raw))
 
 	switch requ.Resource {
 	case podResource:
 		var pod corev1.Pod
-		err = json.Unmarshal(raw, &pod)
-		if err != nil {
-			break
+		if err := json.Unmarshal(raw, &pod); err != nil {
+			return nil, fmt.Errorf("failed to decode pod object: %v", err)
 		}
 
 		podName := pod.Name
@@ -109,102 +106,32 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		}
 		log.Infof("received pod request: namespace=%s, name=%s", requ.Namespace, podName)
 
-		err = mutatePod(requ.Namespace, getGenerateName(pod.GenerateName), &pod)
-		resource = pod
+		if requ.Operation != admissionv1.Create {
+			return marshalPatch(requ, nil)
+		}
+
+		mutatedPod := pod.DeepCopy()
+		changed, err := mutatePod(requ.Namespace, getGenerateName(mutatedPod.GenerateName), mutatedPod)
+		if err != nil {
+			return nil, fmt.Errorf("failed to mutate type %#v resource: %v", requ.Resource, err)
+		}
+
+		patches := buildPodInjectionPatch(&pod, mutatedPod)
+		if changed && len(patches) == 0 {
+			log.Warnf("admission mutation produced no patch: uid=%s, namespace=%s, name=%s", requ.UID, requ.Namespace, podName)
+		}
+		return marshalPatch(requ, patches)
 
 	default:
 		return nil, fmt.Errorf("Unsupported resource: %#v", requ.Resource)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to mutate type %#v resource: %v", requ.Resource, err)
-	}
-
-	newRaw, err := json.Marshal(resource)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode the mutated object: %v", err)
-	}
-
-	// Preserve restartPolicy for existing initContainers. This field may exist in
-	// newer Kubernetes versions but be unknown to our vendored corev1.Container type.
-	newRaw, err = preserveInitContainerRestartPolicy(raw, newRaw)
-	if err != nil {
-		return nil, fmt.Errorf("failed to preserve init container restartPolicy: %v", err)
-	}
-
-	log.Debugf("response=%s", string(newRaw))
-
-	patchs, err := jsonpatch.CreatePatch(raw, newRaw)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare the JSON patch: %w", err)
-	}
-
-	return json.Marshal(patchs)
 }
 
-func preserveInitContainerRestartPolicy(oldRaw, newRaw []byte) ([]byte, error) {
-	var oldObj map[string]interface{}
-	if err := json.Unmarshal(oldRaw, &oldObj); err != nil {
-		return nil, err
+func marshalPatch(requ *admissionv1.AdmissionRequest, patches []jsonpatch.JsonPatchOperation) (jsonPatch, error) {
+	if patches == nil {
+		patches = []jsonpatch.JsonPatchOperation{}
 	}
-
-	var newObj map[string]interface{}
-	if err := json.Unmarshal(newRaw, &newObj); err != nil {
-		return nil, err
-	}
-
-	oldSpec, ok := oldObj["spec"].(map[string]interface{})
-	if !ok {
-		return newRaw, nil
-	}
-	newSpec, ok := newObj["spec"].(map[string]interface{})
-	if !ok {
-		return newRaw, nil
-	}
-
-	oldInitContainers, ok := oldSpec["initContainers"].([]interface{})
-	if !ok || len(oldInitContainers) == 0 {
-		return newRaw, nil
-	}
-	newInitContainers, ok := newSpec["initContainers"].([]interface{})
-	if !ok || len(newInitContainers) == 0 {
-		return newRaw, nil
-	}
-
-	restartPolicyByName := map[string]interface{}{}
-	for _, c := range oldInitContainers {
-		container, ok := c.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, ok := container["name"].(string)
-		if !ok || name == "" {
-			continue
-		}
-		if policy, ok := container["restartPolicy"]; ok {
-			restartPolicyByName[name] = policy
-		}
-	}
-
-	if len(restartPolicyByName) == 0 {
-		return newRaw, nil
-	}
-
-	for _, c := range newInitContainers {
-		container, ok := c.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, ok := container["name"].(string)
-		if !ok || name == "" {
-			continue
-		}
-		if policy, ok := restartPolicyByName[name]; ok {
-			container["restartPolicy"] = policy
-		}
-	}
-
-	return json.Marshal(newObj)
+	return json.Marshal(patches)
 }
 
 func getGenerateName(name string) string {
