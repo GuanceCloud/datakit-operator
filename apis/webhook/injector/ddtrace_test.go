@@ -38,7 +38,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "true",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -72,7 +72,7 @@ func TestInjectDDTrace(t *testing.T) {
 			"admission.datakit/java-lib.version": "v2.0.0",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -97,7 +97,7 @@ func TestInjectDDTrace(t *testing.T) {
 			"admission.datakit/php-lib.version": "v2.0.0",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -128,7 +128,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "true",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 0)
@@ -159,7 +159,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "true",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -182,7 +182,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "false",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 0)
@@ -206,7 +206,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "true",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -239,7 +239,7 @@ func TestInjectDDTrace(t *testing.T) {
 			ddtraceEnabledAnnotationKey: "true",
 		})
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 		assert.Len(t, pod.Spec.InitContainers, 1)
 		assert.Contains(t, pod.Spec.InitContainers[0].Command[2], "/datadog-lib/linux-gnu/loader/dd_library_loader.ini")
@@ -264,7 +264,7 @@ func TestInjectDDTrace(t *testing.T) {
 			{Name: ddtraceInitContainerName, Image: "existing-image"},
 		}
 
-		err := InjectDDTraceToPod("", pod.Name, pod)
+		_, err := InjectDDTraceToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		assert.Len(t, pod.Spec.InitContainers, 1)
@@ -272,7 +272,7 @@ func TestInjectDDTrace(t *testing.T) {
 	})
 
 	t.Run("nil pod error", func(t *testing.T) {
-		err := InjectDDTraceToPod("", "test-pod", nil)
+		_, err := InjectDDTraceToPod("", "test-pod", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot inject ddtrace-lib into nil pod")
 	})
