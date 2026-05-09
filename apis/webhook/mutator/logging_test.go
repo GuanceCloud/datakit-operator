@@ -52,7 +52,7 @@ func TestMutateLogging(t *testing.T) {
 
 		pod := createTestPod("test-logging-basic", existingMounts, existingVolumes)
 
-		err := MutateLoggingToPod("", pod.Name, pod)
+		_, err := MutateLoggingToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Verify annotation is added
@@ -78,7 +78,7 @@ func TestMutateLogging(t *testing.T) {
 
 		pod := createTestPod("test-single-config", nil, nil)
 
-		err := MutateLoggingToPod("", pod.Name, pod)
+		_, err := MutateLoggingToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Verify annotation is added
@@ -115,7 +115,7 @@ func TestMutateLoggingEdgeCases(t *testing.T) {
 			},
 		}
 
-		err := MutateLoggingToPod("", pod.Name, pod)
+		_, err := MutateLoggingToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Should not modify existing annotation
@@ -130,7 +130,7 @@ func TestMutateLoggingEdgeCases(t *testing.T) {
 
 		pod := createTestPod("test-no-config", nil, nil)
 
-		err := MutateLoggingToPod("", pod.Name, pod)
+		_, err := MutateLoggingToPod("", pod.Name, pod)
 		assert.NoError(t, err)
 
 		// Should not add annotation or volumes
@@ -140,7 +140,7 @@ func TestMutateLoggingEdgeCases(t *testing.T) {
 	})
 
 	t.Run("return error for nil pod", func(t *testing.T) {
-		err := MutateLoggingToPod("", "test-pod", nil)
+		_, err := MutateLoggingToPod("", "test-pod", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot inject ddtrace-lib into nil pod")
 	})
