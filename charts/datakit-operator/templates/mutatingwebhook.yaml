@@ -6,10 +6,10 @@ metadata:
 webhooks:
   - name: "mutation.datakit.svc"
     rules:
-      - operations: [ "CREATE"]
-        apiGroups: [ "" ]
-        apiVersions: [ "v1" ]
-        resources: [ "pods" ]
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
         scope: "Namespaced"
     clientConfig:
       service:
