@@ -12,10 +12,12 @@ import (
 type language string
 
 const (
-	java   language = "java"
-	python language = "python"
-	php    language = "php"
-	golang language = "golang"
+	java             language = "java"
+	python           language = "python"
+	php              language = "php"
+	nodejs           language = "nodejs"
+	nodejsDeprecated language = "js"
+	golang           language = "golang"
 
 	enableEnvFieldRef = true
 )
