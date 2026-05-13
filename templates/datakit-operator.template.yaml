@@ -65,7 +65,7 @@ data:
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "check_annotation":    false,
-                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:latest",
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:v1.60.4-ext",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                         "DD_TRACE_AGENT_PORT":     "9529",
@@ -83,7 +83,7 @@ data:
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "check_annotation":    false,
-                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-python-init:v1.6.2",
+                    "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-python-init:v2.21.12",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                         "DD_TRACE_AGENT_PORT":     "9529",
@@ -134,7 +134,7 @@ data:
                 {
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
-                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.90.1",
+                    "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.93.0",
                     "envs": {
                         "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
                         "LOGFWD_DATAKIT_PORT":              "9533",
@@ -162,7 +162,7 @@ data:
                 {
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
-                    "image": "(@BRAND_REPO_DATAKIT)/flameshot:latest",
+                    "image": "(@BRAND_REPO_DATAKIT)/flameshot:0.2.1",
                     "envs": {
                         "FLAMESHOT_DATAKIT_ADDR":     "http://datakit-service.datakit:9529/profiling/v1/input",
                         "FLAMESHOT_MONITOR_INTERVAL": "10s",
