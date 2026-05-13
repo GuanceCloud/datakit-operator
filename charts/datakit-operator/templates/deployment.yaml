@@ -25,6 +25,7 @@ spec:
         app: {{ include "datakit-operator.fullname" . }}
         {{- include "datakit-operator.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "datakit-operator.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

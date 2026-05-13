@@ -9,5 +9,5 @@ roleRef:
   name: {{ include "datakit-operator.fullname" . }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "datakit-operator.fullname" . }}
-  namespace: datakit
+  name: {{ include "datakit-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}

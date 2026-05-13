@@ -24,6 +24,10 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: "datakit-operator"
 
+serviceAccount:
+  create: true
+  name: ""
+
 admissionregistration:
   webhooks:
     caBundle: (@CABUNDLE)
