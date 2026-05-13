@@ -81,7 +81,7 @@ func (r *ddtraceResource) process() {
 		lib = &ddtracePython{}
 	case php:
 		lib = &ddtracePHP{}
-	case nodejs, nodejsDeprecated:
+	case nodejs:
 		lib = &ddtraceNodejs{}
 	default:
 		log.Warnf("ddtrace language not supported: lang=%s pod=%s", rule.Language, r.parent)
