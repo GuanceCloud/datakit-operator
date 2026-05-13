@@ -54,9 +54,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "datakit-operator.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "datakit-operator.fullname" .) .Values.serviceAccount.name }}
+{{- $serviceAccount := .Values.serviceAccount | default dict }}
+{{- if or (not (hasKey $serviceAccount "create")) $serviceAccount.create }}
+{{- default (include "datakit-operator.fullname" .) $serviceAccount.name }}
 {{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- default "default" $serviceAccount.name }}
 {{- end }}
 {{- end }}
