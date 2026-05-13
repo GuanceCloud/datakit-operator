@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	supportedLanguagesForDDTrace = []language{java, python, php}
+	supportedLanguagesForDDTrace = []language{java, python, php, nodejs}
 )
 
 func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) (bool, error) {
@@ -81,6 +81,8 @@ func (r *ddtraceResource) process() {
 		lib = &ddtracePython{}
 	case php:
 		lib = &ddtracePHP{}
+	case nodejs:
+		lib = &ddtraceNodejs{}
 	default:
 		log.Warnf("ddtrace language not supported: lang=%s pod=%s", rule.Language, r.parent)
 		return
@@ -316,7 +318,6 @@ func (d *ddtracePHP) injectConfig(pod *corev1.Pod) error {
 	return injectDDTraceConfig(pod, phpIniScanDirKey, envValFunc)
 }
 
-/*
 type ddtraceNodejs struct{}
 
 func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
@@ -331,7 +332,6 @@ func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
 	}
 	return injectDDTraceConfig(pod, nodejsOptionsKey, envValFunc)
 }
-*/
 
 func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) string) error {
 	podSpec := pod.Spec
