@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.7] - 2026-05-14
+
+- 更新 helm 和 yaml 的镜像 tag
+
 ## [1.8.6] - 2026-05-12
 
 - 支持注入 Node.js ddtrace agent（#89）
