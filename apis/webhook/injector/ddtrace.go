@@ -30,10 +30,6 @@ const (
 	phpLoaderFlavorMusl = "linux-musl"
 )
 
-var (
-	supportedLanguagesForDDTrace = []language{java, python, php, nodejs}
-)
-
 func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("cannot inject ddtrace-lib into nil pod")
@@ -123,21 +119,23 @@ func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.In
 		return false, nil, ""
 	}
 
-	matched, rule := ddtraceMatchNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
-	if !matched || rule == nil {
+	matched, rules := ddtraceMatchAllNamespaceOrLabelsForConfig(r.namespace, r.pod.GetLabels())
+	if !matched || len(rules) == 0 {
 		return false, nil, ""
 	}
 
-	if !rule.CheckAnnotation {
-		log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
-		return true, rule, ""
-	}
-
 	annotations := r.pod.GetAnnotations()
-	for _, lang := range supportedLanguagesForDDTrace {
-		versionAnnotation := fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, lang)
+
+	for _, rule := range rules {
+		if !rule.CheckAnnotation {
+			log.Infof("ddtrace rule matched: pod=%s, language=%s, image=%s", r.parent, rule.Language, rule.Image)
+			return true, rule, ""
+		}
+
+		ruleLang := language(rule.Language)
+		versionAnnotation := fmt.Sprintf(ddtraceVersionAnnotationKeyFormat, ruleLang)
 		if version, exists := annotations[versionAnnotation]; exists {
-			log.Debugf("ddtrace found %s-lib.version annotation: pod=%s", lang, r.parent)
+			log.Debugf("ddtrace found %s-lib.version annotation: pod=%s", ruleLang, r.parent)
 			return true, rule, version
 		}
 	}
