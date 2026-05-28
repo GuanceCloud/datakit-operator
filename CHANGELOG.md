@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.8] - 2026-05-28
+
+- 修复注入 ddtrace 时 `check_annotation` 配置项可能失效的问题（#91）
+
 ## [1.8.7] - 2026-05-14
 
 - 更新 helm 和 yaml 的镜像 tag
