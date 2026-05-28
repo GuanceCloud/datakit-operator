@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	ddtraceMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.DDTraces.Matches(ns, labels, "")
+	ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
+		return config.Cfg.AdmissionInject.DDTraces.MatchesAll(ns, labels)
 	}
 
 	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
