@@ -74,6 +74,33 @@ func (rs InjectRules) Matches(ns string, labels map[string]string, language stri
 	return false, nil
 }
 
+// MatchesAll returns all matching rules, not just the first one.
+// This is needed when multiple rules have check_annotation enabled and
+// we need to try each rule's language-specific annotation.
+func (rs InjectRules) MatchesAll(ns string, labels map[string]string) (bool, []*InjectRule) {
+	var rules []*InjectRule
+	for idx := range rs {
+		if len(rs[idx].Selector.namespaceSelectors) == 0 && len(rs[idx].Selector.labelSelectors) == 0 {
+			continue
+		}
+
+		var namespaceMatched = true
+		var selectMatched = true
+
+		if len(rs[idx].Selector.namespaceSelectors) != 0 {
+			namespaceMatched = rs[idx].Selector.matchNamespace(ns)
+		}
+		if len(rs[idx].Selector.labelSelectors) != 0 {
+			selectMatched = rs[idx].Selector.matchLabels(labels)
+		}
+
+		if namespaceMatched && selectMatched {
+			rules = append(rules, rs[idx])
+		}
+	}
+	return len(rules) > 0, rules
+}
+
 func (r *InjectRule) setupEnvs() {
 	for _, item := range r.Environments {
 		key, ok := item.Key.(string)
