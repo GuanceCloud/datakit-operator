@@ -11,12 +11,15 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/kubernetes/client"
 )
+
+const podViewEBPFV1 = "ebpf-v1"
 
 func CheckPodRBAC(k8sClient client.Client) error {
 	ctx := context.Background()
@@ -38,6 +41,10 @@ func (h *Handler) ListAllPods(c *gin.Context) {
 		return
 	}
 
+	if c.Query("view") == podViewEBPFV1 {
+		c.JSON(http.StatusOK, trimPodsForEBPFV1(pods))
+		return
+	}
 	c.JSON(http.StatusOK, pods)
 }
 
@@ -51,6 +58,10 @@ func (h *Handler) ListPods(c *gin.Context) {
 		return
 	}
 
+	if c.Query("view") == podViewEBPFV1 {
+		c.JSON(http.StatusOK, trimPodsForEBPFV1(pods))
+		return
+	}
 	c.JSON(http.StatusOK, pods)
 }
 
@@ -64,5 +75,53 @@ func (h *Handler) GetPod(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "not found"})
 		return
 	}
+	if c.Query("view") == podViewEBPFV1 {
+		c.JSON(http.StatusOK, trimPodForEBPFV1(pod))
+		return
+	}
 	c.JSON(http.StatusOK, pod)
+}
+
+func trimPodsForEBPFV1(pods []*corev1.Pod) []corev1.Pod {
+	trimmed := make([]corev1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		trimmed = append(trimmed, trimPodForEBPFV1(pod))
+	}
+	return trimmed
+}
+
+func trimPodForEBPFV1(pod *corev1.Pod) corev1.Pod {
+	if pod == nil {
+		return corev1.Pod{}
+	}
+
+	containers := make([]corev1.Container, 0, len(pod.Spec.Containers))
+	for _, container := range pod.Spec.Containers {
+		containers = append(containers, corev1.Container{
+			Name:  container.Name,
+			Ports: container.Ports,
+		})
+	}
+
+	return corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             pod.UID,
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			Labels:          pod.Labels,
+			OwnerReferences: pod.OwnerReferences,
+		},
+		Spec: corev1.PodSpec{
+			Containers:  containers,
+			HostNetwork: pod.Spec.HostNetwork,
+			HostPID:     pod.Spec.HostPID,
+			HostIPC:     pod.Spec.HostIPC,
+		},
+		Status: corev1.PodStatus{
+			HostIP:    pod.Status.HostIP,
+			PodIP:     pod.Status.PodIP,
+			PodIPs:    pod.Status.PodIPs,
+			StartTime: pod.Status.StartTime,
+		},
+	}
 }
