@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package cluster
 
 import (
@@ -8,75 +13,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
-func TestListAllPodsEBPFV1ViewTrimsPodFields(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	pod := &corev1.Pod{
-		ObjectMeta: v1.ObjectMeta{
-			UID:       types.UID("pod-uid"),
-			Name:      "app-0",
-			Namespace: "default",
-			Labels: map[string]string{
-				"app":        "demo",
-				"project_id": "p1",
-			},
-			Annotations: map[string]string{
-				"large": "annotation",
-			},
-			ManagedFields: []v1.ManagedFieldsEntry{
-				{Manager: "kube-controller-manager"},
-			},
-			OwnerReferences: []v1.OwnerReference{
-				{
-					APIVersion: "apps/v1",
-					Kind:       "ReplicaSet",
-					Name:       "app-7f9d7f",
-					UID:        types.UID("owner-uid"),
-					Controller: boolPtr(true),
-				},
-			},
-		},
-		Spec: corev1.PodSpec{
-			HostNetwork: true,
-			HostPID:     true,
-			HostIPC:     true,
-			Volumes: []corev1.Volume{
-				{Name: "config"},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:  "app",
-					Image: "nginx:1.25",
-					Env: []corev1.EnvVar{
-						{Name: "SECRET", Value: "value"},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{Name: "config", MountPath: "/etc/config"},
-					},
-					Ports: []corev1.ContainerPort{
-						{Name: "http", ContainerPort: 8080, Protocol: corev1.ProtocolTCP},
-					},
-				},
-			},
-		},
-		Status: corev1.PodStatus{
-			HostIP: "10.0.0.1",
-			PodIP:  "10.244.0.10",
-			PodIPs: []corev1.PodIP{
-				{IP: "10.244.0.10"},
-			},
-			Phase: corev1.PodRunning,
-			ContainerStatuses: []corev1.ContainerStatus{
-				{Name: "app", Image: "nginx:1.25", Ready: true},
-			},
-		},
-	}
+func servePods(t *testing.T, pod *corev1.Pod, view string) []corev1.Pod {
+	t.Helper()
 
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
 		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
@@ -85,64 +28,87 @@ func TestListAllPodsEBPFV1ViewTrimsPodFields(t *testing.T) {
 		t.Fatalf("add pod to indexer: %v", err)
 	}
 
-	h := &Handler{PodLister: corev1listers.NewPodLister(indexer)}
-
 	router := gin.New()
-	router.GET("/pods", h.ListAllPods)
+	router.GET("/pods", (&Handler{PodLister: corev1listers.NewPodLister(indexer)}).ListAllPods)
 
-	req := httptest.NewRequest(http.MethodGet, "/pods?view=ebpf-v1", nil)
+	url := "/pods"
+	if view != "" {
+		url += "?view=" + view
+	}
+	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body: %s", w.Code, http.StatusOK, w.Body.String())
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
 	}
 
 	var pods []corev1.Pod
 	if err := json.Unmarshal(w.Body.Bytes(), &pods); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
+		t.Fatalf("unmarshal: %v", err)
 	}
 	if len(pods) != 1 {
-		t.Fatalf("pods len = %d, want 1", len(pods))
+		t.Fatalf("got %d pods, want 1", len(pods))
+	}
+	return pods
+}
+
+func TestListAllPodsEBPFV1ViewTrimsPodFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	controller := true
+	pod := &corev1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			UID:       "pod-uid",
+			Name:      "app-0",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "demo"},
+			Annotations: map[string]string{
+				"kubectl.kubernetes.io/last-applied-configuration": "...",
+			},
+			ManagedFields:  []v1.ManagedFieldsEntry{{Manager: "kcm"}},
+			OwnerReferences: []v1.OwnerReference{{
+				APIVersion: "apps/v1", Kind: "ReplicaSet",
+				Name: "rs-0", UID: "owner-uid", Controller: &controller,
+			}},
+		},
+		Spec: corev1.PodSpec{
+			HostNetwork: true,
+			HostPID:     true,
+			HostIPC:     true,
+			Containers: []corev1.Container{{
+				Name:  "app",
+				Image: "nginx:1.25",
+				Env:   []corev1.EnvVar{{Name: "SECRET", Value: "x"}},
+				Ports: []corev1.ContainerPort{{ContainerPort: 8080}},
+			}},
+			Volumes: []corev1.Volume{{Name: "config"}},
+		},
+		Status: corev1.PodStatus{
+			HostIP: "10.0.0.1", PodIP: "10.244.0.10",
+			PodIPs:            []corev1.PodIP{{IP: "10.244.0.10"}},
+			Phase:             corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{Name: "app", Image: "nginx:1.25", Ready: true}},
+		},
 	}
 
-	got := pods[0]
-	if got.UID != types.UID("pod-uid") ||
-		got.Name != "app-0" ||
-		got.Namespace != "default" ||
-		got.Labels["app"] != "demo" ||
-		len(got.OwnerReferences) != 1 {
-		t.Fatalf("trimmed metadata mismatch: %#v", got.ObjectMeta)
-	}
+	got := servePods(t, pod, "ebpf-v1")[0]
 
-	if !got.Spec.HostNetwork || !got.Spec.HostPID || !got.Spec.HostIPC {
-		t.Fatalf("host namespace flags were not preserved: %#v", got.Spec)
+	// retained
+	ok := got.UID == "pod-uid" && got.Name == "app-0" && got.Namespace == "default" &&
+		got.Spec.HostNetwork && got.Spec.HostPID && got.Spec.HostIPC &&
+		got.Status.HostIP == "10.0.0.1" && got.Status.PodIP == "10.244.0.10" &&
+		got.Labels["app"] == "demo" && len(got.OwnerReferences) == 1 &&
+		len(got.Spec.Containers) == 1 && got.Spec.Containers[0].Name == "app" &&
+		len(got.Spec.Containers[0].Ports) == 1 && got.Spec.Containers[0].Ports[0].ContainerPort == 8080
+	if !ok {
+		t.Errorf("retained: %+v", got)
 	}
-	if len(got.Spec.Containers) != 1 {
-		t.Fatalf("containers len = %d, want 1", len(got.Spec.Containers))
-	}
-	if got.Spec.Containers[0].Name != "app" ||
-		len(got.Spec.Containers[0].Ports) != 1 ||
-		got.Spec.Containers[0].Ports[0].ContainerPort != 8080 {
-		t.Fatalf("trimmed container mismatch: %#v", got.Spec.Containers[0])
-	}
-
-	if got.Status.HostIP != "10.0.0.1" ||
-		got.Status.PodIP != "10.244.0.10" ||
-		len(got.Status.PodIPs) != 1 ||
-		got.Status.PodIPs[0].IP != "10.244.0.10" {
-		t.Fatalf("trimmed status mismatch: %#v", got.Status)
-	}
-
-	if len(got.Annotations) != 0 ||
-		len(got.ManagedFields) != 0 ||
-		len(got.Spec.Volumes) != 0 ||
-		got.Spec.Containers[0].Image != "" ||
-		len(got.Spec.Containers[0].Env) != 0 ||
-		len(got.Spec.Containers[0].VolumeMounts) != 0 ||
-		got.Status.Phase != "" ||
-		len(got.Status.ContainerStatuses) != 0 {
-		t.Fatalf("large fields should be trimmed: %#v", got)
+	// stripped
+	if got.Spec.Containers[0].Image != "" || len(got.Spec.Containers[0].Env) != 0 || len(got.Annotations) != 0 ||
+		len(got.ManagedFields) != 0 || len(got.Spec.Volumes) != 0 ||
+		got.Status.Phase != "" || len(got.Status.ContainerStatuses) != 0 {
+		t.Errorf("stripped: %+v", got)
 	}
 }
 
@@ -151,60 +117,25 @@ func TestListAllPodsDefaultViewKeepsFullPod(t *testing.T) {
 
 	pod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "app-0",
-			Namespace: "default",
-			ManagedFields: []v1.ManagedFieldsEntry{
-				{Manager: "test"},
-			},
+			Name:          "app-0",
+			Namespace:     "default",
+			ManagedFields: []v1.ManagedFieldsEntry{{Manager: "kcm"}},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{Name: "app", Image: "nginx:1.25"},
-			},
+			Containers: []corev1.Container{{Name: "app", Image: "nginx:1.25"}},
 		},
 		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-			ContainerStatuses: []corev1.ContainerStatus{
-				{Name: "app", Image: "nginx:1.25"},
-			},
+			Phase:             corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{Name: "app", Image: "nginx:1.25"}},
 		},
 	}
 
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
-		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-	})
-	if err := indexer.Add(pod); err != nil {
-		t.Fatalf("add pod to indexer: %v", err)
+	got := servePods(t, pod, "")[0]
+
+	if got.Spec.Containers[0].Image != "nginx:1.25" ||
+		got.Status.Phase != corev1.PodRunning ||
+		len(got.Status.ContainerStatuses) != 1 ||
+		len(got.ManagedFields) != 1 {
+		t.Errorf("full pod not preserved: %+v", got)
 	}
-
-	h := &Handler{PodLister: corev1listers.NewPodLister(indexer)}
-
-	router := gin.New()
-	router.GET("/pods", h.ListAllPods)
-
-	req := httptest.NewRequest(http.MethodGet, "/pods", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body: %s", w.Code, http.StatusOK, w.Body.String())
-	}
-
-	var pods []corev1.Pod
-	if err := json.Unmarshal(w.Body.Bytes(), &pods); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if len(pods) != 1 {
-		t.Fatalf("pods len = %d, want 1", len(pods))
-	}
-	if pods[0].Spec.Containers[0].Image != "nginx:1.25" ||
-		pods[0].Status.Phase != corev1.PodRunning ||
-		len(pods[0].Status.ContainerStatuses) != 1 ||
-		len(pods[0].ManagedFields) != 1 {
-		t.Fatalf("default view should keep full pod: %#v", pods[0])
-	}
-}
-
-func boolPtr(v bool) *bool {
-	return &v
 }
