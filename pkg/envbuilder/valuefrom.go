@@ -12,6 +12,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 var fieldRefValuefroms = []struct {
@@ -53,14 +54,14 @@ var fieldRefValuefroms = []struct {
 	},
 	{
 		// e.g. {fieldRef:metadata.labels['app']}
-		keyRe: regexp.MustCompile(`{fieldRef:metadata.labels\['(.+)'\]}`),
+		keyRe: regexp.MustCompile(`^\{fieldRef:metadata\.labels\['([^']+)'\]\}$`),
 		toFieldPath: func(s string) string {
 			return fmt.Sprintf("metadata.labels['%s']", s)
 		},
 	},
 	{
 		// e.g. {fieldRef:metadata.annotations['app']}
-		keyRe: regexp.MustCompile(`{fieldRef:metadata.annotations\['(.+)'\]}`),
+		keyRe: regexp.MustCompile(`^\{fieldRef:metadata\.annotations\['([^']+)'\]\}$`),
 		toFieldPath: func(s string) string {
 			return fmt.Sprintf("metadata.annotations['%s']", s)
 		},
@@ -89,19 +90,24 @@ var resourceFieldRefValuefroms = []struct {
 	},
 }
 
-func converFieldRefPath(s string) string {
+var secretKeyRefValuefroms = []*regexp.Regexp{
+	// e.g. {secretKeyRef:flameshot-oss.access_key_id}
+	regexp.MustCompile(`^\{secretKeyRef:([^.]+)\.([-._A-Za-z0-9]+)\}$`),
+}
+
+func convertFieldRefPath(s string) string {
 	for _, v := range fieldRefValuefroms {
 		if v.key == s {
 			return v.toFieldPath("")
 		}
 
-		if v.keyRe != nil && v.keyRe.MatchString(s) {
+		if v.keyRe != nil {
 			args := v.keyRe.FindStringSubmatch(s)
 			if len(args) != 2 {
-				break
+				continue
 			}
 			if !IsQualifiedName(args[1]) {
-				break
+				continue
 			}
 			return v.toFieldPath(args[1])
 		}
@@ -109,7 +115,7 @@ func converFieldRefPath(s string) string {
 	return ""
 }
 
-func converResourceFieldRefPath(s string) string {
+func convertResourceFieldRefPath(s string) string {
 	for _, v := range resourceFieldRefValuefroms {
 		if v.key == s {
 			return v.toFieldPath("")
@@ -118,9 +124,30 @@ func converResourceFieldRefPath(s string) string {
 	return ""
 }
 
+func convertSecretKeyRef(s string) (string, string, bool) {
+	for _, keyRe := range secretKeyRefValuefroms {
+		args := keyRe.FindStringSubmatch(s)
+		if len(args) != 3 {
+			continue
+		}
+
+		name, key := args[1], args[2]
+		if !IsDNS1123Subdomain(name) {
+			continue
+		}
+		if len(validation.IsConfigMapKey(key)) != 0 {
+			continue
+		}
+
+		return name, key, true
+	}
+
+	return "", "", false
+}
+
 func newEnvVarSource(v string) *corev1.EnvVarSource {
 	// 先尝试 fieldRef
-	fieldPath := converFieldRefPath(v)
+	fieldPath := convertFieldRefPath(v)
 	if fieldPath != "" {
 		return &corev1.EnvVarSource{
 			FieldRef: &corev1.ObjectFieldSelector{FieldPath: fieldPath},
@@ -128,7 +155,7 @@ func newEnvVarSource(v string) *corev1.EnvVarSource {
 	}
 
 	// 再尝试 resourceFieldRef
-	resourcePath := converResourceFieldRefPath(v)
+	resourcePath := convertResourceFieldRefPath(v)
 	if resourcePath != "" {
 		var divisor resource.Quantity
 		if strings.Contains(resourcePath, "cpu") {
@@ -138,6 +165,17 @@ func newEnvVarSource(v string) *corev1.EnvVarSource {
 		}
 		return &corev1.EnvVarSource{
 			ResourceFieldRef: &corev1.ResourceFieldSelector{ContainerName: "", Resource: resourcePath, Divisor: divisor},
+		}
+	}
+
+	// 最后尝试 secretKeyRef
+	secretName, secretKey, ok := convertSecretKeyRef(v)
+	if ok {
+		return &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+				Key:                  secretKey,
+			},
 		}
 	}
 
