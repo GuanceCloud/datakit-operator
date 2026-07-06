@@ -27,15 +27,77 @@ func TestConvertFieldRefPath(t *testing.T) {
 			output: "metadata.labels['app']",
 		},
 		{
+			in:     "prefix{fieldRef:metadata.labels['app']}suffix",
+			output: "",
+		},
+		{
+			in:     "{fieldRef:metadataXlabels['app']}",
+			output: "",
+		},
+		{
 			in:     "unmatched",
 			output: "",
 		},
 	}
 
 	for _, tc := range cases {
-		res := converFieldRefPath(tc.in)
+		res := convertFieldRefPath(tc.in)
 		assert.Equal(t, tc.output, res)
 	}
+}
+
+func TestConvertSecretKeyRef(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		name, key, ok := convertSecretKeyRef("{secretKeyRef:flameshot-oss.access_key_id}")
+
+		assert.True(t, ok)
+		assert.Equal(t, "flameshot-oss", name)
+		assert.Equal(t, "access_key_id", key)
+	})
+
+	invalidValues := []string{
+		"{secretKeyRef:flameshot-oss}",
+		"{secretKeyRef:FLAMESHOT-OSS.access_key_id}",
+		"{secretKeyRef:flameshot-oss.access/key}",
+		"prefix{secretKeyRef:flameshot-oss.access_key_id}suffix",
+	}
+	for _, value := range invalidValues {
+		t.Run(value, func(t *testing.T) {
+			name, key, ok := convertSecretKeyRef(value)
+			assert.False(t, ok)
+			assert.Empty(t, name)
+			assert.Empty(t, key)
+		})
+	}
+}
+
+func TestBuildEnvWithSecretKeyRef(t *testing.T) {
+	got := BuildEnv(
+		"FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID",
+		"{secretKeyRef:flameshot-oss.access_key_id}",
+		true,
+	)
+
+	assert.Equal(t, corev1.EnvVar{
+		Name: "FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "flameshot-oss"},
+				Key:                  "access_key_id",
+			},
+		},
+	}, got)
+}
+
+func TestBuildEnvWithInvalidSecretKeyRef(t *testing.T) {
+	value := "{secretKeyRef:INVALID-NAME.access/key}"
+
+	got := BuildEnv("ACCESS_KEY", value, true)
+
+	assert.Equal(t, corev1.EnvVar{
+		Name:  "ACCESS_KEY",
+		Value: value,
+	}, got)
 }
 
 func TestConvertResourceFieldRefPath(t *testing.T) {
@@ -58,7 +120,7 @@ func TestConvertResourceFieldRefPath(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		res := converResourceFieldRefPath(tc.in)
+		res := convertResourceFieldRefPath(tc.in)
 		assert.Equal(t, tc.output, res)
 	}
 }
