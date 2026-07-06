@@ -66,7 +66,7 @@ func TestListAllPodsEBPFV1ViewTrimsPodFields(t *testing.T) {
 			Annotations: map[string]string{
 				"kubectl.kubernetes.io/last-applied-configuration": "...",
 			},
-			ManagedFields:  []v1.ManagedFieldsEntry{{Manager: "kcm"}},
+			ManagedFields: []v1.ManagedFieldsEntry{{Manager: "kcm"}},
 			OwnerReferences: []v1.OwnerReference{{
 				APIVersion: "apps/v1", Kind: "ReplicaSet",
 				Name: "rs-0", UID: "owner-uid", Controller: &controller,
