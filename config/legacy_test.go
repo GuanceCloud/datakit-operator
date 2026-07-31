@@ -53,57 +53,94 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 				Limits:   ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
 			},
 		},
+		Profiler: DeprecatedInjectRule{
+			EnabledNamespaces: []struct {
+				Namespace string
+				Language  string
+			}{
+				{Namespace: "profiling", Language: "java"},
+			},
+			Images: map[string]string{
+				"java_profiler_image":   "pubrepo.guance.com/datakit-operator/profiler-java:v1.0.0",
+				"python_profiler_image": "pubrepo.guance.com/datakit-operator/profiler-python:v1.0.0",
+			},
+			Environments: mapslice.MapSlice{
+				{Key: "DK_AGENT_HOST", Value: "datakit-service.datakit.svc"},
+			},
+			Resources: ResourceRequirements{
+				Requests: ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
+			},
+		},
 	}
 
 	expected := AdmissionInjectConfig{
-		DDTraces: InjectRules{
-			&InjectRule{
-				Name:            "Used InjectV1 Config",
+		DDTraces: DDTraceRules{
+			&DDTraceRule{
+				InjectRule: InjectRule{
+					Name: "Used InjectV1 Config",
+					Selector: Selector{
+						Namespaces: []string{"default", "production"},
+						Labels:     []string{"app=myapp"},
+					},
+					Image: "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
+					Environments: mapslice.MapSlice{
+						{Key: "DD_AGENT_HOST", Value: "datakit-service.datakit.svc"},
+						{Key: "DD_TRACE_AGENT_PORT", Value: "9529"},
+					},
+					Resources: ResourceRequirements{
+						Requests: ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
+					},
+				},
 				CheckAnnotation: true,
-				Selector: Selector{
-					Namespaces: []string{"default", "production"},
-					Labels:     []string{"app=myapp"},
+				Language:        "java",
+			},
+		},
+		Logfwds: LogfwdRules{
+			&LogfwdRule{
+				InjectRule: InjectRule{
+					Name: "Used InjectV1 Config",
+					Selector: Selector{
+						Namespaces: []string{".*"},
+						Labels:     []string{},
+					},
+					Image: "pubrepo.guance.com/datakit/logfwd:1.5.8",
+					Environments: mapslice.MapSlice{
+						{Key: "LOGFWD_ENV", Value: "test"},
+					},
+					Resources: ResourceRequirements{
+						Requests: ResourceQuotaConfig{CPU: "50m", Memory: "32Mi"},
+						Limits:   ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
 				},
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
+				CheckAnnotation: true,
+			},
+		},
+		Flameshots: FlameshotRules{},
+		Profilers: ProfilerRules{
+			&ProfilerRule{
+				InjectRule: InjectRule{
+					Name: "Used InjectV1 Config",
+					Selector: Selector{
+						Namespaces: []string{"profiling"},
+						Labels:     []string{},
+					},
+					Environments: mapslice.MapSlice{
+						{Key: "DK_AGENT_HOST", Value: "datakit-service.datakit.svc"},
+					},
+					Resources: ResourceRequirements{
+						Requests: ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
+					},
+				},
+				CheckAnnotation: true,
 				Images: map[string]string{
-					"java_agent_image":   "pubrepo.guance.com/datakit-operator/dd-lib-java-init:v1.8.4",
-					"python_agent_image": "pubrepo.guance.com/datakit-operator/dd-lib-python-init:v1.6.2",
-				},
-				Environments: mapslice.MapSlice{
-					{Key: "DD_AGENT_HOST", Value: "datakit-service.datakit.svc"},
-					{Key: "DD_TRACE_AGENT_PORT", Value: "9529"},
-				},
-				Resources: ResourceRequirements{
-					Requests: ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
+					"java_profiler_image":   "pubrepo.guance.com/datakit-operator/profiler-java:v1.0.0",
+					"python_profiler_image": "pubrepo.guance.com/datakit-operator/profiler-python:v1.0.0",
 				},
 			},
 		},
-		Logfwds: InjectRules{
-			&InjectRule{
-				Name:            "Used InjectV1 Config",
-				CheckAnnotation: true,
-				Selector: Selector{
-					Namespaces: []string{".*"},
-					Labels:     []string{},
-				},
-				Language: "",
-				Image:    "pubrepo.guance.com/datakit/logfwd:1.5.8",
-				Images: map[string]string{
-					"logfwd_image": "pubrepo.guance.com/datakit/logfwd:1.5.8",
-				},
-				Environments: mapslice.MapSlice{
-					{Key: "LOGFWD_ENV", Value: "test"},
-				},
-				Resources: ResourceRequirements{
-					Requests: ResourceQuotaConfig{CPU: "50m", Memory: "32Mi"},
-					Limits:   ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			},
-		},
-		Flameshots: InjectRules{},
-		Profilers:  InjectRules{},
 	}
 
 	result := convertDeprecatedToAdmissionInject(input)

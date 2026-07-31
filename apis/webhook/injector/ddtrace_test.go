@@ -13,22 +13,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func newTestDDTraceRule(language, image string) *config.DDTraceRule {
+	return &config.DDTraceRule{
+		InjectRule: config.InjectRule{Image: image},
+		Language:   language,
+	}
+}
+
 func TestInjectDDTrace(t *testing.T) {
 	t.Run("basic injection", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-					{"DD_TAGS", "host:node-02,system:linux"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1")
+			rule.Envs = []struct{ Key, Value string }{
+				{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+				{"DD_TAGS", "host:node-02,system:linux"},
+			}
+			rule.Resources = config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+			}
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -49,19 +54,17 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("CheckAnnotation=true with annotation", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1")
+			rule.CheckAnnotation = true
+			rule.Envs = []struct{ Key, Value string }{
+				{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+			}
+			rule.Resources = config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+			}
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -81,12 +84,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("CheckAnnotation=true with php annotation", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("php", "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1")
+			rule.CheckAnnotation = true
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -106,12 +107,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("CheckAnnotation=true with nodejs annotation", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "nodejs",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("nodejs", "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2")
+			rule.CheckAnnotation = true
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -131,19 +130,17 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("CheckAnnotation=true without annotation", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1")
+			rule.CheckAnnotation = true
+			rule.Envs = []struct{ Key, Value string }{
+				{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+			}
+			rule.Resources = config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+			}
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -162,19 +159,16 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("CheckAnnotation=false", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: false,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1")
+			rule.Envs = []struct{ Key, Value string }{
+				{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+			}
+			rule.Resources = config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+			}
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -193,11 +187,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("skip when annotation is false", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			return true, []*config.DDTraceRule{
+				newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1"),
+			}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -216,12 +209,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("php basic injection", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				PHPLoaderFlavor: "linux-musl",
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("php", "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1")
+			rule.PHPLoaderFlavor = "linux-musl"
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -249,12 +240,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("php invalid flavor fallback to linux-gnu", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				PHPLoaderFlavor: "invalid",
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("php", "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1")
+			rule.PHPLoaderFlavor = "invalid"
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -272,14 +261,12 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("nodejs basic injection", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "nodejs",
-				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			rule := newTestDDTraceRule("nodejs", "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2")
+			rule.Envs = []struct{ Key, Value string }{
+				{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
+			}
+			return true, []*config.DDTraceRule{rule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -311,11 +298,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("nodejs injection without pre-existing env", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "nodejs",
-				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			return true, []*config.DDTraceRule{
+				newTestDDTraceRule("nodejs", "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2"),
+			}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -334,11 +320,10 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("skip when init container already exists", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-			}}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			return true, []*config.DDTraceRule{
+				newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1"),
+			}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
@@ -366,19 +351,12 @@ func TestInjectDDTrace(t *testing.T) {
 
 	t.Run("multiple rules: skip rule whose annotation does not match, try next", func(t *testing.T) {
 		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{
-				{
-					Language:        "java",
-					CheckAnnotation: true,
-					Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				},
-				{
-					Language:        "nodejs",
-					CheckAnnotation: true,
-					Image:           "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v5.102.0",
-				},
-			}
+		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
+			javaRule := newTestDDTraceRule("java", "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1")
+			javaRule.CheckAnnotation = true
+			nodejsRule := newTestDDTraceRule("nodejs", "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v5.102.0")
+			nodejsRule.CheckAnnotation = true
+			return true, []*config.DDTraceRule{javaRule, nodejsRule}
 		}
 		defer func() {
 			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc

@@ -18,20 +18,22 @@ import (
 func TestInjectFlameshot(t *testing.T) {
 	t.Run("inject flameshot with basic configuration", func(t *testing.T) {
 		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
-		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
-				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
-				Envs: []struct{ Key, Value string }{
-					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-					{"DK_AGENT_PORT", "9529"},
-					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.FlameshotRule) {
+			return true, &config.FlameshotRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+					Envs: []struct{ Key, Value string }{
+						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+						{"DK_AGENT_PORT", "9529"},
+						{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+						{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
 			}
 		}
 		defer func() {
@@ -104,20 +106,22 @@ func TestInjectFlameshot(t *testing.T) {
 
 	t.Run("verify volume creation and mounting", func(t *testing.T) {
 		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
-		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
-				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
-				Envs: []struct{ Key, Value string }{
-					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-					{"DK_AGENT_PORT", "9529"},
-					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.FlameshotRule) {
+			return true, &config.FlameshotRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+					Envs: []struct{ Key, Value string }{
+						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+						{"DK_AGENT_PORT", "9529"},
+						{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+						{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
 				},
 				Processes: "[{\"service\":\"jfr-parser\"}]",
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
 			}
 		}
 		defer func() {
@@ -144,7 +148,7 @@ func TestInjectFlameshot(t *testing.T) {
 		// Check volumes are created correctly
 		assert.Len(t, pod.Spec.Volumes, 1)
 		assert.Equal(t, flameshotProfilingVolumeName, pod.Spec.Volumes[0].Name)
-		assert.NotNil(t, pod.Spec.Volumes[0].VolumeSource.EmptyDir)
+		assert.NotNil(t, pod.Spec.Volumes[0].EmptyDir)
 
 		// Check volume mounts in flameshot container
 		flameshotContainer := pod.Spec.Containers[1]
@@ -155,19 +159,21 @@ func TestInjectFlameshot(t *testing.T) {
 
 	t.Run("add prometheus annotations when enabled", func(t *testing.T) {
 		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
-		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
-				Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
-				Envs: []struct{ Key, Value string }{
-					{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
-					{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.FlameshotRule) {
+			return true, &config.FlameshotRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+					Envs: []struct{ Key, Value string }{
+						{"FLAMESHOT_PROFILING_PATH", "/flameshot-data"},
+						{"FLAMESHOT_HTTP_LOCAL_PORT", "8089"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
 				},
 				Processes:                   "[{\"service\":\"jfr-parser\"}]",
 				EnablePrometheusAnnotations: true,
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
 			}
 		}
 		defer func() { flameshotMatchNamespaceOrLabelsForConfig = originalFunc }()

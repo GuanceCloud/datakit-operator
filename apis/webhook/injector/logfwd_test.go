@@ -41,17 +41,19 @@ func TestInjectLogfwd(t *testing.T) {
 
 		// 设置 rule 配置（用于 instances 测试）
 		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
-		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
-				Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
-					{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
-					{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.LogfwdRule) {
+			return true, &config.LogfwdRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+					Envs: []struct{ Key, Value string }{
+						{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
+						{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
+						{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
 				},
 			}
 		}
@@ -139,19 +141,21 @@ func TestInjectLogfwd(t *testing.T) {
 
 		// 设置 rule 配置
 		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
-		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
-				Image:      "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.LogfwdRule) {
+			return true, &config.LogfwdRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+					Envs: []struct{ Key, Value string }{
+						{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
+						{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
+						{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
+				},
 				LogConfigs: logConfigsConfig,
-				Envs: []struct{ Key, Value string }{
-					{"LOGFWD_POD_NAME", "{fieldRef:metadata.name}"},
-					{"LOGFWD_POD_NAMESPACE", "{fieldRef:metadata.namespace}"},
-					{"LOGFWD_GLOBAL_SERVICE", "{fieldRef:metadata.labels['app']}"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
 			}
 		}
 		defer func() {

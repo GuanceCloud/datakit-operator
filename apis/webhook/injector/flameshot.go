@@ -105,7 +105,7 @@ func (r *flameshotResource) process() {
 	log.Infof("flameshot injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
 
-func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
+func (r *flameshotResource) getMatchingRule() (bool, *config.FlameshotRule) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), flameshotEnabledAnnotationKey) {
 		log.Debugf("flameshot annotation disabled: pod=%s", r.parent)
 		return false, nil

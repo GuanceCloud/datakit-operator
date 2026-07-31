@@ -106,7 +106,7 @@ func (r *logfwdResource) process() {
 	log.Infof("logfwd injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
 
-func (r *logfwdResource) getMatchingRule() (bool, *config.InjectRule) {
+func (r *logfwdResource) getMatchingRule() (bool, *config.LogfwdRule) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), logfwdEnabledAnnotationKey) {
 		log.Debugf("logfwd annotation disabled: pod=%s", r.parent)
 		return false, nil
@@ -176,7 +176,7 @@ func (r *logfwdResource) extractInstancesConfig() (string, []string, bool) {
 }
 
 // extractLogConfigsConfig 从 rule.LogConfigs 提取 log_configs config
-func (r *logfwdResource) extractLogConfigsConfig(rule *config.InjectRule) (string, []string, bool) {
+func (r *logfwdResource) extractLogConfigsConfig(rule *config.LogfwdRule) (string, []string, bool) {
 	if rule == nil || rule.LogConfigs == "" {
 		return "", nil, false
 	}

@@ -1,0 +1,17 @@
+version = '2'
+
+[run]
+go = '1.26'
+issues-exit-code = 1
+
+[linters]
+default = 'standard'
+
+[issues]
+max-issues-per-linter = 0
+max-same-issues = 0
+
+[formatters]
+enable = [
+  'gofmt'
+]

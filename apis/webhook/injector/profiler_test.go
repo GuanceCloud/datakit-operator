@@ -16,19 +16,21 @@ import (
 func TestInjectProfiler(t *testing.T) {
 	t.Run("basic injection with CheckAnnotation=true and annotation", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
+				InjectRule: config.InjectRule{
+					Envs: []struct{ Key, Value string }{
+						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+						{"DK_AGENT_PORT", "9529"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
+				},
 				CheckAnnotation: true,
 				Images: map[string]string{
 					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-				Envs: []struct{ Key, Value string }{
-					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-					{"DK_AGENT_PORT", "9529"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
 				},
 			}
 		}
@@ -54,8 +56,8 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("CheckAnnotation=true without annotation", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
 				CheckAnnotation: true,
 				Images: map[string]string{
 					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
@@ -79,19 +81,21 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("CheckAnnotation=false with language in rule", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
+				InjectRule: config.InjectRule{
+					Envs: []struct{ Key, Value string }{
+						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
+				},
 				Language:        "java",
 				CheckAnnotation: false,
 				Images: map[string]string{
 					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-				Envs: []struct{ Key, Value string }{
-					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
 				},
 			}
 		}
@@ -113,18 +117,20 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("python profiler with annotation", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
+				InjectRule: config.InjectRule{
+					Envs: []struct{ Key, Value string }{
+						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
+					},
+					Resources: config.ResourceRequirements{
+						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+					},
+				},
 				CheckAnnotation: true,
 				Images: map[string]string{
 					config.DeprecatedProfilerPythonImageKey: "pubrepo.guance.com/datakit-operator/python-profiler-testing:v1.0.1",
-				},
-				Envs: []struct{ Key, Value string }{
-					{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
 				},
 			}
 		}
@@ -146,8 +152,8 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("skip when profiler.enabled is false", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
 				CheckAnnotation: true,
 				Images: map[string]string{
 					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
@@ -171,8 +177,8 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("skip when container already exists", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
 				CheckAnnotation: true,
 				Images: map[string]string{
 					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
@@ -200,8 +206,8 @@ func TestInjectProfiler(t *testing.T) {
 
 	t.Run("CheckAnnotation=false without language", func(t *testing.T) {
 		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-			return true, &config.InjectRule{
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
 				Language:        "",
 				CheckAnnotation: false,
 				Images: map[string]string{

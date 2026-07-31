@@ -123,7 +123,7 @@ func mutateRequest(requ *admissionv1.AdmissionRequest) (jsonPatch, error) {
 		return marshalPatch(requ, patches)
 
 	default:
-		return nil, fmt.Errorf("Unsupported resource: %#v", requ.Resource)
+		return nil, fmt.Errorf("Unsupported resource: %#v", requ.Resource) //nolint:staticcheck // Preserve the existing error text.
 	}
 }
 
