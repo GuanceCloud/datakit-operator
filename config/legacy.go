@@ -46,18 +46,56 @@ func convertDeprecatedToAdmissionInject(cfg *DeprecatedInjectConfig) AdmissionIn
 	}
 
 	result := AdmissionInjectConfig{
-		DDTraces:   convertDeprecatedToInjectRules(&cfg.DDTrace, "java", DeprecatedDDTraceJavaImageKey),
-		Logfwds:    convertDeprecatedToInjectRules(&cfg.Logfwd, "", DeprecatedLogfwdImageKey),
-		Profilers:  convertDeprecatedToInjectRules(&cfg.Profiler, "", ""),
-		Flameshots: InjectRules{},
+		DDTraces:   convertDeprecatedToDDTraceRules(&cfg.DDTrace),
+		Logfwds:    convertDeprecatedToLogfwdRules(&cfg.Logfwd),
+		Profilers:  convertDeprecatedToProfilerRules(&cfg.Profiler),
+		Flameshots: FlameshotRules{},
 	}
 
 	return result
 }
 
-func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, imageKey string) InjectRules {
+func convertDeprecatedToDDTraceRules(deprecated *DeprecatedInjectRule) DDTraceRules {
+	rule, ok := convertDeprecatedInjectRule(deprecated, DeprecatedDDTraceJavaImageKey)
+	if !ok {
+		return DDTraceRules{}
+	}
+
+	return DDTraceRules{&DDTraceRule{
+		InjectRule:      rule,
+		CheckAnnotation: true,
+		Language:        "java",
+	}}
+}
+
+func convertDeprecatedToLogfwdRules(deprecated *DeprecatedInjectRule) LogfwdRules {
+	rule, ok := convertDeprecatedInjectRule(deprecated, DeprecatedLogfwdImageKey)
+	if !ok {
+		return LogfwdRules{}
+	}
+
+	return LogfwdRules{&LogfwdRule{
+		InjectRule:      rule,
+		CheckAnnotation: true,
+	}}
+}
+
+func convertDeprecatedToProfilerRules(deprecated *DeprecatedInjectRule) ProfilerRules {
+	rule, ok := convertDeprecatedInjectRule(deprecated, "")
+	if !ok {
+		return ProfilerRules{}
+	}
+
+	return ProfilerRules{&ProfilerRule{
+		InjectRule:      rule,
+		CheckAnnotation: true,
+		Images:          deprecated.Images,
+	}}
+}
+
+func convertDeprecatedInjectRule(deprecated *DeprecatedInjectRule, imageKey string) (InjectRule, bool) {
 	if deprecated == nil {
-		return InjectRules{}
+		return InjectRule{}, false
 	}
 
 	namespaces := make([]string, 0)
@@ -80,17 +118,13 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 		image = deprecated.Images[imageKey]
 	}
 
-	// 创建一个 InjectRule，包含所有的 namespace 和 label selector
-	rule := &InjectRule{
-		Name:            "Used InjectV1 Config",
-		CheckAnnotation: true,
+	rule := InjectRule{
+		Name: "Used InjectV1 Config",
 		Selector: Selector{
 			Namespaces: namespaces,
 			Labels:     labels,
 		},
-		Language:     language,
 		Image:        image,
-		Images:       deprecated.Images,
 		Environments: deprecated.Environments,
 		Resources:    deprecated.Resources,
 	}
@@ -102,13 +136,13 @@ func convertDeprecatedToInjectRules(deprecated *DeprecatedInjectRule, language, 
 			Namespaces: []string{".*"},
 			Labels:     []string{},
 		}
-		return InjectRules{rule}
+		return rule, true
 	}
 
 	// 如果没有任何配置，返回空数组
 	if len(namespaces) == 0 && len(labels) == 0 {
-		return InjectRules{}
+		return InjectRule{}, false
 	}
 
-	return InjectRules{rule}
+	return rule, true
 }

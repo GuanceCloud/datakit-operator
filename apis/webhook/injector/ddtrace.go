@@ -108,7 +108,7 @@ func (r *ddtraceResource) process() {
 	log.Infof("ddtrace injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 }
 
-func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.InjectRule, imageVersion string) {
+func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.DDTraceRule, imageVersion string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), ddtraceEnabledAnnotationKey) {
 		log.Debugf("ddtrace annotation disabled: pod=%s", r.parent)
 		return false, nil, ""
@@ -170,7 +170,7 @@ func (r *ddtraceResource) injectInitContainer(image string, resources config.Res
 	manager.NewContainerManager(r.pod).AddInitContainer(&container)
 }
 
-func (r *ddtraceResource) getPHPLoaderFlavor(rule *config.InjectRule) string {
+func (r *ddtraceResource) getPHPLoaderFlavor(rule *config.DDTraceRule) string {
 	if language(rule.Language) != php {
 		return ""
 	}

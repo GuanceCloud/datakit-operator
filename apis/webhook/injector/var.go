@@ -22,19 +22,19 @@ const (
 )
 
 var (
-	ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
+	ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.DDTraceRule) {
 		return config.Cfg.AdmissionInject.DDTraces.MatchesAll(ns, labels)
 	}
 
-	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels, "")
+	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.LogfwdRule) {
+		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels)
 	}
 
-	flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.Flameshots.Matches(ns, labels, "")
+	flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.FlameshotRule) {
+		return config.Cfg.AdmissionInject.Flameshots.Matches(ns, labels)
 	}
 
-	profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.InjectRule) {
-		return config.Cfg.AdmissionInject.Profilers.Matches(ns, labels, "")
+	profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+		return config.Cfg.AdmissionInject.Profilers.Matches(ns, labels)
 	}
 )

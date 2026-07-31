@@ -67,8 +67,8 @@ func isValidDeprecatedRule(rule *DeprecatedInjectRule) bool {
 		return false
 	}
 
-	hasImages := rule.Images != nil && len(rule.Images) > 0
-	hasEnvironments := rule.Environments != nil && len(rule.Environments) > 0
+	hasImages := len(rule.Images) > 0
+	hasEnvironments := len(rule.Environments) > 0
 
 	return hasImages || hasEnvironments
 }
@@ -81,10 +81,10 @@ func initDefaultConfiguration() *Configuration {
 }
 
 type AdmissionInjectConfig struct {
-	DDTraces   InjectRules `json:"ddtraces"`
-	Logfwds    InjectRules `json:"logfwds"`
-	Flameshots InjectRules `json:"flameshots"`
-	Profilers  InjectRules `json:"profilers"`
+	DDTraces   DDTraceRules   `json:"ddtraces"`
+	Logfwds    LogfwdRules    `json:"logfwds"`
+	Flameshots FlameshotRules `json:"flameshots"`
+	Profilers  ProfilerRules  `json:"profilers"`
 }
 
 func (c *AdmissionInjectConfig) Setup() error {

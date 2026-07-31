@@ -9,19 +9,22 @@ DOCKERFILE_DIR= dockerfiles
 ARCH_AMD64    = amd64
 ARCH_ARM64    = arm64
 IMAGE_ARCHS   = linux/arm64,linux/amd64
-GOLINT_BINARY = golangci-lint
+GOLINT_BINARY ?= golangci-lint
+GO_VERSION_EXPECTED ?= 1.26.2
 # UNAME_S     = $(shell uname -s)
 # UNAME_M     = $(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
-SUPPORTED_GOLINT_VERSION         = 1.46.2
-SUPPORTED_GOLINT_VERSION_ANOTHER = v1.46.2
+SUPPORTED_GOLINT_VERSION         = 2.11.4
+SUPPORTED_GOLINT_VERSION_ANOTHER = v2.11.4
 
 # Make them evaluate(expand) only once
 DATE                   := $(shell date -u +'%Y-%m-%d %H:%M:%S')
 GOVERSION              := $(shell go version)
 COMMIT                 := $(shell git rev-parse --short HEAD)
 GIT_BRANCH             := $(shell git rev-parse --abbrev-ref HEAD)
-GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version | cut -c 27- | cut -d' ' -f1)
+GO_VERSION_ACTUAL      := $(shell go version | awk '{print $$3}' | sed 's/^go//')
+GO_VERSION_LOCK_ERR_MSG := Golang version mismatch: expect $(GO_VERSION_EXPECTED), got $(GO_VERSION_ACTUAL) from go
+GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version 2>/dev/null | cut -c 27- | cut -d' ' -f1)
 GOLINT_VERSION_ERR_MSG := golangci-lint version($(GOLINT_VERSION)) is not supported, please use version $(SUPPORTED_GOLINT_VERSION)
 
 # Generate 'pkg/git' package
@@ -126,13 +129,20 @@ pub_uos_image:
 	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)
 
 lint: deps test
+	$(call check_golint_version)
 	@bash scripts/check_copyright.sh
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \
 	fi
 
-deps: prepare gofmt
+deps: check_go_version prepare gofmt
+
+check_go_version:
+	@if [ "$(GO_VERSION_ACTUAL)" != "$(GO_VERSION_EXPECTED)" ]; then \
+		echo '$(GO_VERSION_LOCK_ERR_MSG)'; \
+		exit 1; \
+	fi
 
 # ignore files under vendor/.git/git
 gofmt:
