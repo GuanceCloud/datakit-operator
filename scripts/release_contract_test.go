@@ -54,7 +54,7 @@ func TestRCImageReleasePublishesOnlyImmutableImageTags(t *testing.T) {
 	expectedImages := []string{
 		"registry.jiagouyun.com/datakit-operator/datakit-operator:" + rcVersion,
 		"pubrepo.guance.com/datakit-operator/datakit-operator:" + rcVersion,
-		"pubrepo.truewatch.com/truewatch/datakit-operator:" + rcVersion,
+		"pubrepo.guance.com/truewatch/datakit-operator:" + rcVersion,
 	}
 	for _, image := range expectedImages {
 		if !strings.Contains(releasePlan, "-t "+image) {

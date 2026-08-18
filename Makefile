@@ -69,7 +69,7 @@ define build_rc_image
 	sudo docker buildx build --platform $(IMAGE_ARCHS) \
 		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(RC_VERSION) \
 		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(RC_VERSION) \
-		-t pubrepo.truewatch.com/truewatch/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/truewatch/datakit-operator:$(RC_VERSION) \
 		-f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
