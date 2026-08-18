@@ -85,6 +85,7 @@ func (r *profilerResource) process() {
 	r.resetSpec()
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
+	envs = manager.AddOrUpdateEnvVars(nil, envs, manager.ReplaceExistingEnvVar)
 	r.injectContainer(image, rule.Resources, envs)
 	r.injectVolume()
 	r.injectVolumeMount()

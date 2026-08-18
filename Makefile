@@ -1,6 +1,9 @@
 default: local
 
+.PHONY: check_rc_version pub_rc_image
+
 VERSION=v1.8.10
+RC_VERSION ?=
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -60,6 +63,14 @@ endef
 define build_image
 	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:$(VERSION) -f $(DOCKERFILE_DIR)/Dockerfile . --push
 	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:latest -f $(DOCKERFILE_DIR)/Dockerfile . --push
+endef
+
+define build_rc_image
+	sudo docker buildx build --platform $(IMAGE_ARCHS) \
+		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.truewatch.com/truewatch/datakit-operator:$(RC_VERSION) \
+		-f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
 define build_uos_image
@@ -124,6 +135,33 @@ pub_testing_image:
 	$(call build_image,$(IMAGE_ARCHS),registry.jiagouyun.com/datakit-operator)
 	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
+
+check_rc_version:
+	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
+		echo "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD, got $(RC_VERSION)" >&2; \
+		exit 1; \
+	fi
+	@rc_base="$(RC_VERSION)"; \
+	rc_base="$${rc_base%-rc-*}"; \
+	if [ "$$rc_base" != "$(VERSION)" ]; then \
+		echo "RC base version must match VERSION $(VERSION), got $$rc_base" >&2; \
+		exit 1; \
+	fi
+	@rc_date="$(RC_VERSION)"; \
+	rc_date="$${rc_date##*-rc-}"; \
+	today="$$(TZ=Asia/Shanghai date +%Y%m%d)"; \
+	if [ "$$rc_date" != "$$today" ]; then \
+		echo "RC date must match current date $$today (Asia/Shanghai), got $$rc_date" >&2; \
+		exit 1; \
+	fi
+	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
+	if ! grep -Fq "## [$$changelog_version]" CHANGELOG.md; then \
+		echo "CHANGELOG.md must contain ## [$$changelog_version]" >&2; \
+		exit 1; \
+	fi
+
+pub_rc_image: check_rc_version
+	$(call build_rc_image)
 
 pub_uos_image:
 	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)

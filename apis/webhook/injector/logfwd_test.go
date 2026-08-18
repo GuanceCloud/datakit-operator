@@ -186,4 +186,47 @@ func TestInjectLogfwd(t *testing.T) {
 		assert.Equal(t, "datakit-pod-info", pod.Spec.Containers[1].VolumeMounts[1].Name)
 		assert.Equal(t, "/etc/podinfo", pod.Spec.Containers[1].VolumeMounts[1].MountPath)
 	})
+
+	t.Run("updates generated env in place without changing configured order", func(t *testing.T) {
+		setupTestFunctions()
+
+		originalFunc := logfwdMatchNamespaceOrLabelsForConfig
+		logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.LogfwdRule) {
+			return true, &config.LogfwdRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/logfwd-testing:v1.0.1",
+					Envs: []struct{ Key, Value string }{
+						{Key: "FIRST", Value: "first"},
+						{Key: logfwdLogConfigsKey, Value: "stale"},
+						{Key: "LAST", Value: "last"},
+					},
+				},
+				LogConfigs: `[{"path":"/var/log/app/*.log"}]`,
+			}
+		}
+		defer func() {
+			logfwdMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-logfwd-env-order", map[string]string{
+			logfwdEnabledAnnotationKey: "true",
+		})
+		changed, err := InjectLogfwdToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.True(t, changed)
+		if assert.Len(t, pod.Spec.Containers, 2) {
+			envs := pod.Spec.Containers[1].Env
+			assert.Equal(t, []string{"FIRST", logfwdLogConfigsKey, "LAST"}, envNames(envs))
+			logConfigs, exists := findEnv(envs, logfwdLogConfigsKey)
+			if assert.True(t, exists) {
+				assert.Equal(t, `[{"path":"/var/log/app/*.log"}]`, logConfigs.Value)
+			}
+		}
+
+		afterFirstInjection := pod.DeepCopy()
+		changed, err = InjectLogfwdToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, afterFirstInjection, pod)
+	})
 }

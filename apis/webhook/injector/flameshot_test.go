@@ -196,6 +196,51 @@ func TestInjectFlameshot(t *testing.T) {
 		assert.Equal(t, "/metrics", pod.Annotations["prometheus.io/path"])
 		assert.Equal(t, "flameshot", pod.Annotations["prometheus.io/param_measurement"])
 	})
+
+	t.Run("updates generated env in place without changing configured order", func(t *testing.T) {
+		originalFunc := flameshotMatchNamespaceOrLabelsForConfig
+		flameshotMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.FlameshotRule) {
+			return true, &config.FlameshotRule{
+				InjectRule: config.InjectRule{
+					Image: "pubrepo.guance.com/datakit-operator/flameshot-testing:v1.0.0",
+					Envs: []struct{ Key, Value string }{
+						{Key: "FLAMESHOT_PROFILING_PATH", Value: "/flameshot-data"},
+						{Key: flameshotProcessesKey, Value: "stale"},
+						{Key: "FLAMESHOT_HTTP_LOCAL_PORT", Value: "8089"},
+					},
+				},
+				Processes: `[{"service":"jfr-parser"}]`,
+			}
+		}
+		defer func() {
+			flameshotMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-flameshot-env-order", map[string]string{
+			flameshotEnabledAnnotationKey: "true",
+		})
+		changed, err := InjectFlameshotToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.True(t, changed)
+		if assert.Len(t, pod.Spec.Containers, 2) {
+			envs := pod.Spec.Containers[1].Env
+			assert.Equal(t, []string{
+				"FLAMESHOT_PROFILING_PATH",
+				flameshotProcessesKey,
+				"FLAMESHOT_HTTP_LOCAL_PORT",
+			}, envNames(envs))
+			processes, exists := findEnv(envs, flameshotProcessesKey)
+			if assert.True(t, exists) {
+				assert.Equal(t, `[{"service":"jfr-parser"}]`, processes.Value)
+			}
+		}
+
+		afterFirstInjection := pod.DeepCopy()
+		changed, err = InjectFlameshotToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, afterFirstInjection, pod)
+	})
 }
 
 func TestInjectFlameshotEdgeCases(t *testing.T) {
