@@ -31,14 +31,19 @@ const (
 )
 
 func InjectDDTraceToPod(namespace, parent string, pod *corev1.Pod) (bool, error) {
+	_, changed, err := injectDDTraceToPod(namespace, parent, pod)
+	return changed, err
+}
+
+func injectDDTraceToPod(namespace, parent string, pod *corev1.Pod) (bool, bool, error) {
 	if pod == nil {
-		return false, fmt.Errorf("cannot inject ddtrace-lib into nil pod")
+		return false, false, fmt.Errorf("cannot inject ddtrace-lib into nil pod")
 	}
 
 	before := pod.DeepCopy()
 	r := newDDTraceResource(namespace, parent, pod)
-	r.process()
-	return podcompare.Changed(before, pod), nil
+	selected := r.process()
+	return selected, podcompare.Changed(before, pod), nil
 }
 
 type ddtraceResource struct {
@@ -57,14 +62,14 @@ func newDDTraceResource(namespace, parent string, pod *corev1.Pod) *ddtraceResou
 	}
 }
 
-func (r *ddtraceResource) process() {
+func (r *ddtraceResource) process() bool {
 	if r.pod.Namespace != "" {
 		r.namespace = r.pod.Namespace
 	}
 
 	should, rule, imageVersion := r.getMatchingRule()
 	if !should || rule == nil {
-		return
+		return false
 	}
 
 	log.Infof("ddtrace injection started: pod=%s, namespace=%s, language=%s, rule=%s", r.parent, r.namespace, rule.Language, rule.Name)
@@ -81,7 +86,7 @@ func (r *ddtraceResource) process() {
 		lib = &ddtraceNodejs{}
 	default:
 		log.Warnf("ddtrace language not supported: lang=%s pod=%s", rule.Language, r.parent)
-		return
+		return true
 	}
 
 	image := rule.Image
@@ -95,7 +100,7 @@ func (r *ddtraceResource) process() {
 
 	if err := lib.injectConfig(r.pod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
-		return
+		return true
 	}
 
 	r.injectGlobalVolume()
@@ -106,11 +111,16 @@ func (r *ddtraceResource) process() {
 	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(r.pod.Spec.Containers))
 
 	log.Infof("ddtrace injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
+	return true
 }
 
 func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.DDTraceRule, imageVersion string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), ddtraceEnabledAnnotationKey) {
 		log.Debugf("ddtrace annotation disabled: pod=%s", r.parent)
+		return false, nil, ""
+	}
+	if manager.NewContainerManager(r.pod).ContainsInitContainer(otelInitContainerName) {
+		log.Warnf("ddtrace inject skipped: pod=%s, namespace=%s, reason=otel init container already exists", r.parent, r.namespace)
 		return false, nil, ""
 	}
 

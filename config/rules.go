@@ -30,6 +30,13 @@ type (
 		PHPLoaderFlavor string `json:"php_loader_flavor,omitempty"`
 	}
 
+	OTelRules []*OTelRule
+	OTelRule  struct {
+		InjectRule
+		CheckAnnotation bool   `json:"check_annotation"`
+		Language        string `json:"language"`
+	}
+
 	LogfwdRules []*LogfwdRule
 	LogfwdRule  struct {
 		InjectRule
@@ -67,6 +74,14 @@ func (rs DDTraceRules) Setup() {
 }
 
 func (rs DDTraceRules) MatchesAll(ns string, labels map[string]string) (bool, []*DDTraceRule) {
+	return matchAllInjectRules(rs, ns, labels)
+}
+
+func (rs OTelRules) Setup() {
+	setupInjectRules(rs)
+}
+
+func (rs OTelRules) MatchesAll(ns string, labels map[string]string) (bool, []*OTelRule) {
 	return matchAllInjectRules(rs, ns, labels)
 }
 
