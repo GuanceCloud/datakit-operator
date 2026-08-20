@@ -30,7 +30,7 @@ func mutatePod(namespace, parent string, pod *corev1.Pod) (bool, error) {
 	log.Debug("mutated pod")
 
 	changed := false
-	if ok, err := injector.InjectDDTraceToPod(namespace, parent, pod); err != nil {
+	if ok, err := injector.InjectTracingToPod(namespace, parent, pod); err != nil {
 		return changed, err
 	} else {
 		changed = changed || ok

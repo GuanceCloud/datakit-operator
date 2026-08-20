@@ -28,6 +28,15 @@ func TestAdmissionInjectConfigJSONCompatibility(t *testing.T) {
 			"language": "php",
 			"php_loader_flavor": "linux-musl"
 		}],
+		"otels": [{
+			"name": "otel-java",
+			"namespace_selectors": ["default"],
+			"label_selectors": ["app=web"],
+			"image": "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0",
+			"envs": {"OTEL_SERVICE_NAME": "test"},
+			"check_annotation": false,
+			"language": "java"
+		}],
 		"logfwds": [{
 			"name": "logfwd",
 			"namespace_selectors": ["default"],
@@ -70,6 +79,16 @@ func TestAdmissionInjectConfigJSONCompatibility(t *testing.T) {
 	assert.Equal(t, "php", cfg.DDTraces[0].Language)
 	assert.Equal(t, "linux-musl", cfg.DDTraces[0].PHPLoaderFlavor)
 
+	if !assert.Len(t, cfg.OTels, 1) {
+		return
+	}
+	assert.Equal(t, "otel-java", cfg.OTels[0].Name)
+	assert.Equal(t, []string{"default"}, cfg.OTels[0].Namespaces)
+	assert.Equal(t, []string{"app=web"}, cfg.OTels[0].Labels)
+	assert.Equal(t, "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0", cfg.OTels[0].Image)
+	assert.Equal(t, "OTEL_SERVICE_NAME", cfg.OTels[0].Environments[0].Key)
+	assert.Equal(t, "java", cfg.OTels[0].Language)
+
 	if !assert.Len(t, cfg.Logfwds, 1) {
 		return
 	}
@@ -90,9 +109,16 @@ func TestAdmissionInjectConfigJSONCompatibility(t *testing.T) {
 	assert.Equal(t, "java", cfg.Profilers[0].Language)
 
 	assert.NoError(t, cfg.Setup())
+	assert.Equal(t, "100m", cfg.OTels[0].Resources.Requests.CPU)
+	assert.Equal(t, "64Mi", cfg.OTels[0].Resources.Requests.Memory)
+	assert.Equal(t, "500m", cfg.OTels[0].Resources.Limits.CPU)
+	assert.Equal(t, "512Mi", cfg.OTels[0].Resources.Limits.Memory)
 	ddtraceMatched, ddtraceRules := cfg.DDTraces.MatchesAll("default", map[string]string{"app": "web"})
 	assert.True(t, ddtraceMatched)
 	assert.Equal(t, cfg.DDTraces, DDTraceRules(ddtraceRules))
+	otelMatched, otelRules := cfg.OTels.MatchesAll("default", map[string]string{"app": "web"})
+	assert.True(t, otelMatched)
+	assert.Equal(t, cfg.OTels, OTelRules(otelRules))
 
 	logfwdMatched, logfwdRule := cfg.Logfwds.Matches("default", nil)
 	assert.True(t, logfwdMatched)

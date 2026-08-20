@@ -26,6 +26,10 @@ var (
 		return config.Cfg.AdmissionInject.DDTraces.MatchesAll(ns, labels)
 	}
 
+	otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
+		return config.Cfg.AdmissionInject.OTels.MatchesAll(ns, labels)
+	}
+
 	logfwdMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.LogfwdRule) {
 		return config.Cfg.AdmissionInject.Logfwds.Matches(ns, labels)
 	}

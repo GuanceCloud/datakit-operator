@@ -130,6 +130,30 @@ data:
                     }
                 }
             ],
+            "otels": [
+                {
+                    "name": "otel-java",
+                    "language": "java",
+                    "namespace_selectors": ["default"],
+                    "label_selectors":     [],
+                    "check_annotation":    false,
+                    "image": "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0",
+                    "envs": {
+                        "POD_NAME":                          "{fieldRef:metadata.name}",
+                        "POD_NAMESPACE":                     "{fieldRef:metadata.namespace}",
+                        "NODE_NAME":                          "{fieldRef:spec.nodeName}",
+                        "OTEL_SERVICE_NAME":                  "{fieldRef:metadata.labels['app']}",
+                        "OTEL_RESOURCE_ATTRIBUTES":           "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)",
+                        "OTEL_TRACES_EXPORTER":                "otlp",
+                        "OTEL_LOGS_EXPORTER":                  "none",
+                        "OTEL_METRICS_EXPORTER":               "none",
+                        "OTEL_EXPORTER_OTLP_PROTOCOL":         "http/protobuf",
+                        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":  "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces",
+                        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT":    "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs",
+                        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics"
+                    }
+                }
+            ],
             "logfwds": [
                 {
                     "namespace_selectors": ["default"],
