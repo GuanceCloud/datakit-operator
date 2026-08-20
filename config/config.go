@@ -82,6 +82,7 @@ func initDefaultConfiguration() *Configuration {
 
 type AdmissionInjectConfig struct {
 	DDTraces   DDTraceRules   `json:"ddtraces"`
+	OTels      OTelRules      `json:"otels"`
 	Logfwds    LogfwdRules    `json:"logfwds"`
 	Flameshots FlameshotRules `json:"flameshots"`
 	Profilers  ProfilerRules  `json:"profilers"`
@@ -89,6 +90,7 @@ type AdmissionInjectConfig struct {
 
 func (c *AdmissionInjectConfig) Setup() error {
 	c.DDTraces.Setup()
+	c.OTels.Setup()
 	c.Logfwds.Setup()
 	c.Flameshots.Setup()
 	c.Profilers.Setup()
