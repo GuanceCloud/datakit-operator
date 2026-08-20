@@ -317,3 +317,123 @@ func TestMutateRequestInjectsOTelJavaPatch(t *testing.T) {
 		assert.Equal(t, "none", container.Env[8].Value)
 	}
 }
+
+func TestMutateRequestInjectsOTelPythonPatch(t *testing.T) {
+	originalCfg := config.Cfg
+	defer func() {
+		config.Cfg = originalCfg
+	}()
+
+	var cfg config.Configuration
+	err := json.Unmarshal([]byte(`{
+  "admission_inject_v2": {
+    "otels": [{
+      "name": "otel-python",
+      "language": "python",
+      "namespace_selectors": ["default"],
+      "label_selectors": [],
+      "check_annotation": false,
+      "image": "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0",
+      "envs": {
+        "POD_NAME": "{fieldRef:metadata.name}",
+        "OTEL_SERVICE_NAME": "{fieldRef:metadata.labels['app']}",
+        "OTEL_TRACES_EXPORTER": "otlp",
+        "OTEL_LOGS_EXPORTER": "none",
+        "OTEL_METRICS_EXPORTER": "none",
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces"
+      }
+    }]
+  }
+}`), &cfg)
+	if !assert.NoError(t, err) || !assert.NoError(t, cfg.Setup()) {
+		return
+	}
+	config.Cfg = &cfg
+
+	rawPod := []byte(`{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "test-otel-python",
+    "namespace": "default",
+    "labels": {"app": "checkout-python"},
+    "annotations": {"admission.datakit/ddtrace.enabled": "false"}
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "app",
+        "image": "python:3.10-slim",
+        "env": [{"name": "PYTHONPATH", "value": "/app"}]
+      },
+      {"name": "sidecar", "image": "python:3.14-slim"}
+    ]
+  }
+}`)
+	req := &admissionv1.AdmissionRequest{
+		Operation: admissionv1.Create,
+		Namespace: "default",
+		Resource:  podResource,
+		Object: runtime.RawExtension{
+			Raw: rawPod,
+		},
+	}
+
+	patchBytes, err := mutateRequest(req)
+	if !assert.NoError(t, err) {
+		return
+	}
+	patch, err := jsonpatch.DecodePatch(patchBytes)
+	if !assert.NoError(t, err) {
+		return
+	}
+	mutatedRawPod, err := patch.Apply(rawPod)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	var pod corev1.Pod
+	if !assert.NoError(t, json.Unmarshal(mutatedRawPod, &pod)) {
+		return
+	}
+	if assert.Len(t, pod.Spec.InitContainers, 1) {
+		initContainer := pod.Spec.InitContainers[0]
+		assert.Equal(t, "datakit-otel-lib-init", initContainer.Name)
+		assert.Equal(t, "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0", initContainer.Image)
+		assert.Equal(t, []string{"cp", "-r", "/autoinstrumentation/.", "/otel-auto-instrumentation-python"}, initContainer.Command)
+		assert.Equal(t, "100m", initContainer.Resources.Requests.Cpu().String())
+		assert.Equal(t, "64Mi", initContainer.Resources.Requests.Memory().String())
+		assert.Equal(t, "500m", initContainer.Resources.Limits.Cpu().String())
+		assert.Equal(t, "512Mi", initContainer.Resources.Limits.Memory().String())
+	}
+	if assert.Len(t, pod.Spec.Volumes, 1) {
+		assert.Equal(t, "datakit-otel-auto-instrument", pod.Spec.Volumes[0].Name)
+		assert.NotNil(t, pod.Spec.Volumes[0].EmptyDir)
+	}
+
+	expectedPythonPaths := map[string]string{
+		"app":     "/otel-auto-instrumentation-python/opentelemetry/instrumentation/auto_instrumentation:/app:/otel-auto-instrumentation-python",
+		"sidecar": "/otel-auto-instrumentation-python/opentelemetry/instrumentation/auto_instrumentation:/otel-auto-instrumentation-python",
+	}
+	for _, container := range pod.Spec.Containers {
+		if assert.Len(t, container.VolumeMounts, 1, container.Name) {
+			assert.Equal(t, "datakit-otel-auto-instrument", container.VolumeMounts[0].Name)
+			assert.Equal(t, "/otel-auto-instrumentation-python", container.VolumeMounts[0].MountPath)
+		}
+		envs := make(map[string]corev1.EnvVar, len(container.Env))
+		for _, env := range container.Env {
+			envs[env.Name] = env
+		}
+		assert.Equal(t, expectedPythonPaths[container.Name], envs["PYTHONPATH"].Value, container.Name)
+		assert.Equal(t, "http/protobuf", envs["OTEL_EXPORTER_OTLP_PROTOCOL"].Value, container.Name)
+		assert.Equal(t, "none", envs["OTEL_LOGS_EXPORTER"].Value, container.Name)
+		assert.Equal(t, "none", envs["OTEL_METRICS_EXPORTER"].Value, container.Name)
+		if assert.NotNil(t, envs["POD_NAME"].ValueFrom) && assert.NotNil(t, envs["POD_NAME"].ValueFrom.FieldRef) {
+			assert.Equal(t, "metadata.name", envs["POD_NAME"].ValueFrom.FieldRef.FieldPath)
+		}
+		if assert.NotNil(t, envs["OTEL_SERVICE_NAME"].ValueFrom) && assert.NotNil(t, envs["OTEL_SERVICE_NAME"].ValueFrom.FieldRef) {
+			assert.Equal(t, "metadata.labels['app']", envs["OTEL_SERVICE_NAME"].ValueFrom.FieldRef.FieldPath)
+		}
+	}
+}
