@@ -30,6 +30,7 @@ const (
 	otelJavaToolOptionsKey  = "JAVA_TOOL_OPTIONS"
 	otelJavaAgentOption     = "-javaagent:" + otelJavaAgentPath
 	ddJavaAgentFileName     = "dd-java-agent.jar"
+	ddNodeJSInitModule      = "dd-trace/init"
 
 	otelPythonMountPath        = "/otel-auto-instrumentation-python"
 	otelPythonSourcePath       = "/autoinstrumentation/."
@@ -220,7 +221,7 @@ func (r *otelResource) validateNodeJSInjection(configuredImage string, desiredIn
 			if env.ValueFrom != nil {
 				return fmt.Errorf("container %q has %s defined via ValueFrom", container.Name, otelNodeJSOptionsKey)
 			}
-			if strings.Contains(env.Value, ddtraceMountPath) {
+			if strings.Contains(env.Value, ddtraceMountPath) || containsDatadogNodeJSRequire(env.Value) {
 				return fmt.Errorf("container %q already uses the Datadog Node.js library", container.Name)
 			}
 			requireCount := countNodeJSRequireOptions(env.Value)
@@ -512,6 +513,30 @@ func countNodeJSRequireOptions(value string) int {
 		}
 	}
 	return count
+}
+
+func containsDatadogNodeJSRequire(value string) bool {
+	fields := strings.Fields(value)
+	for idx := 0; idx < len(fields); idx++ {
+		var target string
+		switch {
+		case fields[idx] == "--require" || fields[idx] == "-r":
+			if idx+1 < len(fields) {
+				target = fields[idx+1]
+				idx++
+			}
+		case strings.HasPrefix(fields[idx], "--require="):
+			target = strings.TrimPrefix(fields[idx], "--require=")
+		case strings.HasPrefix(fields[idx], "-r="):
+			target = strings.TrimPrefix(fields[idx], "-r=")
+		}
+
+		target = strings.TrimSuffix(strings.Trim(target, `"'`), ".js")
+		if target == ddNodeJSInitModule || strings.HasSuffix(target, "/node_modules/"+ddNodeJSInitModule) {
+			return true
+		}
+	}
+	return false
 }
 
 func containsJavaToolOption(value, option string) bool {

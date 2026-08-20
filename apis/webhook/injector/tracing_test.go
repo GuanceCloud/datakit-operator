@@ -171,33 +171,43 @@ func TestInjectTracingSkipsOTelNodeJSAtomicallyWithDuplicateNodeOptions(t *testi
 }
 
 func TestInjectTracingSkipsOTelNodeJSWithDatadogRequire(t *testing.T) {
-	originalConfig := config.Cfg
-	rule := newTestOTelRuleForLanguage(
-		"nodejs",
-		"ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.78.0",
-	)
-	rule.Selector = config.Selector{Namespaces: []string{"default"}}
-	config.Cfg = &config.Configuration{
-		AdmissionInject: config.AdmissionInjectConfig{OTels: config.OTelRules{rule}},
-	}
-	defer func() {
-		config.Cfg = originalConfig
-	}()
-	if !assert.NoError(t, config.Cfg.Setup()) {
-		return
+	tests := []struct {
+		name        string
+		nodeOptions string
+	}{
+		{
+			name:        "operator path",
+			nodeOptions: "--trace-warnings --require=/datadog-lib/node_modules/dd-trace/init",
+		},
+		{
+			name:        "package name",
+			nodeOptions: "--require dd-trace/init",
+		},
+		{
+			name:        "application node_modules path",
+			nodeOptions: "--require=/app/node_modules/dd-trace/init",
+		},
+		{
+			name:        "short require flag",
+			nodeOptions: "-r dd-trace/init",
+		},
 	}
 
-	pod := createTestPod("test-tracing-otel-nodejs-datadog", map[string]string{ddtraceEnabledAnnotationKey: "false"})
-	pod.Spec.Containers[0].Env = []corev1.EnvVar{{
-		Name:  otelNodeJSOptionsKey,
-		Value: "--trace-warnings --require=/datadog-lib/node_modules/dd-trace/init",
-	}}
-	originalPod := pod.DeepCopy()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			useTestOTelNodeJSRule(t)
+			pod := createTestPod("test-tracing-otel-nodejs-datadog", map[string]string{
+				ddtraceEnabledAnnotationKey: "false",
+			})
+			pod.Spec.Containers[0].Env = []corev1.EnvVar{{Name: otelNodeJSOptionsKey, Value: tc.nodeOptions}}
+			originalPod := pod.DeepCopy()
 
-	changed, err := InjectTracingToPod("default", pod.Name, pod)
-	assert.NoError(t, err)
-	assert.False(t, changed)
-	assert.Equal(t, originalPod, pod)
+			changed, err := InjectTracingToPod("default", pod.Name, pod)
+			assert.NoError(t, err)
+			assert.False(t, changed)
+			assert.Equal(t, originalPod, pod)
+		})
+	}
 }
 
 func TestInjectTracingSkipsOTelNodeJSWithIncompatibleOTelRequire(t *testing.T) {
