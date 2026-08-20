@@ -7,6 +7,7 @@ package injector
 
 import (
 	"fmt"
+	"strings"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/envbuilder"
@@ -24,6 +25,8 @@ const (
 	ddtraceMountPath  = "/datadog-lib"
 	ddtraceDDTagsKey  = "DD_TAGS"
 
+	javaToolOptionsKey  = "JAVA_TOOL_OPTIONS"
+	javaAgentOption     = "-javaagent:/datadog-lib/dd-java-agent.jar"
 	phpDefaultINIPath   = "/usr/local/etc/php/conf.d"
 	phpLoaderFileName   = "dd_library_loader.ini"
 	phpLoaderFlavorGNU  = "linux-gnu"
@@ -72,10 +75,20 @@ func (r *ddtraceResource) process() bool {
 		return false
 	}
 
+	lang := language(rule.Language)
+	if manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName) {
+		if lang == java {
+			r.repairJavaAgentEnv()
+		} else {
+			log.Debugf("ddtrace init container already exists: pod=%s, language=%s", r.parent, rule.Language)
+		}
+		return true
+	}
+
 	log.Infof("ddtrace injection started: pod=%s, namespace=%s, language=%s, rule=%s", r.parent, r.namespace, rule.Language, rule.Name)
 
 	var lib ddtraceLibrary
-	switch language(rule.Language) {
+	switch lang {
 	case java:
 		lib = &ddtraceJava{}
 	case python:
@@ -95,20 +108,27 @@ func (r *ddtraceResource) process() bool {
 		image = replaceImageVersion(image, imageVersion)
 	}
 
-	phpLoaderFlavor := r.getPHPLoaderFlavor(rule)
-	r.injectInitContainer(image, rule.Resources, language(rule.Language), phpLoaderFlavor)
+	// Build the complete DDTrace mutation on a copy. If one component cannot be
+	// injected (for example, JAVA_TOOL_OPTIONS uses valueFrom), do not leave a
+	// partial init-container-only mutation behind.
+	mutatedPod := r.pod.DeepCopy()
+	mutatedResource := newDDTraceResource(r.namespace, r.parent, mutatedPod)
+	phpLoaderFlavor := mutatedResource.getPHPLoaderFlavor(rule)
+	mutatedResource.injectInitContainer(image, rule.Resources, lang, phpLoaderFlavor)
 
-	if err := lib.injectConfig(r.pod); err != nil {
+	if err := lib.injectConfig(mutatedPod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
 		return true
 	}
 
-	r.injectGlobalVolume()
+	mutatedResource.injectGlobalVolume()
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
-	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
-	r.injectGlobalEnvs(envs)
-	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(r.pod.Spec.Containers))
+	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, mutatedPod)
+	mutatedResource.injectGlobalEnvs(envs)
+	log.Debugf("ddtrace config injected: pod=%s, envs=%d, containers=%d", r.parent, len(envs), len(mutatedPod.Spec.Containers))
+
+	*r.pod = *mutatedPod
 
 	log.Infof("ddtrace injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 	return true
@@ -121,11 +141,6 @@ func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.DD
 	}
 	if manager.NewContainerManager(r.pod).ContainsInitContainer(otelInitContainerName) {
 		log.Warnf("ddtrace inject skipped: pod=%s, namespace=%s, reason=otel init container already exists", r.parent, r.namespace)
-		return false, nil, ""
-	}
-
-	if manager.NewContainerManager(r.pod).ContainsInitContainer(ddtraceInitContainerName) {
-		log.Debugf("ddtrace init container already exists: pod=%s", r.parent)
 		return false, nil, ""
 	}
 
@@ -151,6 +166,61 @@ func (r *ddtraceResource) getMatchingRule() (matched bool, ruleConfig *config.DD
 	}
 
 	return false, nil, ""
+}
+
+func (r *ddtraceResource) repairJavaAgentEnv() {
+	if !manager.NewVolumeManager(r.pod).IsEmptyDirVolume(ddtraceVolumeName) {
+		log.Warnf("ddtrace java env repair skipped: pod=%s, reason=volume_missing_or_invalid", r.parent)
+		return
+	}
+
+	initContainerHasMount := false
+	for idx := range r.pod.Spec.InitContainers {
+		if r.pod.Spec.InitContainers[idx].Name == ddtraceInitContainerName {
+			initContainerHasMount = hasDDTraceLibraryMount(&r.pod.Spec.InitContainers[idx])
+			break
+		}
+	}
+	if !initContainerHasMount {
+		log.Warnf("ddtrace java env repair skipped: pod=%s, reason=init_container_mount_missing", r.parent)
+		return
+	}
+
+	mutatedPod := r.pod.DeepCopy()
+	targets := 0
+	for idx := range mutatedPod.Spec.Containers {
+		container := &mutatedPod.Spec.Containers[idx]
+		if !hasDDTraceLibraryMount(container) {
+			continue
+		}
+		targets++
+		if err := injectDDTraceEnvToContainer(container, javaToolOptionsKey, appendJavaAgentIfMissing); err != nil {
+			log.Warnf("ddtrace java env repair failed: pod=%s, container=%s, error=%v", r.parent, container.Name, err)
+			return
+		}
+	}
+
+	if targets == 0 {
+		log.Warnf("ddtrace java env repair skipped: pod=%s, reason=application_mount_missing", r.parent)
+		return
+	}
+	if !podcompare.Changed(r.pod, mutatedPod) {
+		log.Debugf("ddtrace java env already complete: pod=%s, containers=%d", r.parent, targets)
+		return
+	}
+
+	*r.pod = *mutatedPod
+	log.Infof("ddtrace java env repaired: pod=%s, containers=%d", r.parent, targets)
+}
+
+func hasDDTraceLibraryMount(container *corev1.Container) bool {
+	for idx := range container.VolumeMounts {
+		mount := container.VolumeMounts[idx]
+		if mount.Name == ddtraceVolumeName && mount.MountPath == ddtraceMountPath {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements, lang language, phpLoaderFlavor string) {
@@ -214,51 +284,29 @@ func (r *ddtraceResource) injectGlobalVolume() {
 }
 
 func (r *ddtraceResource) injectGlobalEnvs(envs []corev1.EnvVar) {
-	m := manager.NewEnvVarManager(r.pod)
 	for idx := range envs {
-		// DD_TAGS need to be merged
-		if envs[idx].Name == ddtraceDDTagsKey {
-			r.specialDDTagsEnv(&envs[idx])
-			continue
+		incoming := envs[idx]
+		resolve := manager.KeepExistingEnvVar
+		if incoming.Name == ddtraceDDTagsKey {
+			if incoming.Value == "" || incoming.ValueFrom != nil {
+				continue
+			}
+			resolve = mergeDDTagsEnvVar
 		}
-		m.AddEnvVar(&envs[idx])
+
+		for containerIdx := range r.pod.Spec.Containers {
+			container := &r.pod.Spec.Containers[containerIdx]
+			container.Env = manager.AddOrUpdateEnvVar(container.Env, incoming, resolve)
+		}
 	}
 }
 
-func (r *ddtraceResource) specialDDTagsEnv(newEnv *corev1.EnvVar) {
-	if newEnv.Value == "" {
-		return
+func mergeDDTagsEnvVar(existing, incoming corev1.EnvVar) corev1.EnvVar {
+	if existing.ValueFrom != nil {
+		return existing
 	}
-
-	m := manager.NewEnvVarManager(r.pod)
-
-	for cIdx, container := range r.pod.Spec.Containers {
-		oldDDTagsIndex := -1
-
-		newEnvWithContainer := &corev1.EnvVar{
-			Name:  newEnv.Name,
-			Value: newEnv.Value,
-		}
-
-		for envIdx, env := range container.Env {
-			if env.Name != ddtraceDDTagsKey {
-				continue
-			}
-			if env.ValueFrom == nil {
-				oldDDTagsIndex = envIdx
-				kvStr := appendKVPairs(env.Value, newEnvWithContainer.Value)
-				newEnvWithContainer.Value = kvStr
-			}
-			break
-		}
-
-		if oldDDTagsIndex != -1 {
-			env := DeleteSlice(r.pod.Spec.Containers[cIdx].Env, oldDDTagsIndex, oldDDTagsIndex+1)
-			r.pod.Spec.Containers[cIdx].Env = env
-		}
-
-		m.AddEnvVarToContainer(container.Name, newEnvWithContainer)
-	}
+	existing.Value = appendKVPairs(existing.Value, incoming.Value)
+	return existing
 }
 
 type ddtraceLibrary interface {
@@ -268,16 +316,7 @@ type ddtraceLibrary interface {
 type ddtraceJava struct{}
 
 func (d *ddtraceJava) injectConfig(pod *corev1.Pod) error {
-	// Java config
-	const (
-		javaToolOptionsKey   = "JAVA_TOOL_OPTIONS"
-		javaToolOptionsValue = " -javaagent:/datadog-lib/dd-java-agent.jar"
-	)
-
-	envValFunc := func(predefinedVal string) string {
-		return predefinedVal + javaToolOptionsValue
-	}
-	return injectDDTraceConfig(pod, javaToolOptionsKey, envValFunc)
+	return injectDDTraceConfig(pod, javaToolOptionsKey, appendJavaAgentIfMissing)
 }
 
 type ddtracePython struct{}
@@ -290,6 +329,9 @@ func (d *ddtracePython) injectConfig(pod *corev1.Pod) error {
 	)
 
 	envValFunc := func(predefinedVal string) string {
+		if pathListContains(predefinedVal, pythonPathValue) {
+			return predefinedVal
+		}
 		if predefinedVal == "" {
 			return pythonPathValue
 		}
@@ -318,6 +360,9 @@ func (d *ddtracePHP) injectConfig(pod *corev1.Pod) error {
 	}
 
 	envValFunc := func(predefinedVal string) string {
+		if pathListContains(predefinedVal, ddtraceMountPath) {
+			return predefinedVal
+		}
 		if predefinedVal == "" {
 			return fmt.Sprintf("%s:%s", phpDefaultINIPath, ddtraceMountPath)
 		}
@@ -331,31 +376,20 @@ type ddtraceNodejs struct{}
 func (d *ddtraceNodejs) injectConfig(pod *corev1.Pod) error {
 	// Nodejs config
 	const (
-		nodejsOptionsKey   = "NODE_OPTIONS"
-		nodejsOptionsValue = " --require=/datadog-lib/node_modules/dd-trace/init"
+		nodejsOptionsKey = "NODE_OPTIONS"
+		nodejsInitOption = "--require=/datadog-lib/node_modules/dd-trace/init"
 	)
 
 	envValFunc := func(predefinedVal string) string {
-		return predefinedVal + nodejsOptionsValue
+		return appendOptionIfMissing(predefinedVal, nodejsInitOption)
 	}
 	return injectDDTraceConfig(pod, nodejsOptionsKey, envValFunc)
 }
 
 func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) string) error {
-	podSpec := pod.Spec
-	for i, container := range podSpec.Containers {
-		index := envIndex(container.Env, envKey)
-
-		if index < 0 {
-			podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{
-				Name:  envKey,
-				Value: envVal(""),
-			})
-		} else {
-			if podSpec.Containers[i].Env[index].ValueFrom != nil {
-				return fmt.Errorf("%q is defined via ValueFrom", envKey)
-			}
-			podSpec.Containers[i].Env[index].Value = envVal(podSpec.Containers[i].Env[index].Value)
+	for idx := range pod.Spec.Containers {
+		if err := injectDDTraceEnvToContainer(&pod.Spec.Containers[idx], envKey, envVal); err != nil {
+			return err
 		}
 	}
 
@@ -368,11 +402,50 @@ func injectDDTraceConfig(pod *corev1.Pod, envKey string, envVal func(string) str
 	return nil
 }
 
-func envIndex(envs []corev1.EnvVar, name string) int {
-	for i := range envs {
-		if envs[i].Name == name {
-			return i
+func injectDDTraceEnvToContainer(container *corev1.Container, envKey string, envVal func(string) string) error {
+	for idx := range container.Env {
+		if container.Env[idx].Name != envKey {
+			continue
+		}
+		if container.Env[idx].ValueFrom != nil {
+			return fmt.Errorf("%q is defined via ValueFrom", envKey)
+		}
+		break
+	}
+
+	incoming := corev1.EnvVar{Name: envKey, Value: envVal("")}
+	resolve := func(existing, _ corev1.EnvVar) corev1.EnvVar {
+		existing.Value = envVal(existing.Value)
+		return existing
+	}
+
+	container.Env = manager.AddOrUpdateEnvVar(container.Env, incoming, resolve)
+	return nil
+}
+
+func appendJavaAgentIfMissing(value string) string {
+	for _, existing := range strings.Fields(value) {
+		if existing == javaAgentOption || strings.HasPrefix(existing, javaAgentOption+"=") {
+			return value
 		}
 	}
-	return -1
+	return value + " " + javaAgentOption
+}
+
+func appendOptionIfMissing(value, option string) string {
+	for _, existing := range strings.Fields(value) {
+		if existing == option {
+			return value
+		}
+	}
+	return value + " " + option
+}
+
+func pathListContains(value, path string) bool {
+	for _, existing := range strings.Split(value, ":") {
+		if existing == path {
+			return true
+		}
+	}
+	return false
 }

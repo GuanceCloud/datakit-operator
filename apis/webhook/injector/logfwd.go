@@ -73,6 +73,7 @@ func (r *logfwdResource) process() {
 	// Then create a logfwd container, the container needs to be ReadOnly.
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
+	envs = manager.AddOrUpdateEnvVars(nil, envs, manager.ReplaceExistingEnvVar)
 
 	// 提取配置：instances（Annotation）或 log_configs（rule）
 	instancesConfig, instancesVolumePaths, hasInstancesConfig := r.extractInstancesConfig()
@@ -82,10 +83,18 @@ func (r *logfwdResource) process() {
 
 	// 设置环境变量
 	if hasInstancesConfig {
-		envs = append(envs, corev1.EnvVar{Name: logfwdJSONConfigKey, Value: instancesConfig})
+		envs = manager.AddOrUpdateEnvVar(
+			envs,
+			corev1.EnvVar{Name: logfwdJSONConfigKey, Value: instancesConfig},
+			manager.ReplaceExistingEnvVar,
+		)
 	}
 	if hasLogConfigsConfig {
-		envs = append(envs, corev1.EnvVar{Name: logfwdLogConfigsKey, Value: logConfigsConfig})
+		envs = manager.AddOrUpdateEnvVar(
+			envs,
+			corev1.EnvVar{Name: logfwdLogConfigsKey, Value: logConfigsConfig},
+			manager.ReplaceExistingEnvVar,
+		)
 	}
 
 	// 收集所有 volume paths

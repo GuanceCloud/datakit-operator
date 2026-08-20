@@ -230,6 +230,50 @@ func TestInjectProfiler(t *testing.T) {
 		assert.Len(t, pod.Spec.Volumes, 0)
 	})
 
+	t.Run("updates duplicate configured env in place", func(t *testing.T) {
+		originalFunc := profilerMatchNamespaceOrLabelsForConfig
+		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
+			return true, &config.ProfilerRule{
+				InjectRule: config.InjectRule{
+					Envs: []struct{ Key, Value string }{
+						{Key: "FIRST", Value: "first"},
+						{Key: "DUPLICATE", Value: "old"},
+						{Key: "LAST", Value: "last"},
+						{Key: "DUPLICATE", Value: "new"},
+					},
+				},
+				Language: "java",
+				Images: map[string]string{
+					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
+				},
+			}
+		}
+		defer func() {
+			profilerMatchNamespaceOrLabelsForConfig = originalFunc
+		}()
+
+		pod := createTestPod("test-profiler-env-order", map[string]string{
+			profilerEnabledAnnotationKey: "true",
+		})
+		changed, err := InjectProfilerToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.True(t, changed)
+		if assert.Len(t, pod.Spec.Containers, 2) {
+			envs := pod.Spec.Containers[1].Env
+			assert.Equal(t, []string{"FIRST", "DUPLICATE", "LAST"}, envNames(envs))
+			duplicate, exists := findEnv(envs, "DUPLICATE")
+			if assert.True(t, exists) {
+				assert.Equal(t, "new", duplicate.Value)
+			}
+		}
+
+		afterFirstInjection := pod.DeepCopy()
+		changed, err = InjectProfilerToPod("", pod.Name, pod)
+		assert.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, afterFirstInjection, pod)
+	})
+
 	t.Run("nil pod error", func(t *testing.T) {
 		_, err := InjectProfilerToPod("", "test-pod", nil)
 		assert.Error(t, err)

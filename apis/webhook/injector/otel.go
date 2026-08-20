@@ -111,9 +111,9 @@ func (r *otelResource) process() {
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
-	envManager := manager.NewEnvVarManager(r.pod)
-	for idx := range envs {
-		envManager.AddEnvVar(&envs[idx])
+	for idx := range r.pod.Spec.Containers {
+		container := &r.pod.Spec.Containers[idx]
+		container.Env = manager.AddOrUpdateEnvVars(container.Env, envs, manager.KeepExistingEnvVar)
 	}
 	log.Infof("otel injection completed: pod=%s, namespace=%s, image=%s, rule=%s", r.parent, r.namespace, image, rule.Name)
 }
@@ -395,7 +395,11 @@ func (r *otelResource) injectJavaConfig() {
 		container := &r.pod.Spec.Containers[idx]
 		envIdx := envIndex(container.Env, otelJavaToolOptionsKey)
 		if envIdx < 0 {
-			container.Env = append(container.Env, corev1.EnvVar{Name: otelJavaToolOptionsKey, Value: otelJavaAgentOption})
+			container.Env = manager.AddOrUpdateEnvVar(
+				container.Env,
+				corev1.EnvVar{Name: otelJavaToolOptionsKey, Value: otelJavaAgentOption},
+				manager.KeepExistingEnvVar,
+			)
 		} else if !containsJavaToolOption(container.Env[envIdx].Value, otelJavaAgentOption) {
 			if container.Env[envIdx].Value == "" {
 				container.Env[envIdx].Value = otelJavaAgentOption
@@ -418,7 +422,11 @@ func (r *otelResource) injectPythonConfig() {
 		if envIdx < 0 || container.Env[envIdx].Value == "" {
 			pythonPath := otelPythonPathPrefix + ":" + otelPythonMountPath
 			if envIdx < 0 {
-				manager.AddEnvVarToContainer(container, &corev1.EnvVar{Name: otelPythonPathKey, Value: pythonPath})
+				container.Env = manager.AddOrUpdateEnvVar(
+					container.Env,
+					corev1.EnvVar{Name: otelPythonPathKey, Value: pythonPath},
+					manager.KeepExistingEnvVar,
+				)
 			} else {
 				container.Env[envIdx].Value = pythonPath
 			}
@@ -436,4 +444,13 @@ func containsJavaToolOption(value, option string) bool {
 		}
 	}
 	return false
+}
+
+func envIndex(envs []corev1.EnvVar, name string) int {
+	for idx := range envs {
+		if envs[idx].Name == name {
+			return idx
+		}
+	}
+	return -1
 }

@@ -307,5 +307,5 @@ webhooks:
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 5
-    reinvocationPolicy: Never
+    reinvocationPolicy: IfNeeded
     failurePolicy: Ignore
