@@ -30,12 +30,20 @@ const (
 	otelJavaToolOptionsKey  = "JAVA_TOOL_OPTIONS"
 	otelJavaAgentOption     = "-javaagent:" + otelJavaAgentPath
 	ddJavaAgentFileName     = "dd-java-agent.jar"
+	ddNodeJSInitModule      = "dd-trace/init"
 
 	otelPythonMountPath        = "/otel-auto-instrumentation-python"
 	otelPythonSourcePath       = "/autoinstrumentation/."
 	otelPythonPathKey          = "PYTHONPATH"
 	otelPythonPathPrefix       = otelPythonMountPath + "/opentelemetry/instrumentation/auto_instrumentation"
 	otelPythonInitCopyArgument = "-r"
+
+	otelNodeJSMountPath        = "/otel-auto-instrumentation-nodejs"
+	otelNodeJSSourcePath       = "/autoinstrumentation/."
+	otelNodeJSOptionsKey       = "NODE_OPTIONS"
+	otelNodeJSRequirePath      = otelNodeJSMountPath + "/autoinstrumentation.js"
+	otelNodeJSRequireOption    = "--require " + otelNodeJSRequirePath
+	otelNodeJSInitCopyArgument = "-r"
 )
 
 func InjectOTelToPod(namespace, parent string, pod *corev1.Pod) (bool, error) {
@@ -76,7 +84,8 @@ func (r *otelResource) process() {
 	}
 	r.warnIfMultipleRulesMatched(rules, rule)
 	ruleLanguage := language(rule.Language)
-	if ruleLanguage != java && ruleLanguage != python {
+	library, supported := r.libraryForLanguage(ruleLanguage)
+	if !supported {
 		log.Warnf("otel language not supported: pod=%s, namespace=%s, rule=%s, language=%s", r.parent, r.namespace, rule.Name, rule.Language)
 		return
 	}
@@ -85,29 +94,16 @@ func (r *otelResource) process() {
 	if imageVersion != "" {
 		image = replaceImageVersion(image, imageVersion)
 	}
-	var initContainer corev1.Container
-	var validationErr error
-	switch ruleLanguage {
-	case java:
-		initContainer = r.javaInitContainer(rule, image)
-		validationErr = r.validateJavaInjection(rule.Image, &initContainer)
-	case python:
-		initContainer = r.pythonInitContainer(rule, image)
-		validationErr = r.validatePythonInjection(rule.Image, &initContainer)
-	}
-	if validationErr != nil {
-		log.Warnf("otel inject skipped: pod=%s, namespace=%s, rule=%s, reason=%v", r.parent, r.namespace, rule.Name, validationErr)
+	initContainer := r.initContainer(rule, image, library)
+	if err := library.validate(rule.Image, &initContainer); err != nil {
+		log.Warnf("otel inject skipped: pod=%s, namespace=%s, rule=%s, reason=%v", r.parent, r.namespace, rule.Name, err)
 		return
 	}
 
 	log.Infof("otel injection started: pod=%s, namespace=%s, language=%s, rule=%s", r.parent, r.namespace, rule.Language, rule.Name)
 	r.injectInitContainer(&initContainer)
 	r.injectVolume()
-	if ruleLanguage == java {
-		r.injectJavaConfig()
-	} else {
-		r.injectPythonConfig()
-	}
+	library.inject()
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
@@ -116,6 +112,41 @@ func (r *otelResource) process() {
 		container.Env = manager.AddOrUpdateEnvVars(container.Env, envs, manager.KeepExistingEnvVar)
 	}
 	log.Infof("otel injection completed: pod=%s, namespace=%s, image=%s, rule=%s", r.parent, r.namespace, image, rule.Name)
+}
+
+type otelLibrary struct {
+	mountPath string
+	command   []string
+	validate  func(string, *corev1.Container) error
+	inject    func()
+}
+
+func (r *otelResource) libraryForLanguage(lang language) (otelLibrary, bool) {
+	switch lang {
+	case java:
+		return otelLibrary{
+			mountPath: otelJavaMountPath,
+			command:   []string{"cp", otelJavaAgentSourcePath, otelJavaAgentPath},
+			validate:  r.validateJavaInjection,
+			inject:    r.injectJavaConfig,
+		}, true
+	case python:
+		return otelLibrary{
+			mountPath: otelPythonMountPath,
+			command:   []string{"cp", otelPythonInitCopyArgument, otelPythonSourcePath, otelPythonMountPath},
+			validate:  r.validatePythonInjection,
+			inject:    r.injectPythonConfig,
+		}, true
+	case nodejs:
+		return otelLibrary{
+			mountPath: otelNodeJSMountPath,
+			command:   []string{"cp", otelNodeJSInitCopyArgument, otelNodeJSSourcePath, otelNodeJSMountPath},
+			validate:  r.validateNodeJSInjection,
+			inject:    r.injectNodeJSConfig,
+		}, true
+	default:
+		return otelLibrary{}, false
+	}
 }
 
 func (r *otelResource) warnIfMultipleRulesMatched(rules []*config.OTelRule, selected *config.OTelRule) {
@@ -165,6 +196,38 @@ func (r *otelResource) validatePythonInjection(configuredImage string, desiredIn
 				(containsPythonPathComponent(env.Value, otelPythonPathPrefix) ||
 					containsPythonPathComponent(env.Value, otelPythonMountPath)) {
 				return fmt.Errorf("container %q has an incompatible OpenTelemetry %s", container.Name, otelPythonPathKey)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *otelResource) validateNodeJSInjection(configuredImage string, desiredInitContainer *corev1.Container) error {
+	if err := r.validateCommonInjection(configuredImage, desiredInitContainer, otelNodeJSMountPath); err != nil {
+		return err
+	}
+
+	for _, container := range r.pod.Spec.Containers {
+		nodeOptionsCount := 0
+		for idx := range container.Env {
+			env := &container.Env[idx]
+			if env.Name != otelNodeJSOptionsKey {
+				continue
+			}
+			nodeOptionsCount++
+			if nodeOptionsCount > 1 {
+				return fmt.Errorf("container %q has duplicate %s entries", container.Name, otelNodeJSOptionsKey)
+			}
+			if env.ValueFrom != nil {
+				return fmt.Errorf("container %q has %s defined via ValueFrom", container.Name, otelNodeJSOptionsKey)
+			}
+			if strings.Contains(env.Value, ddtraceMountPath) || containsDatadogNodeJSRequire(env.Value) {
+				return fmt.Errorf("container %q already uses the Datadog Node.js library", container.Name)
+			}
+			requireCount := countNodeJSRequireOptions(env.Value)
+			pathCount := strings.Count(env.Value, strings.TrimPrefix(otelNodeJSMountPath, "/"))
+			if requireCount > 1 || pathCount > 0 && (requireCount != 1 || pathCount != 1) {
+				return fmt.Errorf("container %q has incompatible OpenTelemetry %s", container.Name, otelNodeJSOptionsKey)
 			}
 		}
 	}
@@ -343,31 +406,14 @@ func selectOTelRule(rules []*config.OTelRule, annotations map[string]string) (*c
 	return nil, ""
 }
 
-func (r *otelResource) javaInitContainer(rule *config.OTelRule, image string) corev1.Container {
+func (r *otelResource) initContainer(rule *config.OTelRule, image string, library otelLibrary) corev1.Container {
 	container := corev1.Container{
 		Name:            otelInitContainerName,
 		Image:           image,
-		Command:         []string{"cp", otelJavaAgentSourcePath, otelJavaAgentPath},
+		Command:         library.command,
 		ImagePullPolicy: corev1.PullAlways,
 		VolumeMounts: []corev1.VolumeMount{
-			{Name: otelVolumeName, MountPath: otelJavaMountPath},
-		},
-	}
-	if len(r.pod.Spec.Containers) > 0 && r.pod.Spec.Containers[0].SecurityContext != nil {
-		container.SecurityContext = r.pod.Spec.Containers[0].SecurityContext.DeepCopy()
-	}
-	setContainerResources(&container, rule.Resources.Requests.CPU, rule.Resources.Requests.Memory, rule.Resources.Limits.CPU, rule.Resources.Limits.Memory)
-	return container
-}
-
-func (r *otelResource) pythonInitContainer(rule *config.OTelRule, image string) corev1.Container {
-	container := corev1.Container{
-		Name:            otelInitContainerName,
-		Image:           image,
-		Command:         []string{"cp", otelPythonInitCopyArgument, otelPythonSourcePath, otelPythonMountPath},
-		ImagePullPolicy: corev1.PullAlways,
-		VolumeMounts: []corev1.VolumeMount{
-			{Name: otelVolumeName, MountPath: otelPythonMountPath},
+			{Name: otelVolumeName, MountPath: library.mountPath},
 		},
 	}
 	if len(r.pod.Spec.Containers) > 0 && r.pod.Spec.Containers[0].SecurityContext != nil {
@@ -435,6 +481,62 @@ func (r *otelResource) injectPythonConfig() {
 		}
 		manager.AddVolumeMountToContainer(container, &corev1.VolumeMount{Name: otelVolumeName, MountPath: otelPythonMountPath})
 	}
+}
+
+func (r *otelResource) injectNodeJSConfig() {
+	for idx := range r.pod.Spec.Containers {
+		container := &r.pod.Spec.Containers[idx]
+		envIdx := envIndex(container.Env, otelNodeJSOptionsKey)
+		if envIdx < 0 {
+			container.Env = manager.AddOrUpdateEnvVar(
+				container.Env,
+				corev1.EnvVar{Name: otelNodeJSOptionsKey, Value: " " + otelNodeJSRequireOption},
+				manager.KeepExistingEnvVar,
+			)
+		} else if !containsNodeJSRequireOption(container.Env[envIdx].Value) {
+			container.Env[envIdx].Value += " " + otelNodeJSRequireOption
+		}
+		manager.AddVolumeMountToContainer(container, &corev1.VolumeMount{Name: otelVolumeName, MountPath: otelNodeJSMountPath})
+	}
+}
+
+func containsNodeJSRequireOption(value string) bool {
+	return countNodeJSRequireOptions(value) == 1
+}
+
+func countNodeJSRequireOptions(value string) int {
+	fields := strings.Fields(value)
+	count := 0
+	for idx := 0; idx+1 < len(fields); idx++ {
+		if fields[idx] == "--require" && fields[idx+1] == otelNodeJSRequirePath {
+			count++
+		}
+	}
+	return count
+}
+
+func containsDatadogNodeJSRequire(value string) bool {
+	fields := strings.Fields(value)
+	for idx := 0; idx < len(fields); idx++ {
+		var target string
+		switch {
+		case fields[idx] == "--require" || fields[idx] == "-r":
+			if idx+1 < len(fields) {
+				target = fields[idx+1]
+				idx++
+			}
+		case strings.HasPrefix(fields[idx], "--require="):
+			target = strings.TrimPrefix(fields[idx], "--require=")
+		case strings.HasPrefix(fields[idx], "-r="):
+			target = strings.TrimPrefix(fields[idx], "-r=")
+		}
+
+		target = strings.TrimSuffix(strings.Trim(target, `"'`), ".js")
+		if target == ddNodeJSInitModule || strings.HasSuffix(target, "/node_modules/"+ddNodeJSInitModule) {
+			return true
+		}
+	}
+	return false
 }
 
 func containsJavaToolOption(value, option string) bool {

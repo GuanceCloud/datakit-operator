@@ -273,7 +273,8 @@ func TestInjectOTelPythonSkipsIncompatiblePod(t *testing.T) {
 					"ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0",
 				)
 				resource := &otelResource{pod: pod}
-				initContainer := resource.pythonInitContainer(rule, rule.Image)
+				library, _ := resource.libraryForLanguage(python)
+				initContainer := resource.initContainer(rule, rule.Image, library)
 				initContainer.VolumeMounts = append(initContainer.VolumeMounts, corev1.VolumeMount{
 					Name:      "conflicting",
 					MountPath: otelPythonMountPath,
@@ -375,6 +376,13 @@ func TestInjectOTelReinvocationToleratesInitContainerDefaults(t *testing.T) {
 			image:        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0",
 			expectedEnv:  otelPythonPathKey,
 			expectedPath: otelPythonPathPrefix + ":" + otelPythonMountPath,
+		},
+		{
+			name:         "nodejs",
+			language:     "nodejs",
+			image:        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.78.0",
+			expectedEnv:  otelNodeJSOptionsKey,
+			expectedPath: " " + otelNodeJSRequireOption,
 		},
 	}
 
@@ -542,6 +550,35 @@ func TestInjectOTelPythonUsesVersionAnnotation(t *testing.T) {
 	if assert.Len(t, pod.Spec.InitContainers, 1) {
 		assert.Equal(t,
 			"ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.63b1",
+			pod.Spec.InitContainers[0].Image,
+		)
+	}
+}
+
+func TestInjectOTelNodeJSUsesVersionAnnotation(t *testing.T) {
+	originalFunc := otelMatchAllNamespaceOrLabelsForConfig
+	otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
+		rule := newTestOTelRuleForLanguage(
+			"nodejs",
+			"ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.78.0",
+		)
+		rule.CheckAnnotation = true
+		return true, []*config.OTelRule{rule}
+	}
+	defer func() {
+		otelMatchAllNamespaceOrLabelsForConfig = originalFunc
+	}()
+
+	pod := createTestPod("test-otel-nodejs-version", map[string]string{
+		otelEnabledAnnotationKey:                    "true",
+		"admission.datakit/otel-nodejs-lib.version": "0.77.0",
+	})
+	changed, err := InjectOTelToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	if assert.Len(t, pod.Spec.InitContainers, 1) {
+		assert.Equal(t,
+			"ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.77.0",
 			pod.Spec.InitContainers[0].Image,
 		)
 	}
