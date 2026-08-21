@@ -575,6 +575,54 @@ func TestMutateRequestInjectsOTelJavaPatch(t *testing.T) {
 	}
 }
 
+func TestMutateRequestSkipsOTelPatchForRunAsNonRootWithoutRunAsUser(t *testing.T) {
+	originalCfg := config.Cfg
+	defer func() {
+		config.Cfg = originalCfg
+	}()
+
+	config.Cfg = &config.Configuration{
+		AdmissionInject: config.AdmissionInjectConfig{
+			OTels: config.OTelRules{
+				{
+					InjectRule: config.InjectRule{
+						Name:     "otel-java",
+						Selector: config.Selector{Namespaces: []string{"default"}},
+						Image:    "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0",
+					},
+					Language: "java",
+				},
+			},
+		},
+	}
+	if !assert.NoError(t, config.Cfg.Setup()) {
+		return
+	}
+
+	rawPod := []byte(`{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "test-otel-run-as-non-root",
+    "namespace": "default"
+  },
+  "spec": {
+    "securityContext": {"runAsNonRoot": true},
+    "containers": [{"name": "app", "image": "example.com/checkout:1.0.0"}]
+  }
+}`)
+	req := &admissionv1.AdmissionRequest{
+		Operation: admissionv1.Create,
+		Namespace: "default",
+		Resource:  podResource,
+		Object:    runtime.RawExtension{Raw: rawPod},
+	}
+
+	patchBytes, err := mutateRequest(req)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(patchBytes))
+}
+
 func TestMutateRequestInjectsOTelPythonPatch(t *testing.T) {
 	originalCfg := config.Cfg
 	defer func() {

@@ -6,10 +6,14 @@
 package injector
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -30,6 +34,174 @@ func newTestOTelRuleForLanguage(lang, image string) *config.OTelRule {
 	}
 }
 
+func TestInjectOTelSkipsRunAsNonRootWithoutRunAsUser(t *testing.T) {
+	tests := []struct {
+		name     string
+		language string
+		image    string
+	}{
+		{
+			name:     "java",
+			language: "java",
+			image:    "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0",
+		},
+		{
+			name:     "python",
+			language: "python",
+			image:    "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0",
+		},
+		{
+			name:     "nodejs",
+			language: "nodejs",
+			image:    "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.78.0",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			originalFunc := otelMatchAllNamespaceOrLabelsForConfig
+			otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
+				return true, []*config.OTelRule{newTestOTelRuleForLanguage(tc.language, tc.image)}
+			}
+			defer func() {
+				otelMatchAllNamespaceOrLabelsForConfig = originalFunc
+			}()
+
+			runAsNonRoot := true
+			pod := createTestPod("test-otel-nonroot-"+tc.name, nil)
+			pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+			originalPod := pod.DeepCopy()
+
+			changed, err := InjectOTelToPod("default", pod.Name, pod)
+			assert.NoError(t, err)
+			assert.False(t, changed)
+			assert.Equal(t, originalPod, pod)
+		})
+	}
+}
+
+func TestInjectOTelRunAsNonRootWarningIncludesTraceFields(t *testing.T) {
+	const image = "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0"
+	originalFunc := otelMatchAllNamespaceOrLabelsForConfig
+	otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
+		rule := newTestOTelRule(image)
+		rule.Name = "otel-java"
+		return true, []*config.OTelRule{rule}
+	}
+	defer func() {
+		otelMatchAllNamespaceOrLabelsForConfig = originalFunc
+	}()
+
+	var logs bytes.Buffer
+	originalLog := log
+	core := zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(&logs), zap.WarnLevel)
+	log = &logger.Logger{SugaredLogger: zap.New(core).Sugar()}
+	defer func() {
+		log = originalLog
+	}()
+
+	runAsNonRoot := true
+	pod := createTestPod("test-otel-run-as-non-root", nil)
+	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+
+	changed, err := InjectOTelToPod("default", "<no-one>", pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Contains(t, logs.String(),
+		"otel inject skipped: pod=test-otel-run-as-non-root, namespace=default, rule=otel-java, language=java, image="+image+
+			", reason=run_as_non_root_without_run_as_user",
+	)
+}
+
+func TestInjectOTelRunAsNonRootGuardUsesEffectiveSecurityContext(t *testing.T) {
+	runAsNonRoot := true
+	doNotRunAsNonRoot := false
+	nonRootUser := int64(1000)
+	rootUser := int64(0)
+	tests := []struct {
+		name                     string
+		podSecurityContext       *corev1.PodSecurityContext
+		containerSecurityContext *corev1.SecurityContext
+		wantChanged              bool
+	}{
+		{
+			name:               "pod requires non-root without user",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &runAsNonRoot},
+		},
+		{
+			name: "pod provides non-root user",
+			podSecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot: &runAsNonRoot,
+				RunAsUser:    &nonRootUser,
+			},
+			wantChanged: true,
+		},
+		{
+			name:               "container disables pod non-root requirement",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &runAsNonRoot},
+			containerSecurityContext: &corev1.SecurityContext{
+				RunAsNonRoot: &doNotRunAsNonRoot,
+			},
+			wantChanged: true,
+		},
+		{
+			name:                     "container inherits pod non-root user",
+			podSecurityContext:       &corev1.PodSecurityContext{RunAsUser: &nonRootUser},
+			containerSecurityContext: &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot},
+			wantChanged:              true,
+		},
+		{
+			name: "container root user overrides pod non-root user",
+			podSecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot: &runAsNonRoot,
+				RunAsUser:    &nonRootUser,
+			},
+			containerSecurityContext: &corev1.SecurityContext{RunAsUser: &rootUser},
+		},
+		{
+			name:                     "container provides non-root user for pod requirement",
+			podSecurityContext:       &corev1.PodSecurityContext{RunAsNonRoot: &runAsNonRoot},
+			containerSecurityContext: &corev1.SecurityContext{RunAsUser: &nonRootUser},
+			wantChanged:              true,
+		},
+		{
+			name:                     "root user without non-root requirement",
+			containerSecurityContext: &corev1.SecurityContext{RunAsUser: &rootUser},
+			wantChanged:              true,
+		},
+	}
+
+	originalFunc := otelMatchAllNamespaceOrLabelsForConfig
+	otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
+		return true, []*config.OTelRule{newTestOTelRule("ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.29.0")}
+	}
+	defer func() {
+		otelMatchAllNamespaceOrLabelsForConfig = originalFunc
+	}()
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := createTestPod("test-otel-security-context", nil)
+			if tc.podSecurityContext != nil {
+				pod.Spec.SecurityContext = tc.podSecurityContext.DeepCopy()
+			}
+			if tc.containerSecurityContext != nil {
+				pod.Spec.Containers[0].SecurityContext = tc.containerSecurityContext.DeepCopy()
+			}
+			originalPod := pod.DeepCopy()
+
+			changed, err := InjectOTelToPod("default", pod.Name, pod)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantChanged, changed)
+			if tc.wantChanged {
+				assert.Len(t, pod.Spec.InitContainers, 1)
+			} else {
+				assert.Equal(t, originalPod, pod)
+			}
+		})
+	}
+}
+
 func TestInjectOTelPythonToPod(t *testing.T) {
 	originalFunc := otelMatchAllNamespaceOrLabelsForConfig
 	otelMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.OTelRule) {
@@ -44,8 +216,9 @@ func TestInjectOTelPythonToPod(t *testing.T) {
 	}()
 
 	runAsNonRoot := true
+	runAsUser := int64(1000)
 	pod := createTestPod("test-otel-python", map[string]string{otelEnabledAnnotationKey: "true"})
-	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot, RunAsUser: &runAsUser}
 	pod.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "PYTHONPATH", Value: "/app:/vendor"}}
 	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: "sidecar", Image: "python:3.14-slim"})
 
@@ -398,7 +571,8 @@ func TestInjectOTelReinvocationToleratesInitContainerDefaults(t *testing.T) {
 
 			pod := createTestPod("test-otel-reinvocation-"+tc.name, nil)
 			runAsNonRoot := true
-			pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+			runAsUser := int64(1000)
+			pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot, RunAsUser: &runAsUser}
 			changed, err := InjectOTelToPod("default", pod.Name, pod)
 			assert.NoError(t, err)
 			assert.True(t, changed)
@@ -445,8 +619,9 @@ func TestInjectOTelJavaToPod(t *testing.T) {
 	}()
 
 	runAsNonRoot := true
+	runAsUser := int64(1000)
 	pod := createTestPod("test-otel-java", map[string]string{otelEnabledAnnotationKey: "true"})
-	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot, RunAsUser: &runAsUser}
 	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: "sidecar", Image: "busybox:1.36"})
 
 	changed, err := InjectOTelToPod("default", pod.Name, pod)

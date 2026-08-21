@@ -95,6 +95,21 @@ func (r *otelResource) process() {
 		image = replaceImageVersion(image, imageVersion)
 	}
 	initContainer := r.initContainer(rule, image, library)
+	if runAsNonRootWithoutNonRootUser(r.pod.Spec.SecurityContext, initContainer.SecurityContext) {
+		podLogName := r.pod.Name
+		if podLogName == "" {
+			podLogName = r.parent
+		}
+		log.Warnf(
+			"otel inject skipped: pod=%s, namespace=%s, rule=%s, language=%s, image=%s, reason=run_as_non_root_without_run_as_user",
+			podLogName,
+			r.namespace,
+			rule.Name,
+			rule.Language,
+			image,
+		)
+		return
+	}
 	if err := library.validate(rule.Image, &initContainer); err != nil {
 		log.Warnf("otel inject skipped: pod=%s, namespace=%s, rule=%s, reason=%v", r.parent, r.namespace, rule.Name, err)
 		return
@@ -112,6 +127,25 @@ func (r *otelResource) process() {
 		container.Env = manager.AddOrUpdateEnvVars(container.Env, envs, manager.KeepExistingEnvVar)
 	}
 	log.Infof("otel injection completed: pod=%s, namespace=%s, image=%s, rule=%s", r.parent, r.namespace, image, rule.Name)
+}
+
+func runAsNonRootWithoutNonRootUser(podSecurityContext *corev1.PodSecurityContext, containerSecurityContext *corev1.SecurityContext) bool {
+	var runAsNonRoot *bool
+	var runAsUser *int64
+	if podSecurityContext != nil {
+		runAsNonRoot = podSecurityContext.RunAsNonRoot
+		runAsUser = podSecurityContext.RunAsUser
+	}
+	if containerSecurityContext != nil {
+		if containerSecurityContext.RunAsNonRoot != nil {
+			runAsNonRoot = containerSecurityContext.RunAsNonRoot
+		}
+		if containerSecurityContext.RunAsUser != nil {
+			runAsUser = containerSecurityContext.RunAsUser
+		}
+	}
+
+	return runAsNonRoot != nil && *runAsNonRoot && (runAsUser == nil || *runAsUser == 0)
 }
 
 type otelLibrary struct {
