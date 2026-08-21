@@ -51,8 +51,9 @@ func TestInjectTracingInjectsOTelNodeJS(t *testing.T) {
 	}
 
 	runAsNonRoot := true
+	runAsUser := int64(1000)
 	pod := createTestPod("test-tracing-otel-nodejs", map[string]string{ddtraceEnabledAnnotationKey: "false"})
-	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot}
+	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{RunAsNonRoot: &runAsNonRoot, RunAsUser: &runAsUser}
 	pod.Spec.Containers[0].Env = []corev1.EnvVar{{
 		Name:  "NODE_OPTIONS",
 		Value: "--require /app/preload.js --max-old-space-size=512",
