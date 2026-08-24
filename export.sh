@@ -7,15 +7,17 @@ readonly EXPORT_DIR="${SCRIPT_DIR}/export"
 readonly CONFIG_FILE="${EXPORT_DIR}/config.env"
 
 doc_repo="${HOME}/git/dataflux-doc"
+check_only=false
 
 usage() {
     cat <<'EOF'
 Export DataKit Operator documents to dataflux-doc.
 
 Usage:
-  ./export.sh [-D dataflux-doc-dir]
+  ./export.sh [-c] [-D dataflux-doc-dir]
 
 Options:
+  -c      check source and rendered documents without exporting
   -D DIR  dataflux-doc repository (default: ~/git/dataflux-doc)
   -h      show this help
 EOF
@@ -26,8 +28,11 @@ fail() {
     exit 1
 }
 
-while getopts ":D:h" opt; do
+while getopts ":cD:h" opt; do
     case "${opt}" in
+    c)
+        check_only=true
+        ;;
     D)
         doc_repo="${OPTARG}"
         ;;
@@ -48,11 +53,13 @@ shift $((OPTIND - 1))
 [[ $# -eq 0 ]] || fail "unexpected argument: $1"
 [[ -f "${CONFIG_FILE}" ]] || fail "missing config: ${CONFIG_FILE}"
 [[ -d "${EXPORT_DIR}/zh" && -d "${EXPORT_DIR}/en" ]] || fail "missing zh/en document sources"
-[[ -d "${doc_repo}" ]] || fail "dataflux-doc directory does not exist: ${doc_repo}"
 
-doc_repo="$(cd -- "${doc_repo}" && pwd)"
-[[ -f "${doc_repo}/mkdocs.zh.yml" && -f "${doc_repo}/mkdocs.en.yml" ]] || \
-    fail "target is not a dataflux-doc repository: ${doc_repo}"
+if [[ "${check_only}" == false ]]; then
+    [[ -d "${doc_repo}" ]] || fail "dataflux-doc directory does not exist: ${doc_repo}"
+    doc_repo="$(cd -- "${doc_repo}" && pwd)"
+    [[ -f "${doc_repo}/mkdocs.zh.yml" && -f "${doc_repo}/mkdocs.en.yml" ]] || \
+        fail "target is not a dataflux-doc repository: ${doc_repo}"
+fi
 
 list_documents() {
     find "$1" -maxdepth 1 -type f -name '*.md' -printf '%f\n' | LC_ALL=C sort
@@ -65,6 +72,74 @@ list_placeholders() {
 list_brand_tokens() {
     { grep -oE '<<<[^>]*>>>' "$1" || true; } | LC_ALL=C sort
 }
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+run_mdcheck() {
+    local markdown_dir="$1"
+    local check_section="$2"
+
+    (
+        cd -- "${SCRIPT_DIR}"
+        GOFLAGS=-mod=vendor go run ./cmd/doccheck \
+            -dir "${markdown_dir}" \
+            -check-section="${check_section}"
+    )
+}
+
+check_brand_names() {
+    local markdown_dir="$1"
+    local keyword
+    local matches
+    local found=false
+    local keywords=("观测云" "Guance Cloud" "Guance" "guance.com")
+
+    for keyword in "${keywords[@]}"; do
+        matches="$({ grep -RFn --include='*.md' -- "${keyword}" "${markdown_dir}" || true; })"
+        if [[ -n "${matches}" ]]; then
+            printf '%s\n' "${matches}" >&2
+            found=true
+        fi
+    done
+
+    [[ "${found}" == false ]] || fail "hard-coded brand names found in rendered documents"
+}
+
+check_rendered_documents() {
+    local markdown_dir="$1"
+    local -a markdown_files=()
+    local path
+
+    run_mdcheck "${markdown_dir}" false
+    check_brand_names "${markdown_dir}"
+
+    while IFS= read -r -d '' path; do
+        markdown_files+=("${path#"${markdown_dir}/"}")
+    done < <(find "${markdown_dir}" -type f -name '*.md' -print0 | LC_ALL=C sort -z)
+    [[ ${#markdown_files[@]} -gt 0 ]] || fail "no rendered Markdown documents found"
+
+    (
+        cd -- "${markdown_dir}"
+        cspell lint --show-suggestions \
+            -c "${SCRIPT_DIR}/scripts/cspell.json" \
+            --no-progress "${markdown_files[@]}"
+    )
+    markdownlint -c "${SCRIPT_DIR}/scripts/markdownlint.yml" "${markdown_dir}"
+}
+
+if [[ "${check_only}" == true ]]; then
+    require_command go
+    require_command cspell
+    require_command markdownlint
+    cspell_version="$(cspell --version)" || fail "unable to run cspell"
+    markdownlint_version="$(markdownlint --version)" || fail "unable to run markdownlint"
+    echo "cspell ${cspell_version}"
+    echo "markdownlint ${markdownlint_version}"
+    run_mdcheck "${EXPORT_DIR}/zh" true
+    run_mdcheck "${EXPORT_DIR}/en" true
+fi
 
 if ! diff -u <(list_documents "${EXPORT_DIR}/zh") <(list_documents "${EXPORT_DIR}/en"); then
     fail "zh/en document filenames differ"
@@ -130,7 +205,17 @@ for lang in zh en; do
 done
 
 unresolved="$({ grep -RnoE '\{\{\.[A-Za-z][A-Za-z0-9]*\}\}' "${stage_dir}" || true; })"
-[[ -z "${unresolved}" ]] || fail "unresolved template placeholders:\n${unresolved}"
+if [[ -n "${unresolved}" ]]; then
+    printf 'error: unresolved template placeholders:\n%s\n' "${unresolved}" >&2
+    exit 1
+fi
+
+if [[ "${check_only}" == true ]]; then
+    check_rendered_documents "${stage_dir}"
+    document_count="$(find "${stage_dir}" -type f -name '*.md' | wc -l)"
+    echo "Checked ${document_count} source and rendered documents"
+    exit 0
+fi
 
 document_count=0
 for lang in zh en; do

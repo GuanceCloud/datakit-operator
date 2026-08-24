@@ -60,6 +60,7 @@ test:
   only:
     - /^.*$/
   script:
+    - nvm use v16.14.0
     - make lint GOLINT_BINARY="$GOLANGCI_LINT_BIN"
   tags:
     - cloudcare-ft

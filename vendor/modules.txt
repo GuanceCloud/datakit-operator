@@ -1,3 +1,6 @@
+# github.com/GuanceCloud/mdcheck v0.0.2-0.20250110081153-61d47275e386
+## explicit; go 1.18
+github.com/GuanceCloud/mdcheck/check
 # github.com/ake-persson/mapslice-json v0.0.0-20210720081907-22c8edf57807
 ## explicit; go 1.16
 github.com/ake-persson/mapslice-json
@@ -129,6 +132,20 @@ github.com/stretchr/testify/assert/yaml
 # github.com/ugorji/go/codec v1.1.7
 ## explicit
 github.com/ugorji/go/codec
+# github.com/yuin/goldmark v1.5.4
+## explicit; go 1.18
+github.com/yuin/goldmark
+github.com/yuin/goldmark/ast
+github.com/yuin/goldmark/extension
+github.com/yuin/goldmark/extension/ast
+github.com/yuin/goldmark/parser
+github.com/yuin/goldmark/renderer
+github.com/yuin/goldmark/renderer/html
+github.com/yuin/goldmark/text
+github.com/yuin/goldmark/util
+# github.com/yuin/goldmark-meta v1.1.0
+## explicit; go 1.17
+github.com/yuin/goldmark-meta
 # gitlab.jiagouyun.com/cloudcare-tools/cliutils v0.0.0-20220928075050-6a94ccf938f8
 ## explicit; go 1.18
 gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger
