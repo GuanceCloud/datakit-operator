@@ -352,7 +352,7 @@ DataKit Operator 的 `envs` 支持将占位符转换为 Kubernetes 原生的环�
                     "POD_NAMESPACE": "{fieldRef:metadata.namespace}"
                 }
             }
-        }
+        ]
     }
 }
 ```

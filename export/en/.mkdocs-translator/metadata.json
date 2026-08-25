@@ -1,0 +1,79 @@
+{
+  "files": {
+    "datakit-operator.md": {
+      "last_translated": "2026-08-25T03:42:26.317544+00:00",
+      "source_hash": "5fdf14c814f6fbf62a5555c90cde95bb288eb2bcb204c8c9670cc67317ab8be3",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-asyncprofile.md": {
+      "last_translated": "2026-08-25T03:42:26.319958+00:00",
+      "source_hash": "e34b70bf6a8603091f4c31c1934a061d3500487234b92cc0423d14f5782a1f80",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-changelog.md": {
+      "last_translated": "2026-08-25T03:42:26.322940+00:00",
+      "source_hash": "344b20d392db3f0c24b63704e9987b4720d6fd656809b5d7f2708d1f1359c420",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-ddtrace.md": {
+      "last_translated": "2026-08-25T03:42:26.324985+00:00",
+      "source_hash": "f2b4364228dd93238dcdb3c8486d77d656cbbc2ddd45819c1624cf6d0788bc71",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-flameshot.md": {
+      "last_translated": "2026-08-25T03:42:26.328809+00:00",
+      "source_hash": "1accdb357805e726b4bf814a66dafb849865dc068732e7db3498ce67382f8a61",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-logfwd.md": {
+      "last_translated": "2026-08-25T03:42:26.332519+00:00",
+      "source_hash": "9abef4915cfa654db8d8ec8df3c741f6030475e9c424b04df1e7da057bdc63d1",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-logging.md": {
+      "last_translated": "2026-08-25T03:42:26.335059+00:00",
+      "source_hash": "182da99d3dff5398421f8429c4411399e83d0079156d4413ac783a7d20b963b7",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-pyspy.md": {
+      "last_translated": "2026-08-25T03:42:26.338128+00:00",
+      "source_hash": "ccf62175e725000c013a996199973dcd53cefe804085ee9ecb5c7fc25fef1493",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    },
+    "operator-v1.6.0-logfwd.md": {
+      "last_translated": "2026-08-25T03:42:26.339796+00:00",
+      "source_hash": "dd6a2a0337be22f1ea67f43d10b0ac5a8507a4b80ef532e2da47d1db3bb80ded",
+      "status": "success",
+      "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+      "translation_time": 0,
+      "usage": null
+    }
+  },
+  "target_language": "en",
+  "translation_fingerprint": "2d8794939c3a73c166a49b3411c84b7200a7455c61f6fb30fa9476340c8c93bd",
+  "version": 2
+}

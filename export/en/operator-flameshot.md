@@ -175,6 +175,8 @@ When `enable_prometheus_annotations` is set to `true` (it is `true` in the defau
 
 ## Example Case {#flameshot-example}
 
+> **Annotation usage**: For details about how `check_annotation` affects version annotations and the behavior of each annotation, see [Annotation Configuration Injection](datakit-operator.md#annotation-injection) and [`check_annotation` Configuration Item Explanation](datakit-operator.md#check-annotation-config).
+
 <!-- markdownlint-disable MD046 -->
 ???+ warning
 

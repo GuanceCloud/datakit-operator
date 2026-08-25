@@ -42,7 +42,7 @@ logfwd ->> logfwds: Collect and report logs
 
 > For Operator versions <= v1.6.0, please refer to [here](operator-v1.6.0-logfwd.md) for logfwd injection usage.
 
-Use `ClusterLoggingConfig` CRD for centralized log collection management: [:octicons-tag-24: Version-1.8.0](operator-changelog.md#cl-1.8.0)
+Use `ClusterLoggingConfig` CRD for centralized log collection management: [:octicons-tag-24: Version-1.7.0](operator-changelog.md#cl-1.7.0)
 
 - **Centralized Collection Configuration Management**: Supports listening to Kubernetes `ClusterLoggingConfig` CRD and exposing matching results for logfwd sidecar polling (sidecar defaults to making an HTTP request to Operator every 60 seconds, logfwd requires [:octicons-tag-24: Version-1.86.0](changelog-2025.md#cl-1.86.0)).
 - **Hot Updates & Granular Matching**: CRD selector (Namespace/Pod/Label/Container) changes take effect immediately without rebuilding Workloads.
@@ -284,6 +284,8 @@ Operator logfwd injection supports adding the following Annotations to applicati
 - `admission.datakit/logfwd.enabled`: Controls whether injection is allowed. Value `"false"` rejects injection; value `"true"` or unset allows injection (but requires matching rules and `log_configs` field to actually trigger injection).
 - ~~`admission.datakit/logfwd.log_configs`~~: [:octicons-tag-24: Version-1.7.0](operator-changelog.md#cl-1.7.0) Removed, log collection configuration should be fully managed via `ClusterLoggingConfig` CRD.
 - ~~`admission.datakit/logfwd.volume_paths`~~: [:octicons-tag-24: Version-1.7.0](operator-changelog.md#cl-1.7.0) Removed, log collection configuration should be fully managed via `ClusterLoggingConfig` CRD.
+
+> **Annotation usage**: For details about how `check_annotation` affects version annotations and the behavior of each annotation, see [Annotation Configuration Injection](datakit-operator.md#annotation-injection) and [`check_annotation` Configuration Item Explanation](datakit-operator.md#check-annotation-config).
 
 <!-- markdownlint-disable MD046 -->
 ???+ warning

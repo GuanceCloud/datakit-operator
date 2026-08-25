@@ -5,6 +5,8 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly EXPORT_DIR="${SCRIPT_DIR}/export"
 readonly CONFIG_FILE="${EXPORT_DIR}/config.env"
+readonly -a LANGUAGES=(zh en ja ko)
+readonly -a TRANSLATED_LANGUAGES=(en ja ko)
 
 doc_repo="${HOME}/git/dataflux-doc"
 check_only=false
@@ -52,7 +54,12 @@ shift $((OPTIND - 1))
 
 [[ $# -eq 0 ]] || fail "unexpected argument: $1"
 [[ -f "${CONFIG_FILE}" ]] || fail "missing config: ${CONFIG_FILE}"
-[[ -d "${EXPORT_DIR}/zh" && -d "${EXPORT_DIR}/en" ]] || fail "missing zh/en document sources"
+
+declare -a language_dirs=()
+for lang in "${LANGUAGES[@]}"; do
+    [[ -d "${EXPORT_DIR}/${lang}" ]] || fail "missing ${lang} document sources"
+    language_dirs+=("${EXPORT_DIR}/${lang}")
+done
 
 if [[ "${check_only}" == false ]]; then
     [[ -d "${doc_repo}" ]] || fail "dataflux-doc directory does not exist: ${doc_repo}"
@@ -89,6 +96,16 @@ run_mdcheck() {
     )
 }
 
+run_translation_check() {
+    (
+        cd -- "${SCRIPT_DIR}"
+        GOFLAGS=-mod=vendor go run ./cmd/doctranslationcheck \
+            -root "${EXPORT_DIR}" \
+            -source-language zh \
+            -target-languages en,ja,ko
+    )
+}
+
 check_brand_names() {
     local markdown_dir="$1"
     local keyword
@@ -112,16 +129,17 @@ check_rendered_documents() {
     local -a markdown_files=()
     local path
 
-    run_mdcheck "${markdown_dir}" false
+    run_mdcheck "${markdown_dir}/zh" false
+    run_mdcheck "${markdown_dir}/en" false
     check_brand_names "${markdown_dir}"
 
     while IFS= read -r -d '' path; do
-        markdown_files+=("${path#"${markdown_dir}/"}")
-    done < <(find "${markdown_dir}" -type f -name '*.md' -print0 | LC_ALL=C sort -z)
+        markdown_files+=("${path#"${markdown_dir}/en/"}")
+    done < <(find "${markdown_dir}/en" -type f -name '*.md' -print0 | LC_ALL=C sort -z)
     [[ ${#markdown_files[@]} -gt 0 ]] || fail "no rendered Markdown documents found"
 
     (
-        cd -- "${markdown_dir}"
+        cd -- "${markdown_dir}/en"
         cspell lint --show-suggestions \
             -c "${SCRIPT_DIR}/scripts/cspell.json" \
             --no-progress "${markdown_files[@]}"
@@ -139,15 +157,18 @@ if [[ "${check_only}" == true ]]; then
     echo "markdownlint ${markdownlint_version}"
     run_mdcheck "${EXPORT_DIR}/zh" true
     run_mdcheck "${EXPORT_DIR}/en" true
+    run_translation_check
 fi
 
-if ! diff -u <(list_documents "${EXPORT_DIR}/zh") <(list_documents "${EXPORT_DIR}/en"); then
-    fail "zh/en document filenames differ"
-fi
+for lang in "${TRANSLATED_LANGUAGES[@]}"; do
+    if ! diff -u <(list_documents "${EXPORT_DIR}/zh") <(list_documents "${EXPORT_DIR}/${lang}"); then
+        fail "zh/${lang} document filenames differ"
+    fi
 
-if ! diff -u <(list_placeholders "${EXPORT_DIR}/zh") <(list_placeholders "${EXPORT_DIR}/en"); then
-    fail "zh/en template placeholders differ"
-fi
+    if ! diff -u <(list_placeholders "${EXPORT_DIR}/zh") <(list_placeholders "${EXPORT_DIR}/${lang}"); then
+        fail "zh/${lang} template placeholders differ"
+    fi
+done
 
 declare -A config_values=()
 declare -a config_keys=()
@@ -175,7 +196,7 @@ done <"${CONFIG_FILE}"
 declare -a sed_expressions=()
 for key in "${config_keys[@]}"; do
     placeholder="{{.${key}}}"
-    if ! grep -RFq --include='*.md' -- "${placeholder}" "${EXPORT_DIR}/zh" "${EXPORT_DIR}/en"; then
+    if ! grep -RFq --include='*.md' -- "${placeholder}" "${language_dirs[@]}"; then
         fail "unused config key: ${key}"
     fi
 
@@ -188,9 +209,11 @@ done
 
 stage_dir="$(mktemp -d)"
 trap 'rm -rf -- "${stage_dir}"' EXIT
-mkdir -p "${stage_dir}/zh" "${stage_dir}/en"
+for lang in "${LANGUAGES[@]}"; do
+    mkdir -p "${stage_dir}/${lang}"
+done
 
-for lang in zh en; do
+for lang in "${LANGUAGES[@]}"; do
     while IFS= read -r filename; do
         source_file="${EXPORT_DIR}/${lang}/${filename}"
         rendered_file="${stage_dir}/${lang}/${filename}"
@@ -218,7 +241,7 @@ if [[ "${check_only}" == true ]]; then
 fi
 
 document_count=0
-for lang in zh en; do
+for lang in "${LANGUAGES[@]}"; do
     target_dir="${doc_repo}/docs/${lang}/datakit"
     [[ -d "${doc_repo}/docs/${lang}" ]] || fail "missing dataflux-doc language directory: docs/${lang}"
     mkdir -p "${target_dir}"
@@ -229,4 +252,4 @@ for lang in zh en; do
     done < <(list_documents "${stage_dir}/${lang}")
 done
 
-echo "Exported ${document_count} documents to ${doc_repo}/docs/{zh,en}/datakit"
+echo "Exported ${document_count} documents to ${doc_repo}/docs/{zh,en,ja,ko}/datakit"

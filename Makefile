@@ -1,6 +1,6 @@
 default: local
 
-.PHONY: check_rc_version docs_lint pub_rc_image
+.PHONY: check_rc_version docs_lint docs_translate pub_rc_image
 
 VERSION=v1.8.10
 RC_VERSION ?=
@@ -176,6 +176,9 @@ lint: deps test docs_lint
 
 docs_lint:
 	@bash export.sh -c
+
+docs_translate:
+	@bash scripts/translate-docs.sh
 
 deps: check_go_version prepare gofmt
 

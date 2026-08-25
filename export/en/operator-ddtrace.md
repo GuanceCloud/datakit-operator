@@ -266,6 +266,7 @@ The following conditions must be met to perform injection:
     ```json
     {
         "namespace_selectors": [],
+        "check_annotation": false,
         "label_selectors": [],
         "image": "{{.DDTraceJavaImage}}",
         "language": "java",

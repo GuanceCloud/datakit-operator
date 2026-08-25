@@ -352,7 +352,7 @@ For example, if there is a Pod named `nginx-123` in the `middleware` namespace, 
                     "POD_NAMESPACE": "{fieldRef:metadata.namespace}"
                 }
             }
-        }
+        ]
     }
 }
 ```
