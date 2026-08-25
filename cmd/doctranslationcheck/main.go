@@ -174,7 +174,7 @@ func checkTranslations(root, sourceLanguage string, targetLanguages []string) er
 			return err
 		}
 		if !sameStrings(sourceDocuments, targetDocuments) {
-			return fmt.Errorf("Markdown document filenames differ in %s and %s", sourceDir, targetDir)
+			return fmt.Errorf("markdown document filenames differ in %s and %s", sourceDir, targetDir)
 		}
 
 		metadata, err := loadMetadata(root, language)
