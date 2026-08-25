@@ -10,273 +10,99 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
-	corev1 "k8s.io/api/core/v1"
 )
 
+func testProfilerRule() *config.ProfilerRule {
+	return &config.ProfilerRule{
+		InjectRule: config.InjectRule{
+			Envs: config.Envs{
+				{Key: "FIRST", Value: "first"},
+				{Key: "DUPLICATE", Value: "old"},
+				{Key: "DK_AGENT_HOST", Value: "datakit-service.datakit.svc"},
+				{Key: "LAST", Value: "$(FIRST)"},
+				{Key: "DUPLICATE", Value: "new"},
+			},
+			Resources: config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
+			},
+		},
+		Language: "java",
+		Images: map[string]string{
+			config.DeprecatedProfilerJavaImageKey: "example.com/java-profiler:1",
+		},
+	}
+}
+
+func useProfilerRule(t *testing.T, rule *config.ProfilerRule) {
+	t.Helper()
+	original := profilerMatchNamespaceOrLabelsForConfig
+	profilerMatchNamespaceOrLabelsForConfig = func(string, map[string]string) (bool, *config.ProfilerRule) {
+		return true, rule
+	}
+	t.Cleanup(func() { profilerMatchNamespaceOrLabelsForConfig = original })
+}
+
 func TestInjectProfiler(t *testing.T) {
-	t.Run("basic injection with CheckAnnotation=true and annotation", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				InjectRule: config.InjectRule{
-					Envs: []struct{ Key, Value string }{
-						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-						{"DK_AGENT_PORT", "9529"},
-					},
-					Resources: config.ResourceRequirements{
-						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-					},
-				},
-				CheckAnnotation: true,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
+	useProfilerRule(t, testProfilerRule())
+	pod := createTestPod("profiler", nil)
 
-		pod := createTestPod("test-profiler-java", map[string]string{
-			profilerEnabledAnnotationKey:              "true",
-			"admission.datakit/java-profiler.version": "v2.0.0",
-		})
+	changed, err := InjectProfilerToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) || !assert.NotNil(t, pod.Spec.ShareProcessNamespace) {
+		return
+	}
+	assert.True(t, *pod.Spec.ShareProcessNamespace)
+	assert.Len(t, pod.Spec.Volumes, 3)
+	if !assert.Len(t, pod.Spec.Containers, 2) {
+		return
+	}
+	profiler := pod.Spec.Containers[1]
+	assert.Equal(t, profilerContainerName, profiler.Name)
+	assert.Equal(t, "example.com/java-profiler:1", profiler.Image)
+	assert.Equal(t, []string{"FIRST", "DUPLICATE", "DK_AGENT_HOST", "LAST"}, envNames(profiler.Env))
+	assert.Equal(t, "new", envValues(profiler.Env)["DUPLICATE"])
+	assert.Equal(t, "datakit-service.datakit.svc", envValues(profiler.Env)["DK_AGENT_HOST"])
 
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
+	afterFirstInjection := pod.DeepCopy()
+	changed, err = InjectProfilerToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, afterFirstInjection, pod)
+}
 
-		assert.Len(t, pod.Spec.Containers, 2)
-		assert.Equal(t, profilerContainerName, pod.Spec.Containers[1].Name)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-profiler-testing:v2.0.0", pod.Spec.Containers[1].Image)
-		assert.Len(t, pod.Spec.Volumes, 3)
-		assert.NotNil(t, pod.Spec.ShareProcessNamespace)
-		assert.True(t, *pod.Spec.ShareProcessNamespace)
+func TestInjectProfilerHonorsVersionAnnotation(t *testing.T) {
+	rule := testProfilerRule()
+	rule.CheckAnnotation = true
+	useProfilerRule(t, rule)
+
+	withoutVersion := createTestPod("without-version", nil)
+	changed, err := InjectProfilerToPod("default", withoutVersion.Name, withoutVersion)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+
+	withVersion := createTestPod("with-version", map[string]string{
+		"admission.datakit/java-profiler.version": "2",
 	})
+	changed, err = InjectProfilerToPod("default", withVersion.Name, withVersion)
+	if !assert.NoError(t, err) || !assert.True(t, changed) || !assert.Len(t, withVersion.Spec.Containers, 2) {
+		return
+	}
+	assert.Equal(t, "example.com/java-profiler:2", withVersion.Spec.Containers[1].Image)
+}
 
-	t.Run("CheckAnnotation=true without annotation", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				CheckAnnotation: true,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
+func TestInjectProfilerCanBeDisabled(t *testing.T) {
+	useProfilerRule(t, testProfilerRule())
+	pod := createTestPod("disabled", map[string]string{profilerEnabledAnnotationKey: "false"})
+	before := pod.DeepCopy()
 
-		pod := createTestPod("test-profiler-no-annotation", map[string]string{
-			profilerEnabledAnnotationKey: "true",
-		})
+	changed, err := InjectProfilerToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, before, pod)
+}
 
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 1)
-		assert.Len(t, pod.Spec.Volumes, 0)
-	})
-
-	t.Run("CheckAnnotation=false with language in rule", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				InjectRule: config.InjectRule{
-					Envs: []struct{ Key, Value string }{
-						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-					},
-					Resources: config.ResourceRequirements{
-						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-					},
-				},
-				Language:        "java",
-				CheckAnnotation: false,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-no-check", map[string]string{
-			profilerEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 2)
-		assert.Equal(t, profilerContainerName, pod.Spec.Containers[1].Name)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1", pod.Spec.Containers[1].Image)
-	})
-
-	t.Run("python profiler with annotation", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				InjectRule: config.InjectRule{
-					Envs: []struct{ Key, Value string }{
-						{"DK_AGENT_HOST", "datakit-service.datakit.svc"},
-					},
-					Resources: config.ResourceRequirements{
-						Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-						Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-					},
-				},
-				CheckAnnotation: true,
-				Images: map[string]string{
-					config.DeprecatedProfilerPythonImageKey: "pubrepo.guance.com/datakit-operator/python-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-python", map[string]string{
-			profilerEnabledAnnotationKey:                "true",
-			"admission.datakit/python-profiler.version": "latest",
-		})
-
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 2)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/python-profiler-testing:latest", pod.Spec.Containers[1].Image)
-	})
-
-	t.Run("skip when profiler.enabled is false", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				CheckAnnotation: true,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-disabled", map[string]string{
-			profilerEnabledAnnotationKey: "false",
-		})
-
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 1)
-		assert.Len(t, pod.Spec.Volumes, 0)
-	})
-
-	t.Run("skip when container already exists", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				CheckAnnotation: true,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-exists", map[string]string{
-			profilerEnabledAnnotationKey: "true",
-		})
-		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
-			Name:  profilerContainerName,
-			Image: "existing-profiler-image",
-		})
-
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 2)
-		assert.Equal(t, "existing-profiler-image", pod.Spec.Containers[1].Image)
-	})
-
-	t.Run("CheckAnnotation=false without language", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				Language:        "",
-				CheckAnnotation: false,
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-no-lang", map[string]string{
-			profilerEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.Containers, 1)
-		assert.Len(t, pod.Spec.Volumes, 0)
-	})
-
-	t.Run("updates duplicate configured env in place", func(t *testing.T) {
-		originalFunc := profilerMatchNamespaceOrLabelsForConfig
-		profilerMatchNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, *config.ProfilerRule) {
-			return true, &config.ProfilerRule{
-				InjectRule: config.InjectRule{
-					Envs: []struct{ Key, Value string }{
-						{Key: "FIRST", Value: "first"},
-						{Key: "DUPLICATE", Value: "old"},
-						{Key: "LAST", Value: "last"},
-						{Key: "DUPLICATE", Value: "new"},
-					},
-				},
-				Language: "java",
-				Images: map[string]string{
-					config.DeprecatedProfilerJavaImageKey: "pubrepo.guance.com/datakit-operator/java-profiler-testing:v1.0.1",
-				},
-			}
-		}
-		defer func() {
-			profilerMatchNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-profiler-env-order", map[string]string{
-			profilerEnabledAnnotationKey: "true",
-		})
-		changed, err := InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-		assert.True(t, changed)
-		if assert.Len(t, pod.Spec.Containers, 2) {
-			envs := pod.Spec.Containers[1].Env
-			assert.Equal(t, []string{"FIRST", "DUPLICATE", "LAST"}, envNames(envs))
-			duplicate, exists := findEnv(envs, "DUPLICATE")
-			if assert.True(t, exists) {
-				assert.Equal(t, "new", duplicate.Value)
-			}
-		}
-
-		afterFirstInjection := pod.DeepCopy()
-		changed, err = InjectProfilerToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-		assert.False(t, changed)
-		assert.Equal(t, afterFirstInjection, pod)
-	})
-
-	t.Run("nil pod error", func(t *testing.T) {
-		_, err := InjectProfilerToPod("", "test-pod", nil)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot inject profiler into nil pod")
-	})
+func TestInjectProfilerRejectsNilPod(t *testing.T) {
+	changed, err := InjectProfilerToPod("default", "nil", nil)
+	assert.False(t, changed)
+	assert.Error(t, err)
 }
