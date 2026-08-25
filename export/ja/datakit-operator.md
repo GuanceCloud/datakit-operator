@@ -160,10 +160,12 @@ curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=eb
 
 - 同じ配列内の複数の selector は OR 条件で評価されます。
 - 両方の配列を設定した場合、namespace と label の両方が一致する必要があります。
-- 両方の配列が空の場合、そのルールでは注入されません。一部の単一マッチ機能では後続ルールの確認も停止するため、空のルールを残さないでください。
-- 一方だけを設定した場合は、その条件だけで照合します。
+- 注入ルールで一方の条件だけを設定した場合は、その条件だけで照合します。どちらも設定していない場合は現在のルールを無効にし、後続ルールの確認を続けます。
+- Logging mutation ルールでは両方の条件が必要です。どちらか一方がない場合は現在のルールを無効にします。
 
 `namespace_selectors` には Go の正規表現を使用します。文字列 `"*"` はすべての Namespace に一致する省略表記です。完全一致には `^` と `$` の使用を推奨します。`label_selectors` には Kubernetes Label Selector 構文を使用し、`=`、`==`、`!=` では glob マッチングも利用できます。
+
+空文字列、空白のみの値、無効な Namespace 正規表現、および無効または制約が空の Label selector は無効な項目です。Operator は起動時に warning を記録して各無効項目を無視します。設定済みの条件に有効な項目が残らない場合は現在のルールを無効にし、後続ルールの確認を続けます。すべての Namespace に明示的に一致させるには `"*"` を使用してください。
 
 次のルールは、`production` Namespace 内で `admission.datakit/ddtrace-language=java` ラベルを持つ Pod だけに一致します。
 

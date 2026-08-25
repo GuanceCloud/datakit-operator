@@ -117,6 +117,45 @@ func TestMutateRequest_NoPatchWhenPodIsNotMutated(t *testing.T) {
 	assert.Empty(t, patches)
 }
 
+func TestMutateRequest_InvalidSelectorReturnsEmptyPatch(t *testing.T) {
+	originalConfig := config.Cfg
+	config.Cfg = &config.Configuration{
+		AdmissionInject: config.AdmissionInjectConfig{
+			DDTraces: config.DDTraceRules{
+				{
+					InjectRule: config.InjectRule{
+						Selector: config.Selector{Namespaces: []string{""}},
+						Image:    "dd-lib-python-init:test",
+					},
+					Language: "python",
+				},
+			},
+		},
+	}
+	defer func() {
+		config.Cfg = originalConfig
+	}()
+	assert.NoError(t, config.Cfg.Setup())
+
+	rawPod := []byte(`{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {"name": "test-invalid-selector", "namespace": "default"},
+  "spec": {"containers": [{"name": "app", "image": "python:3.10-slim"}]}
+}`)
+	req := &admissionv1.AdmissionRequest{
+		Operation: admissionv1.Create,
+		Namespace: "default",
+		Resource:  podResource,
+		Object:    runtime.RawExtension{Raw: rawPod},
+	}
+
+	patchBytes, err := mutateRequest(req)
+
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(patchBytes))
+}
+
 func TestMutateRequest_UpdateReturnsEmptyPatch(t *testing.T) {
 	rawPod := []byte(`{
   "apiVersion": "v1",

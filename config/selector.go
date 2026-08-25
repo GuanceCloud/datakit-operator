@@ -7,6 +7,7 @@ package config
 
 import (
 	"regexp"
+	"strings"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/labels"
 )
@@ -19,23 +20,55 @@ type Selector struct {
 }
 
 func (s *Selector) Setup() {
-	for _, namespaceSelector := range s.Namespaces {
+	s.setup("selector", 0, "")
+}
+
+func (s *Selector) setup(ruleset string, ruleIndex int, ruleName string) {
+	s.namespaceSelectors = nil
+	s.labelSelectors = nil
+
+	for selectorIndex, namespaceSelector := range s.Namespaces {
+		if strings.TrimSpace(namespaceSelector) == "" {
+			log.Warnf("invalid admission selector: ruleset=%s rule_index=%d rule_name=%q selector=namespace selector_index=%d value=%q reason=blank",
+				ruleset, ruleIndex, ruleName, selectorIndex, namespaceSelector)
+			continue
+		}
 		ns := replaceAsteriskWithDotAsterisk(namespaceSelector)
 		re, err := regexp.Compile(ns)
 		if err != nil {
-			log.Warnf("Unexpected namespaceSelector '%s', compile error: %s", ns, err)
+			log.Warnf("invalid admission selector: ruleset=%s rule_index=%d rule_name=%q selector=namespace selector_index=%d value=%q reason=compile_error error=%q",
+				ruleset, ruleIndex, ruleName, selectorIndex, namespaceSelector, err)
 			continue
 		}
 		s.namespaceSelectors = append(s.namespaceSelectors, re)
 	}
 
-	for _, labelSelector := range s.Labels {
+	for selectorIndex, labelSelector := range s.Labels {
 		p, err := labels.Parse(labelSelector)
 		if err != nil {
-			log.Warnf("Unexpected labelSelector '%s', parse error: %s", labelSelector, err)
+			log.Warnf("invalid admission selector: ruleset=%s rule_index=%d rule_name=%q selector=label selector_index=%d value=%q reason=parse_error error=%q",
+				ruleset, ruleIndex, ruleName, selectorIndex, labelSelector, err)
+			continue
+		}
+		if p.Empty() {
+			reason := "empty"
+			if strings.TrimSpace(labelSelector) == "" {
+				reason = "blank"
+			}
+			log.Warnf("invalid admission selector: ruleset=%s rule_index=%d rule_name=%q selector=label selector_index=%d value=%q reason=%s",
+				ruleset, ruleIndex, ruleName, selectorIndex, labelSelector, reason)
 			continue
 		}
 		s.labelSelectors = append(s.labelSelectors, p)
+	}
+
+	if len(s.Namespaces) > 0 && len(s.namespaceSelectors) == 0 {
+		log.Warnf("admission rule disabled: ruleset=%s rule_index=%d rule_name=%q reason=no_valid_namespace_selectors",
+			ruleset, ruleIndex, ruleName)
+	}
+	if len(s.Labels) > 0 && len(s.labelSelectors) == 0 {
+		log.Warnf("admission rule disabled: ruleset=%s rule_index=%d rule_name=%q reason=no_valid_label_selectors",
+			ruleset, ruleIndex, ruleName)
 	}
 }
 

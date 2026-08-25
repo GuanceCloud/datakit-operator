@@ -160,10 +160,12 @@ curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=eb
 
 - 同一数组中的多个 selector 按“或”匹配。
 - 两个数组同时配置时，namespace 和 label 两个维度都必须匹配。
-- 两个数组同时为空时，该规则不会注入；部分单匹配功能还会停止继续检查后续规则，因此不要保留空规则。
-- 只配置一个维度时，仅使用该维度匹配。
+- 注入规则只配置一个维度时，仅使用该维度匹配；两个维度都未配置时禁用当前规则并继续检查后续规则。
+- Logging mutation 规则需要同时配置两个维度，缺少任一维度时禁用当前规则。
 
 `namespace_selectors` 使用 Go 正则表达式。字符串 `"*"` 是匹配全部命名空间的简写；精确匹配建议使用 `^` 和 `$`。`label_selectors` 使用 Kubernetes Label Selector 语法，并为 `=`、`==` 和 `!=` 扩展了 glob 匹配。
+
+Selector 数组中的空字符串、纯空白、非法 namespace 正则以及非法或空约束 label selector 都是无效项。Operator 启动时会记录 warning 并忽略无效项；如果某个已配置维度没有剩余的有效项，则禁用当前规则并继续检查后续规则。需要显式匹配全部命名空间时请使用 `"*"`。
 
 下面的规则只匹配 `production` 命名空间中带有 `admission.datakit/ddtrace-language=java` 标签的 Pod：
 

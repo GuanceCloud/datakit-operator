@@ -6,6 +6,7 @@
 - OTel 注入遇到 `runAsNonRoot: true` 但未明确配置非零 `runAsUser` 时，跳过注入并记录可检索的 warning，避免业务 Pod 无法启动（#105）
 - 修复 DDTrace Java 在 Admission Webhook 重入时可能缺少 Agent 启动参数的问题（#100）
 - Operator 独立维护中文、英文、日文和韩文文档（#106）
+- 无效或空白的 Admission selector 现在会记录 warning 并仅禁用对应规则，避免意外扩大 Pod 匹配范围（#87）
 
 ## 1.8.10(2026-07-06) {#cl-1.8.10}
 

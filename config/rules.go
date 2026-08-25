@@ -70,7 +70,7 @@ func (r *InjectRule) commonRule() *InjectRule {
 }
 
 func (rs DDTraceRules) Setup() {
-	setupInjectRules(rs)
+	setupInjectRules("ddtraces", rs)
 }
 
 func (rs DDTraceRules) MatchesAll(ns string, labels map[string]string) (bool, []*DDTraceRule) {
@@ -78,7 +78,7 @@ func (rs DDTraceRules) MatchesAll(ns string, labels map[string]string) (bool, []
 }
 
 func (rs OTelRules) Setup() {
-	setupInjectRules(rs)
+	setupInjectRules("otels", rs)
 }
 
 func (rs OTelRules) MatchesAll(ns string, labels map[string]string) (bool, []*OTelRule) {
@@ -86,7 +86,7 @@ func (rs OTelRules) MatchesAll(ns string, labels map[string]string) (bool, []*OT
 }
 
 func (rs LogfwdRules) Setup() {
-	setupInjectRules(rs)
+	setupInjectRules("logfwds", rs)
 }
 
 func (rs LogfwdRules) Matches(ns string, labels map[string]string) (bool, *LogfwdRule) {
@@ -94,7 +94,7 @@ func (rs LogfwdRules) Matches(ns string, labels map[string]string) (bool, *Logfw
 }
 
 func (rs FlameshotRules) Setup() {
-	setupInjectRules(rs)
+	setupInjectRules("flameshots", rs)
 }
 
 func (rs FlameshotRules) Matches(ns string, labels map[string]string) (bool, *FlameshotRule) {
@@ -102,14 +102,14 @@ func (rs FlameshotRules) Matches(ns string, labels map[string]string) (bool, *Fl
 }
 
 func (rs ProfilerRules) Setup() {
-	setupInjectRules(rs)
+	setupInjectRules("profilers", rs)
 }
 
 func (rs ProfilerRules) Matches(ns string, labels map[string]string) (bool, *ProfilerRule) {
 	return matchInjectRule(rs, ns, labels)
 }
 
-func setupInjectRules[T injectRule](rs []T) {
+func setupInjectRules[T injectRule](ruleset string, rs []T) {
 	for idx := range rs {
 		rule := rs[idx].commonRule()
 		if rule.Resources.Nil() {
@@ -119,7 +119,11 @@ func setupInjectRules[T injectRule](rs []T) {
 			rule.Resources = defaultResourceRequirements()
 		}
 
-		rule.Setup()
+		rule.setup(ruleset, idx, rule.Name)
+		if len(rule.Namespaces) == 0 && len(rule.Labels) == 0 {
+			log.Warnf("admission rule disabled: ruleset=%s rule_index=%d rule_name=%q reason=no_selectors",
+				ruleset, idx, rule.Name)
+		}
 		rule.setupEnvs()
 	}
 }
@@ -128,10 +132,6 @@ func matchInjectRule[T injectRule](rs []T, ns string, labels map[string]string) 
 	var zero T
 	for idx := range rs {
 		rule := rs[idx].commonRule()
-		if len(rule.namespaceSelectors) == 0 && len(rule.labelSelectors) == 0 {
-			return false, zero
-		}
-
 		if injectRuleMatches(rule, ns, labels) {
 			return true, rs[idx]
 		}
@@ -143,10 +143,6 @@ func matchAllInjectRules[T injectRule](rs []T, ns string, labels map[string]stri
 	var rules []T
 	for idx := range rs {
 		rule := rs[idx].commonRule()
-		if len(rule.namespaceSelectors) == 0 && len(rule.labelSelectors) == 0 {
-			continue
-		}
-
 		if injectRuleMatches(rule, ns, labels) {
 			rules = append(rules, rs[idx])
 		}
@@ -155,6 +151,16 @@ func matchAllInjectRules[T injectRule](rs []T, ns string, labels map[string]stri
 }
 
 func injectRuleMatches(rule *InjectRule, ns string, labels map[string]string) bool {
+	if len(rule.Namespaces) == 0 && len(rule.Labels) == 0 {
+		return false
+	}
+	if len(rule.Namespaces) > 0 && len(rule.namespaceSelectors) == 0 {
+		return false
+	}
+	if len(rule.Labels) > 0 && len(rule.labelSelectors) == 0 {
+		return false
+	}
+
 	namespaceMatched := true
 	labelMatched := true
 
@@ -194,7 +200,13 @@ type (
 
 func (rs MutateRules) Setup() {
 	for idx := range rs {
-		rs[idx].Setup()
+		rs[idx].setup("loggings", idx, "")
+		if len(rs[idx].Namespaces) == 0 {
+			log.Warnf("admission rule disabled: ruleset=loggings rule_index=%d rule_name=%q reason=no_namespace_selectors", idx, "")
+		}
+		if len(rs[idx].Labels) == 0 {
+			log.Warnf("admission rule disabled: ruleset=loggings rule_index=%d rule_name=%q reason=no_label_selectors", idx, "")
+		}
 	}
 }
 

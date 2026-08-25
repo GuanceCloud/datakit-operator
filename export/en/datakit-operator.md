@@ -160,10 +160,12 @@ Every injection configuration must first match a Pod through selectors. An Annot
 
 - Multiple selectors in the same array are matched with OR.
 - When both arrays are configured, both the Namespace and Label dimensions must match.
-- When both arrays are empty, the rule does not inject. Some single-match features also stop checking subsequent rules, so do not retain empty rules.
-- When only one dimension is configured, only that dimension is used for matching.
+- When an injection rule configures only one dimension, only that dimension is used. If neither dimension is configured, the current rule is disabled and evaluation continues with subsequent rules.
+- Logging mutation rules require both dimensions. If either dimension is missing, the current rule is disabled.
 
 `namespace_selectors` uses Go regular expressions. The string `"*"` is shorthand for matching all Namespaces; use `^` and `$` for exact matches. `label_selectors` uses Kubernetes Label Selector syntax and extends `=`, `==`, and `!=` with glob matching.
+
+Empty strings, whitespace-only values, invalid Namespace regular expressions, and invalid or empty-constraint Label selectors are invalid entries. At startup, the Operator logs a warning and ignores each invalid entry. If a configured dimension has no valid entries left, the current rule is disabled and evaluation continues with subsequent rules. Use `"*"` to explicitly match all Namespaces.
 
 The following rule matches only Pods in the `production` Namespace that have the `admission.datakit/ddtrace-language=java` label:
 

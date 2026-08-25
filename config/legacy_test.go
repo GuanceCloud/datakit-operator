@@ -145,4 +145,10 @@ func TestConvertDeprecatedToAdmissionInject(t *testing.T) {
 
 	result := convertDeprecatedToAdmissionInject(input)
 	assert.Equal(t, expected, result)
+	assert.NoError(t, result.Setup())
+
+	matched, rule := result.Logfwds.Matches("any-namespace", nil)
+	if assert.True(t, matched) {
+		assert.Equal(t, "Used InjectV1 Config", rule.Name)
+	}
 }
