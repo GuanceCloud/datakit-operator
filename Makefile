@@ -1,6 +1,6 @@
 default: local
 
-.PHONY: check_rc_version pub_rc_image
+.PHONY: check_rc_version docs_lint pub_rc_image
 
 VERSION=v1.8.10
 RC_VERSION ?=
@@ -166,13 +166,16 @@ pub_rc_image: check_rc_version
 pub_uos_image:
 	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)
 
-lint: deps test
+lint: deps test docs_lint
 	$(call check_golint_version)
 	@bash scripts/check_copyright.sh
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \
 	fi
+
+docs_lint:
+	@bash export.sh -c
 
 deps: check_go_version prepare gofmt
 
