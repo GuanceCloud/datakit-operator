@@ -160,10 +160,12 @@ curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=eb
 
 - 같은 배열의 여러 selector는 OR로 평가합니다.
 - 두 배열을 모두 구성하면 namespace와 label 조건이 모두 일치해야 합니다.
-- 두 배열이 모두 비어 있으면 해당 규칙은 주입하지 않습니다. 일부 단일 일치 기능은 이후 규칙 검사도 중단하므로 빈 규칙을 남겨 두지 마십시오.
-- 한 조건만 구성하면 해당 조건만 사용하여 일치 여부를 판단합니다.
+- 주입 규칙에 한 조건만 구성하면 해당 조건만 사용하여 일치 여부를 판단합니다. 두 조건을 모두 구성하지 않으면 현재 규칙을 비활성화하고 이후 규칙 검사를 계속합니다.
+- Logging mutation 규칙에는 두 조건이 모두 필요합니다. 한 조건이라도 없으면 현재 규칙을 비활성화합니다.
 
 `namespace_selectors`는 Go 정규식을 사용합니다. 문자열 `"*"`는 모든 Namespace와 일치하는 축약형입니다. 정확히 일치시키려면 `^`와 `$`를 사용하는 것이 좋습니다. `label_selectors`는 Kubernetes Label Selector 구문을 사용하며 `=`, `==` 및 `!=`에 glob 일치 기능이 확장되어 있습니다.
+
+빈 문자열, 공백으로만 된 값, 잘못된 Namespace 정규식, 잘못되었거나 제약 조건이 비어 있는 Label selector는 유효하지 않은 항목입니다. Operator는 시작할 때 warning을 기록하고 각 잘못된 항목을 무시합니다. 구성된 조건에 유효한 항목이 하나도 남지 않으면 현재 규칙을 비활성화하고 이후 규칙 검사를 계속합니다. 모든 Namespace와 명시적으로 일치시키려면 `"*"`를 사용하십시오.
 
 다음 규칙은 `production` Namespace에서 `admission.datakit/ddtrace-language=java` Label이 있는 Pod에만 일치합니다.
 

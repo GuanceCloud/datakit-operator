@@ -6,6 +6,7 @@
 - OTel 주입 시 `runAsNonRoot: true`이지만 0이 아닌 `runAsUser`를 명시하지 않은 경우 주입을 건너뛰고 검색 가능한 warning을 기록하여 애플리케이션 Pod가 시작되지 않는 문제 방지 (#105)
 - Admission Webhook 재진입 시 DDTrace Java Agent 시작 인수가 누락될 수 있는 문제 수정 (#100)
 - Operator의 중국어, 영어, 일본어 및 한국어 문서를 독립적으로 관리 (#106)
+- 유효하지 않거나 비어 있는 Admission selector에 대해 warning을 기록하고 해당 규칙만 비활성화하여 Pod 일치 범위가 의도치 않게 확대되는 문제 방지 (#87)
 
 ## 1.8.10(2026-07-06) {#cl-1.8.10}
 

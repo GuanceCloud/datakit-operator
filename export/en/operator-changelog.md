@@ -6,6 +6,7 @@
 - When OTel injection encounters `runAsNonRoot: true` without an explicitly configured nonzero `runAsUser`, it now skips injection and logs a searchable warning, preventing the application Pod from failing to start (#105)
 - Fixed an issue where DDTrace Java Agent startup arguments could be missing when the Admission Webhook was re-entered (#100)
 - Operator documentation is now maintained independently in Chinese, English, Japanese, and Korean (#106)
+- Invalid or blank Admission selectors now log a warning and disable only the affected rule, preventing unintended expansion of the Pod match scope (#87)
 
 ## 1.8.10(2026-07-06) {#cl-1.8.10}
 
