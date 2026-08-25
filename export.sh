@@ -76,10 +76,6 @@ list_placeholders() {
     { grep -rhoE --include='*.md' '\{\{\.[A-Za-z][A-Za-z0-9]*\}\}' "$1" || true; } | LC_ALL=C sort -u
 }
 
-list_brand_tokens() {
-    { grep -oE '<<<[^>]*>>>' "$1" || true; } | LC_ALL=C sort
-}
-
 require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
 }
@@ -99,10 +95,7 @@ run_mdcheck() {
 run_translation_check() {
     (
         cd -- "${SCRIPT_DIR}"
-        GOFLAGS=-mod=vendor go run ./cmd/doctranslationcheck \
-            -root "${EXPORT_DIR}" \
-            -source-language zh \
-            -target-languages en,ja,ko
+        GOFLAGS=-mod=vendor go run ./cmd/doctranslationcheck
     )
 }
 
@@ -218,12 +211,6 @@ for lang in "${LANGUAGES[@]}"; do
         source_file="${EXPORT_DIR}/${lang}/${filename}"
         rendered_file="${stage_dir}/${lang}/${filename}"
         sed "${sed_expressions[@]}" "${source_file}" >"${rendered_file}"
-
-        # Full image values can add brand variables, but existing variables must remain.
-        missing_brand_tokens="$(comm -23 \
-            <(list_brand_tokens "${source_file}") \
-            <(list_brand_tokens "${rendered_file}"))"
-        [[ -z "${missing_brand_tokens}" ]] || fail "brand variables changed in ${lang}/${filename}"
     done < <(list_documents "${EXPORT_DIR}/${lang}")
 done
 

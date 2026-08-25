@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,22 +107,22 @@ func checkProtectedSyntax(sourceLanguage, targetLanguage, name string, source, t
 		}
 	}
 
-	sourceStructures, err := fencedCodeStructures(source)
+	sourceBracketSignatures, err := fencedCodeBracketSignatures(source)
 	if err != nil {
-		return fmt.Errorf("read fenced code structure in %s/%s: %w", sourceLanguage, name, err)
+		return fmt.Errorf("read fenced code bracket signatures in %s/%s: %w", sourceLanguage, name, err)
 	}
-	targetStructures, err := fencedCodeStructures(target)
+	targetBracketSignatures, err := fencedCodeBracketSignatures(target)
 	if err != nil {
-		return fmt.Errorf("read fenced code structure in %s/%s: %w", targetLanguage, name, err)
+		return fmt.Errorf("read fenced code bracket signatures in %s/%s: %w", targetLanguage, name, err)
 	}
-	if !sameStrings(sourceStructures, targetStructures) {
-		return fmt.Errorf("fenced code structure differs in %s/%s and %s/%s", sourceLanguage, name, targetLanguage, name)
+	if !sameStrings(sourceBracketSignatures, targetBracketSignatures) {
+		return fmt.Errorf("fenced code bracket signatures differ in %s/%s and %s/%s", sourceLanguage, name, targetLanguage, name)
 	}
 	return nil
 }
 
-func fencedCodeStructures(content []byte) ([]string, error) {
-	var structures []string
+func fencedCodeBracketSignatures(content []byte) ([]string, error) {
+	var signatures []string
 	var brackets strings.Builder
 	var fenceMarker byte
 	var fenceLength int
@@ -140,7 +139,7 @@ func fencedCodeStructures(content []byte) ([]string, error) {
 			continue
 		}
 		if match != nil && match[1][0] == fenceMarker && len(match[1]) >= fenceLength {
-			structures = append(structures, brackets.String())
+			signatures = append(signatures, brackets.String())
 			fenceMarker = 0
 			fenceLength = 0
 			continue
@@ -154,7 +153,7 @@ func fencedCodeStructures(content []byte) ([]string, error) {
 	if fenceMarker != 0 {
 		return nil, errors.New("unclosed Markdown code fence")
 	}
-	return structures, nil
+	return signatures, nil
 }
 
 func checkTranslations(root, sourceLanguage string, targetLanguages []string) error {
@@ -212,17 +211,7 @@ func checkTranslations(root, sourceLanguage string, targetLanguages []string) er
 }
 
 func main() {
-	root := flag.String("root", "export", "root directory containing language document directories")
-	sourceLanguage := flag.String("source-language", "zh", "source language directory")
-	targetLanguageList := flag.String("target-languages", "en,ja,ko", "comma-separated translated language directories")
-	flag.Parse()
-	if flag.NArg() != 0 {
-		flag.Usage()
-		os.Exit(2)
-	}
-
-	targetLanguages := strings.Split(*targetLanguageList, ",")
-	if err := checkTranslations(*root, *sourceLanguage, targetLanguages); err != nil {
+	if err := checkTranslations("export", "zh", []string{"en", "ja", "ko"}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

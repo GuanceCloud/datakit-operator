@@ -55,7 +55,7 @@ func TestCheckTranslationsRejectsChangedProtectedSyntax(t *testing.T) {
 	}
 }
 
-func TestCheckTranslationsRejectsChangedFencedCodeStructure(t *testing.T) {
+func TestCheckTranslationsRejectsChangedFencedCodeBracketSignatures(t *testing.T) {
 	root := t.TempDir()
 	source := "```json\n{\"rules\":[{\"name\":\"demo\"}]}\n```\n"
 	writeDocument(t, root, "zh", "guide.md", source)
@@ -63,8 +63,8 @@ func TestCheckTranslationsRejectsChangedFencedCodeStructure(t *testing.T) {
 	writeMetadata(t, root, "ko", map[string]string{"guide.md": sourceHash(source)})
 
 	err := checkTranslations(root, "zh", []string{"ko"})
-	if err == nil || !strings.Contains(err.Error(), "fenced code structure differs") {
-		t.Fatalf("checkTranslations() error = %v, want fenced code structure error", err)
+	if err == nil || !strings.Contains(err.Error(), "fenced code bracket signatures differ") {
+		t.Fatalf("checkTranslations() error = %v, want fenced code bracket signature error", err)
 	}
 }
 
