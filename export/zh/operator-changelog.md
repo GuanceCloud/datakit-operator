@@ -1,5 +1,16 @@
 # Operator 更新记录
 
+## 1.9.0（待发布） {#cl-1.9.0}
+
+- 支持为 Java、Python 和 Node.js 应用注入 OpenTelemetry 自动探针（#98、#101、#102）
+- OTel 注入遇到 `runAsNonRoot: true` 但未明确配置非零 `runAsUser` 时，跳过注入并记录可检索的 warning，避免业务 Pod 无法启动（#105）
+- 修复 DDTrace Java 在 Admission Webhook 重入时可能缺少 Agent 启动参数的问题（#100）
+- Operator 独立维护中文、英文、日文和韩文文档（#106）
+
+## 1.8.10(2026-07-06) {#cl-1.8.10}
+
+- 支持通过 `secretKeyRef` 引用 Kubernetes Secret 注入环境变量（#95）
+
 ## 1.8.9(2026-06-23) {#cl-1.8.9}
 
 - 优化 Cluster API Pod 查询性能，支持面向 eBPF 的精简视图，降低大规模集群下的响应体大小和解析开销（#94）
@@ -36,7 +47,7 @@
 ## 1.8.1(2026-02-11) {#cl-1.8.1}
 
 - 支持以 `resourceFieldRef` 格式注入环境变量，现可引用容器资源限制与请求值，包括 limits.cpu、limits.memory、requests.cpu、requests.memory（#84）
-- 支持注入 Python ddtrace agent（#81）
+- 支持注入 Python ddtrace agent（#82）
 - 提供代理 API 接口，用于获取本集群内 Pod 的相关数据（#79）
 
 ## 1.8.0(2026-01-29) {#cl-1.8.0}
@@ -99,7 +110,7 @@
 
 ## 1.5.13(2025-03-31) {#cl-1.5.13}
 
-- 支持正则表达式匹配 namespace 和 labels，以注入 DDtrace 和 Profiler（#58）
+- 支持正则表达式匹配 namespace 和 labels，以注入 DDTrace 和 Profiler（#58）
 - 支持正则表达式匹配 namespace 和 labels 注入 logging 配置（#59）
 
 ## 1.5.12(2025-02-28) {#cl-1.5.12}
@@ -174,7 +185,7 @@
 
 ## 1.4.0(2023-09-13) {#cl-1.4.0}
 
-- 支持以 Kubernetes DownloadAPI FieldRef 的方式配置环境变量 (#26)
+- 支持以 Kubernetes Downward API FieldRef 的方式配置环境变量 (#26)
 - ddtrace 默认添加 DD_TAGS (#26)
 
 ## 1.3.1(2023-08-24) {#cl-1.3.1}

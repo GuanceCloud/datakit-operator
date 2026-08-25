@@ -1,78 +1,91 @@
 # DataKit Operator 注入日志采集配置
 
-DataKit Operator 可以为指定的 Pod 自动添加 DataKit Logging 采集所需的配置，包括 `datakit/logs` 注解和对应的文件路径 volume/volumeMount，简化了手动配置的繁杂步骤。这样，用户无需手动干预每个 Pod 配置即可自动启用日志采集功能。
+DataKit Operator 可以为新建 Pod 添加 `datakit/logs` Annotation，并根据文件日志路径创建或复用 EmptyDir 卷。这样无需在每个 Deployment 中重复维护日志 Annotation 和目录挂载。
 
-以下是一个配置示例，展示了如何通过 DataKit Operator 的 `admission_mutate` 配置来实现日志采集配置的自动注入：
+该功能适用于 DataKit 直接采集 Kubernetes Pod 文件日志。需要 Sidecar 将日志转发到 DataKit 时，请使用 [logfwd 注入](operator-logfwd.md)。
+
+## Operator 配置 {#logging-config}
+
+在 `admission_mutate.loggings` 中添加规则：
 
 ```json
 {
-    "server_listen": "0.0.0.0:9543",
-    "log_level":     "info",
-    "admission_inject": {
-        # 其他配置
-    },
     "admission_mutate": {
         "loggings": [
             {
-                "namespace_selectors": ["middleware"],
-                "label_selectors":     ["app=logging"],
-                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/tmp/opt/**/*.log\",\"source\":\"logging-tmp\"}]"
+                "namespace_selectors": ["^middleware$"],
+                "label_selectors": ["app=logging"],
+                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/var/log/app/*.log\",\"source\":\"logging-demo\"}]"
             }
         ]
     }
 }
 ```
 
-`admission_mutate.loggings`：这是一个对象数组，包含多个日志采集配置。每个日志配置包括以下字段：
+| 字段 | 说明 |
+| --- | --- |
+| `namespace_selectors` | Namespace 正则数组，必须至少配置一个可匹配项 |
+| `label_selectors` | Pod Label Selector 数组，必须至少配置一个可匹配项 |
+| `config` | 写入 `datakit/logs` 的 JSON 数组字符串 |
 
-- `namespace_selectors`：限定符合条件的 Pod 所在的 Namespacce。可以设置多个 Namespace，Pod 必须匹配至少一个 Namespace 才会被选中。与 `label_selectors` 是“或”的关系。
-- `label_selectors`：限定符合条件的 Pod 的 label。Pod 必须匹配至少一个 label selector 才会被选中。与 `namespace_selectors` 是“或”的关系。
-- `config`：这是一个 JSON 字符串，它将被添加到 Pod 的注解中，注解的 Key 是 `datakit/logs`。如果该 Key 已经存在，它不会被覆盖或重复添加。这个配置将告诉 DataKit 如何采集日志。
+Namespace 和 Label 两个维度必须同时匹配。同一维度中的多个 selector 按“或”匹配；多条规则按配置顺序使用第一条匹配项。
 
-DataKit Operator 会自动解析 `config` 配置，并根据其中的路径（`path`）为 Pod 创建对应的 volume 和 volumeMount。
+`config` 必须是有效 JSON。Operator 会解析其中未禁用的 `type: "file"` 配置，从 `path` 提取目录并进行挂载。`stdout` 配置只写入 Annotation，不需要新增卷。
 
-以上述 DataKit Operator 配置为例，如果发现某个 Pod 的 Namespace 是 `middleware`，或 Labels 匹配 `app=logging`，就在 Pod 新增注解和挂载。例如：
+## 注入结果 {#logging-injection-result}
 
-```yaml hl_lines="5"
-apiVersion: v1
-kind: Pod
+对于匹配上例的 Pod，Operator 会添加：
+
+```yaml
 metadata:
   annotations:
-    datakit/logs: '[{"disable":false,"type":"file","path":"/tmp/opt/**/*.log","source":"logging-tmp"}]'
-  labels:
-    app: logging
-  name: logging-test
-  namespace: default
+    datakit/logs: '[{"disable":false,"type":"file","path":"/var/log/app/*.log","source":"logging-demo"}]'
 spec:
   containers:
-  - args:
-    - |
-      mkdir -p /tmp/opt/log1;
-      i=1;
-      while true; do
-        echo "Writing logs to file ${i}.log";
-        for ((j=1;j<=10000000;j++)); do
-          echo "$(date +'%F %H:%M:%S')  [$j]  Bash For Loop Examples. Hello, world! Testing output." >> /tmp/opt/log1/file_${i}.log;
-          sleep 1;
-        done;
-        echo "Finished writing 5000000 lines to file_${i}.log";
-        i=$((i+1));
-      done
-    command:
-    - /bin/bash
-    - -c
-    - --
-    image: pubrepo.<<<custom_key.brand_main_domain>>>/base/ubuntu:18.04
-    imagePullPolicy: IfNotPresent
-    name: demo
-    volumeMounts:
-    - mountPath: /tmp/opt
-      name: datakit-logs-volume-0
+    - name: app
+      volumeMounts:
+        - name: datakit-logs-volume-0
+          mountPath: /var/log/app
   volumes:
-  - emptyDir: {}
-    name: datakit-logs-volume-0
+    - name: datakit-logs-volume-0
+      emptyDir: {}
 ```
 
-这个 Pod 存在 label `app=logging`，能够匹配上，于是 DataKit Operator 就给它添加了 `datakit/logs` 注解，并且将路径 `/tmp/opt` 添加 EmptyDir 挂载。
+Operator 会将目录挂载到所有普通业务容器：
 
-DataKit 日志采集发现到 Pod 后，就会根据 `datakit/logs` 内容进行定制化采集。
+- 如果该路径已经挂载 EmptyDir，则复用原有卷。
+- 如果没有对应挂载，则创建新的 EmptyDir。
+- 如果该路径已经使用其他类型的卷，则记录 warning 并跳过该路径。
+- 如果 Pod 已有 `datakit/logs` Annotation，则保留用户配置，不再修改 Annotation 或卷。
+
+## Deployment 示例 {#logging-example}
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logging-demo
+  namespace: middleware
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logging
+  template:
+    metadata:
+      labels:
+        app: logging
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.25
+```
+
+创建 Pod 后检查：
+
+```shell
+kubectl -n middleware get pod -l app=logging -o yaml
+kubectl logs -n datakit deployment/datakit-operator
+```
+
+最终 Pod 应包含 `datakit/logs` Annotation，以及 `/var/log/app` 对应的 EmptyDir 和挂载。修改规则后需要重新创建 Pod 才能生效。

@@ -1,78 +1,91 @@
 # DataKit Operator によるログ収集設定の注入
 
-DataKit Operator は、指定した Pod に DataKit Logging の収集に必要な設定を自動的に追加できます。これには、`datakit/logs` アノテーションと、対応するファイルパスの volume/volumeMount が含まれ、手動設定の煩雑な手順を簡素化します。これにより、ユーザーは各 Pod の設定を手動で変更することなく、ログ収集機能を自動的に有効化できます。
+DataKit Operator は、新規 Pod に `datakit/logs` Annotation を追加し、ファイルログのパスに基づいて EmptyDir ボリュームを作成または再利用できます。これにより、各 Deployment でログ Annotation とディレクトリのマウントを重複して管理する必要がなくなります。
 
-以下は、DataKit Operator の `admission_mutate` 設定を使用して、ログ収集設定を自動的に注入する方法を示す設定例です。
+この機能は、DataKit が Kubernetes Pod のファイルログを直接収集する場合に使用します。Sidecar から DataKit へログを転送する場合は、[logfwd の注入](operator-logfwd.md)を使用してください。
+
+## Operator の設定 {#logging-config}
+
+`admission_mutate.loggings` にルールを追加します。
 
 ```json
 {
-    "server_listen": "0.0.0.0:9543",
-    "log_level":     "info",
-    "admission_inject": {
-        # その他の設定
-    },
     "admission_mutate": {
         "loggings": [
             {
-                "namespace_selectors": ["middleware"],
-                "label_selectors":     ["app=logging"],
-                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/tmp/opt/**/*.log\",\"source\":\"logging-tmp\"}]"
+                "namespace_selectors": ["^middleware$"],
+                "label_selectors": ["app=logging"],
+                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/var/log/app/*.log\",\"source\":\"logging-demo\"}]"
             }
         ]
     }
 }
 ```
 
-`admission_mutate.loggings`：複数のログ収集設定を含むオブジェクト配列です。各ログ設定には、以下のフィールドが含まれます。
+| フィールド | 説明 |
+| --- | --- |
+| `namespace_selectors` | Namespace の正規表現配列。マッチ可能な項目を1つ以上指定する必要があります |
+| `label_selectors` | Pod Label Selector の配列。マッチ可能な項目を1つ以上指定する必要があります |
+| `config` | `datakit/logs` に書き込む JSON 配列文字列 |
 
-- `namespace_selectors`：条件に一致する Pod が属する Namespace を限定します。複数の Namespace を設定でき、Pod が選択されるには少なくとも 1 つの Namespace に一致する必要があります。`label_selectors` とは OR の関係です。
-- `label_selectors`：条件に一致する Pod の label を限定します。Pod が選択されるには、少なくとも 1 つの label selector に一致する必要があります。`namespace_selectors` とは OR の関係です。
-- `config`：Pod のアノテーションに追加される JSON 文字列です。アノテーションの Key は `datakit/logs` です。この Key がすでに存在する場合、上書きも重複追加もされません。この設定により、DataKit にログの収集方法を指定します。
+Namespace と Label の両方が一致する必要があります。同じ次元内の複数の selector は OR 条件で評価され、複数のルールでは設定順に最初に一致したものが使用されます。
 
-DataKit Operator は `config` 設定を自動的に解析し、その中のパス（`path`）に基づいて、Pod に対応する volume と volumeMount を作成します。
+`config` は有効な JSON である必要があります。Operator は、無効化されていない `type: "file"` 設定を解析し、`path` からディレクトリを抽出してマウントします。`stdout` 設定は Annotation に書き込まれるだけで、新しいボリュームは追加されません。
 
-上記の DataKit Operator 設定を例にすると、Pod の Namespace が `middleware` であるか、Labels が `app=logging` に一致する場合、Pod にアノテーションとマウントを追加します。例：
+## 注入結果 {#logging-injection-result}
 
-```yaml hl_lines="5"
-apiVersion: v1
-kind: Pod
+前述の例に一致する Pod には、Operator により次の内容が追加されます。
+
+```yaml
 metadata:
   annotations:
-    datakit/logs: '[{"disable":false,"type":"file","path":"/tmp/opt/**/*.log","source":"logging-tmp"}]'
-  labels:
-    app: logging
-  name: logging-test
-  namespace: default
+    datakit/logs: '[{"disable":false,"type":"file","path":"/var/log/app/*.log","source":"logging-demo"}]'
 spec:
   containers:
-  - args:
-    - |
-      mkdir -p /tmp/opt/log1;
-      i=1;
-      while true; do
-        echo "Writing logs to file ${i}.log";
-        for ((j=1;j<=10000000;j++)); do
-          echo "$(date +'%F %H:%M:%S')  [$j]  Bash For Loop Examples. Hello, world! Testing output." >> /tmp/opt/log1/file_${i}.log;
-          sleep 1;
-        done;
-        echo "Finished writing 5000000 lines to file_${i}.log";
-        i=$((i+1));
-      done
-    command:
-    - /bin/bash
-    - -c
-    - --
-    image: pubrepo.<<<custom_key.brand_main_domain>>>/base/ubuntu:18.04
-    imagePullPolicy: IfNotPresent
-    name: demo
-    volumeMounts:
-    - mountPath: /tmp/opt
-      name: datakit-logs-volume-0
+    - name: app
+      volumeMounts:
+        - name: datakit-logs-volume-0
+          mountPath: /var/log/app
   volumes:
-  - emptyDir: {}
-    name: datakit-logs-volume-0
+    - name: datakit-logs-volume-0
+      emptyDir: {}
 ```
 
-この Pod には `app=logging` label があり、条件に一致します。そのため、DataKit Operator は `datakit/logs` アノテーションを追加し、パス `/tmp/opt` を EmptyDir としてマウントします。
+Operator は、すべての通常のアプリケーションコンテナにディレクトリをマウントします。
 
-DataKit のログ収集機能が Pod を検出すると、`datakit/logs` の内容に基づいてカスタム収集を実行します。
+- 対象パスに EmptyDir がすでにマウントされている場合は、既存のボリュームを再利用します。
+- 対応するマウントがない場合は、新しい EmptyDir を作成します。
+- 対象パスで別の種類のボリュームが使用されている場合は、warning を記録してそのパスをスキップします。
+- Pod に `datakit/logs` Annotation がすでにある場合は、ユーザー設定を維持し、Annotation もボリュームも変更しません。
+
+## Deployment の例 {#logging-example}
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logging-demo
+  namespace: middleware
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logging
+  template:
+    metadata:
+      labels:
+        app: logging
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.25
+```
+
+Pod の作成後、次のコマンドで確認します。
+
+```shell
+kubectl -n middleware get pod -l app=logging -o yaml
+kubectl logs -n datakit deployment/datakit-operator
+```
+
+最終的な Pod には、`datakit/logs` Annotation と、`/var/log/app` に対応する EmptyDir およびマウントが含まれます。ルールの変更を反映するには、Pod を再作成する必要があります。

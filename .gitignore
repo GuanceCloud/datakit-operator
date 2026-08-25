@@ -2,5 +2,3 @@ dist/*
 pkg/git/git.go
 datakit-operator.yaml
 .idea/
-translation.log
-export/*/.mkdocs-translator/last-run.json

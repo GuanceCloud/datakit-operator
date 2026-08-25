@@ -1,78 +1,91 @@
-# DataKit Operator 로그 수집 설정 주입
+# DataKit Operator 로그 수집 구성 주입
 
-DataKit Operator는 지정된 Pod에 DataKit Logging 수집에 필요한 설정을 자동으로 추가할 수 있습니다. 여기에는 `datakit/logs` 어노테이션과 해당 파일 경로의 volume/volumeMount가 포함되며, 번거로운 수동 설정 절차를 간소화합니다. 이를 통해 사용자는 각 Pod 설정에 수동으로 개입하지 않고도 로그 수집 기능을 자동으로 활성화할 수 있습니다.
+DataKit Operator는 새 Pod에 `datakit/logs` Annotation을 추가하고 파일 로그 경로에 따라 EmptyDir 볼륨을 생성하거나 재사용할 수 있습니다. 따라서 각 Deployment에서 로그 Annotation과 디렉터리 마운트를 반복해서 관리할 필요가 없습니다.
 
-다음은 DataKit Operator의 `admission_mutate` 설정을 통해 로그 수집 설정을 자동으로 주입하는 방법을 보여 주는 설정 예시입니다.
+이 기능은 DataKit이 Kubernetes Pod의 파일 로그를 직접 수집하는 경우에 적합합니다. 사이드카를 통해 로그를 DataKit으로 전달하려면 [logfwd 주입](operator-logfwd.md)을 사용하십시오.
+
+## Operator 구성 {#logging-config}
+
+`admission_mutate.loggings`에 규칙을 추가합니다.
 
 ```json
 {
-    "server_listen": "0.0.0.0:9543",
-    "log_level":     "info",
-    "admission_inject": {
-        # 기타 설정
-    },
     "admission_mutate": {
         "loggings": [
             {
-                "namespace_selectors": ["middleware"],
-                "label_selectors":     ["app=logging"],
-                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/tmp/opt/**/*.log\",\"source\":\"logging-tmp\"}]"
+                "namespace_selectors": ["^middleware$"],
+                "label_selectors": ["app=logging"],
+                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/var/log/app/*.log\",\"source\":\"logging-demo\"}]"
             }
         ]
     }
 }
 ```
 
-`admission_mutate.loggings`: 여러 로그 수집 설정을 포함하는 객체 배열입니다. 각 로그 설정에는 다음 필드가 포함됩니다.
+| 필드 | 설명 |
+| --- | --- |
+| `namespace_selectors` | Namespace 정규식 배열. 일치 가능한 항목을 하나 이상 구성해야 합니다. |
+| `label_selectors` | Pod Label Selector 배열. 일치 가능한 항목을 하나 이상 구성해야 합니다. |
+| `config` | `datakit/logs`에 기록할 JSON 배열 문자열 |
 
-- `namespace_selectors`: 조건에 부합하는 Pod가 위치한 Namespace를 제한합니다. 여러 Namespace를 설정할 수 있으며, Pod가 선택되려면 하나 이상의 Namespace와 일치해야 합니다. `label_selectors`와는 “또는” 관계입니다.
-- `label_selectors`: 조건에 부합하는 Pod의 label을 제한합니다. Pod가 선택되려면 하나 이상의 label selector와 일치해야 합니다. `namespace_selectors`와는 “또는” 관계입니다.
-- `config`: Pod의 어노테이션에 추가되는 JSON 문자열이며, 어노테이션의 Key는 `datakit/logs`입니다. 해당 Key가 이미 존재하면 덮어쓰거나 중복으로 추가하지 않습니다. 이 설정은 DataKit에 로그 수집 방법을 지정합니다.
+Namespace와 Label 두 조건이 모두 일치해야 합니다. 같은 조건의 여러 selector는 OR로 평가하며, 여러 규칙은 구성 순서에 따라 첫 번째로 일치하는 항목을 사용합니다.
 
-DataKit Operator는 `config` 설정을 자동으로 파싱하고, 설정에 포함된 경로(`path`)에 따라 Pod에 해당 volume과 volumeMount를 생성합니다.
+`config`는 유효한 JSON이어야 합니다. Operator는 비활성화되지 않은 `type: "file"` 구성을 파싱하고 `path`에서 디렉터리를 추출하여 마운트합니다. `stdout` 구성은 Annotation에만 기록하며 새 볼륨을 추가하지 않습니다.
 
-위 DataKit Operator 설정을 예로 들면, Pod의 Namespace가 `middleware`이거나 Labels가 `app=logging`와 일치하면 Pod에 어노테이션과 마운트를 추가합니다. 예시는 다음과 같습니다.
+## 주입 결과 {#logging-injection-result}
 
-```yaml hl_lines="5"
-apiVersion: v1
-kind: Pod
+위 예시와 일치하는 Pod에는 다음 항목이 추가됩니다.
+
+```yaml
 metadata:
   annotations:
-    datakit/logs: '[{"disable":false,"type":"file","path":"/tmp/opt/**/*.log","source":"logging-tmp"}]'
-  labels:
-    app: logging
-  name: logging-test
-  namespace: default
+    datakit/logs: '[{"disable":false,"type":"file","path":"/var/log/app/*.log","source":"logging-demo"}]'
 spec:
   containers:
-  - args:
-    - |
-      mkdir -p /tmp/opt/log1;
-      i=1;
-      while true; do
-        echo "Writing logs to file ${i}.log";
-        for ((j=1;j<=10000000;j++)); do
-          echo "$(date +'%F %H:%M:%S')  [$j]  Bash For Loop Examples. Hello, world! Testing output." >> /tmp/opt/log1/file_${i}.log;
-          sleep 1;
-        done;
-        echo "Finished writing 5000000 lines to file_${i}.log";
-        i=$((i+1));
-      done
-    command:
-    - /bin/bash
-    - -c
-    - --
-    image: pubrepo.<<<custom_key.brand_main_domain>>>/base/ubuntu:18.04
-    imagePullPolicy: IfNotPresent
-    name: demo
-    volumeMounts:
-    - mountPath: /tmp/opt
-      name: datakit-logs-volume-0
+    - name: app
+      volumeMounts:
+        - name: datakit-logs-volume-0
+          mountPath: /var/log/app
   volumes:
-  - emptyDir: {}
-    name: datakit-logs-volume-0
+    - name: datakit-logs-volume-0
+      emptyDir: {}
 ```
 
-이 Pod에는 `app=logging` label이 있어 조건과 일치하므로, DataKit Operator가 `datakit/logs` 어노테이션을 추가하고 `/tmp/opt` 경로를 EmptyDir로 마운트합니다.
+Operator는 디렉터리를 모든 일반 애플리케이션 컨테이너에 마운트합니다.
 
-DataKit 로그 수집이 Pod를 감지하면 `datakit/logs` 내용에 따라 맞춤형 수집을 수행합니다.
+- 해당 경로에 EmptyDir가 이미 마운트되어 있으면 기존 볼륨을 재사용합니다.
+- 해당 마운트가 없으면 새 EmptyDir를 생성합니다.
+- 해당 경로에 다른 유형의 볼륨이 사용 중이면 warning을 기록하고 그 경로를 건너뜁니다.
+- Pod에 `datakit/logs` Annotation이 이미 있으면 사용자 구성을 유지하고 Annotation이나 볼륨을 변경하지 않습니다.
+
+## Deployment 예시 {#logging-example}
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logging-demo
+  namespace: middleware
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logging
+  template:
+    metadata:
+      labels:
+        app: logging
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.25
+```
+
+Pod를 생성한 후 다음을 확인합니다.
+
+```shell
+kubectl -n middleware get pod -l app=logging -o yaml
+kubectl logs -n datakit deployment/datakit-operator
+```
+
+최종 Pod에는 `datakit/logs` Annotation과 `/var/log/app`에 해당하는 EmptyDir 및 마운트가 있어야 합니다. 규칙을 변경한 후에는 Pod를 다시 생성해야 적용됩니다.

@@ -1,78 +1,91 @@
-# DataKit Operator Injecting Log Collection Configuration
+# Inject Log Configuration with DataKit Operator
 
-DataKit Operator can automatically add the configuration required for DataKit Logging collection to specified Pods, including the `datakit/logs` annotation and the corresponding file path volume/volumeMount, simplifying the tedious manual configuration steps. This way, users can automatically enable log collection functionality without manually intervening in each Pod configuration.
+DataKit Operator can add the `datakit/logs` Annotation to newly created Pods and create or reuse EmptyDir volumes based on file log paths. This avoids repeatedly maintaining log Annotations and directory mounts in every Deployment.
 
-Below is a configuration example demonstrating how to implement automatic injection of log collection configuration through the `admission_mutate` configuration of DataKit Operator:
+This feature is intended for DataKit to collect Kubernetes Pod file logs directly. To forward logs to DataKit through a Sidecar, use [logfwd injection](operator-logfwd.md).
+
+## Operator Configuration {#logging-config}
+
+Add a rule to `admission_mutate.loggings`:
 
 ```json
 {
-    "server_listen": "0.0.0.0:9543",
-    "log_level":     "info",
-    "admission_inject": {
-        # other configurations
-    },
     "admission_mutate": {
         "loggings": [
             {
-                "namespace_selectors": ["middleware"],
-                "label_selectors":     ["app=logging"],
-                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/tmp/opt/**/*.log\",\"source\":\"logging-tmp\"}]"
+                "namespace_selectors": ["^middleware$"],
+                "label_selectors": ["app=logging"],
+                "config": "[{\"disable\":false,\"type\":\"file\",\"path\":\"/var/log/app/*.log\",\"source\":\"logging-demo\"}]"
             }
         ]
     }
 }
 ```
 
-`admission_mutate.loggings`: This is an array of objects containing multiple log collection configurations. Each log configuration includes the following fields:
+| Field | Description |
+| --- | --- |
+| `namespace_selectors` | Array of Namespace regular expressions; at least one matching entry is required |
+| `label_selectors` | Array of Pod Label Selectors; at least one matching entry is required |
+| `config` | JSON array string written to `datakit/logs` |
 
-- `namespace_selectors`: Limits the Namespaces where the matching Pods reside. Multiple Namespaces can be set, and a Pod must match at least one Namespace to be selected. The relationship with `label_selectors` is "OR".
-- `label_selectors`: Limits the labels of matching Pods. A Pod must match at least one label selector to be selected. The relationship with `namespace_selectors` is "OR".
-- `config`: This is a JSON string that will be added to the Pod's annotations, with the key `datakit/logs`. If the key already exists, it will not be overwritten or added repeatedly. This configuration tells DataKit how to collect logs.
+Both the Namespace and Label dimensions must match. Multiple selectors within the same dimension are matched with OR; across multiple rules, the first matching entry in configuration order is used.
 
-DataKit Operator will automatically parse the `config` configuration and create the corresponding volume and volumeMount for the Pod based on the path (`path`) within it.
+`config` must be valid JSON. The Operator parses enabled configurations with `type: "file"`, extracts directories from `path`, and mounts them. A `stdout` configuration is written only to the Annotation and does not require a new volume.
 
-Taking the above DataKit Operator configuration as an example, if a Pod is found with Namespace `middleware` or Labels matching `app=logging`, the annotation and mount will be added to the Pod. For example:
+## Injection Result {#logging-injection-result}
 
-```yaml hl_lines="5"
-apiVersion: v1
-kind: Pod
+For a Pod matching the preceding example, the Operator adds:
+
+```yaml
 metadata:
   annotations:
-    datakit/logs: '[{"disable":false,"type":"file","path":"/tmp/opt/**/*.log","source":"logging-tmp"}]'
-  labels:
-    app: logging
-  name: logging-test
-  namespace: default
+    datakit/logs: '[{"disable":false,"type":"file","path":"/var/log/app/*.log","source":"logging-demo"}]'
 spec:
   containers:
-  - args:
-    - |
-      mkdir -p /tmp/opt/log1;
-      i=1;
-      while true; do
-        echo "Writing logs to file ${i}.log";
-        for ((j=1;j<=10000000;j++)); do
-          echo "$(date +'%F %H:%M:%S')  [$j]  Bash For Loop Examples. Hello, world! Testing output." >> /tmp/opt/log1/file_${i}.log;
-          sleep 1;
-        done;
-        echo "Finished writing 5000000 lines to file_${i}.log";
-        i=$((i+1));
-      done
-    command:
-    - /bin/bash
-    - -c
-    - --
-    image: pubrepo.<<<custom_key.brand_main_domain>>>/base/ubuntu:18.04
-    imagePullPolicy: IfNotPresent
-    name: demo
-    volumeMounts:
-    - mountPath: /tmp/opt
-      name: datakit-logs-volume-0
+    - name: app
+      volumeMounts:
+        - name: datakit-logs-volume-0
+          mountPath: /var/log/app
   volumes:
-  - emptyDir: {}
-    name: datakit-logs-volume-0
+    - name: datakit-logs-volume-0
+      emptyDir: {}
 ```
 
-This Pod has the label `app=logging`, which matches, so DataKit Operator adds the `datakit/logs` annotation to it and adds an EmptyDir mount for the path `/tmp/opt`.
+The Operator mounts the directory into all regular application containers:
 
-After DataKit log collection discovers the Pod, it will perform customized collection based on the content of `datakit/logs`.
+- If an EmptyDir is already mounted at the path, the existing volume is reused.
+- If the path has no corresponding mount, a new EmptyDir is created.
+- If another volume type is already mounted at the path, a warning is logged and that path is skipped.
+- If the Pod already has a `datakit/logs` Annotation, the user configuration is preserved and neither the Annotation nor volumes are modified.
+
+## Deployment Example {#logging-example}
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logging-demo
+  namespace: middleware
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logging
+  template:
+    metadata:
+      labels:
+        app: logging
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.25
+```
+
+After creating the Pod, check it with:
+
+```shell
+kubectl -n middleware get pod -l app=logging -o yaml
+kubectl logs -n datakit deployment/datakit-operator
+```
+
+The resulting Pod should contain the `datakit/logs` Annotation and the EmptyDir and mount corresponding to `/var/log/app`. Recreate the Pod after changing a rule for the change to take effect.

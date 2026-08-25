@@ -1,39 +1,52 @@
-# DataKit Operator 注入 async-profiler
+# 旧版 Java Profiler 注入
+
+该功能通过 `datakit-profiler` Sidecar 运行 async-profiler，属于兼容旧部署的注入方式。新部署建议使用 [Flameshot](operator-flameshot.md)。
 
 ## 前置条件 {#async-profiler-prerequisites}
 
-- 集群已安装 [DataKit](https://docs.<<<custom_key.brand_main_domain>>>/datakit/datakit-daemonset-deploy/){:target="_blank"}。
-- [开启 profile](https://docs.<<<custom_key.brand_main_domain>>>/datakit/datakit-daemonset-deploy/#using-k8-env){:target="_blank"} 采集器。
-- Linux 内核参数 [kernel.perf_event_paranoid](https://www.kernel.org/doc/Documentation/sysctl/kernel.txt){:target="_blank"} 值设置为 2 及以下。
+- DataKit 已开启 Profile 采集器。
+- 节点允许 `perf_events`，通常要求 `kernel.perf_event_paranoid` 不大于 `2`。
+- Pod 安全策略允许 Sidecar 增加 `SYS_PTRACE` 和 `SYS_ADMIN` capability。
 
-<!-- markdownlint-disable MD046 -->
-???+ note
+## Operator 配置 {#annotation-injection}
 
-    `async-profiler` 使用 [`perf_events`](https://perf.wiki.kernel.org/index.php/Main_Page){:target="_blank"} 工具来抓取 Linux 的内核调用堆栈，非特权进程依赖内核的相应设置，可以使用以下命令来修改内核参数：
-    ```shell
-    $ sudo sysctl kernel.perf_event_paranoid=1
-    $ sudo sysctl kernel.kptr_restrict=0
-    # 或者
-    $ sudo sh -c 'echo 1 >/proc/sys/kernel/perf_event_paranoid'
-    $ sudo sh -c 'echo 0 >/proc/sys/kernel/kptr_restrict'
-    ```
-<!-- markdownlint-enable MD046 -->
-## 配置注入 {#annotation-injection}
+当前版本必须先在 `admission_inject_v2.profilers` 中配置匹配规则；只添加 Annotation 不会触发注入。
 
-在你的 [Pod 控制器](https://kubernetes.io/docs/concepts/workloads/controllers/){:target="_blank"} 资源配置文件中的
-`.spec.template.metadata.annotations` 节点下添加如下 annotation，然后应用该资源配置文件，
-DataKit-Operator 会自动在相应的 Pod 中创建一个名为 `datakit-profiler` 的容器来辅助进行 profiling。
+```json
+{
+    "admission_inject_v2": {
+        "profilers": [
+            {
+                "name": "legacy-java-profiler",
+                "language": "java",
+                "namespace_selectors": ["^production$"],
+                "label_selectors": ["profiling=async-profiler"],
+                "check_annotation": false,
+                "image": "{{.K8sProfilersAsyncProfileImage}}",
+                "envs": {
+                    "DK_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DK_AGENT_PORT": "9529",
+                    "DK_PROFILE_DURATION": "240",
+                    "DK_PROFILE_SCHEDULE": "0 * * * *"
+                }
+            }
+        ]
+    }
+}
+```
 
-> **注解使用说明**：关于 `check_annotation` 配置如何影响版本注解的行为，以及各种注解的详细说明，请参考 [Annotation 配置注入](datakit-operator.md#annotation-injection) 和 [`check_annotation` 配置项说明](datakit-operator.md#check-annotation-config)。
+当 `check_annotation: true` 时，Pod 还必须提供 `admission.datakit/java-profiler.version`；其值只替换镜像 tag。`admission.datakit/profiler.enabled: "false"` 可以为单个 Pod 禁用旧版 Profiler。
 
-以如下 Deployment 资源配置文件为例进行说明：
+匹配后，Operator 会添加 `datakit-profiler` Sidecar、共享进程命名空间以及工作目录、`/tmp` 和 `/etc/localtime` 挂载，并将 Pod `restartPolicy` 设置为 `Always`。上线前应确认这些变更符合 Pod 安全策略。
 
-```yaml hl_lines="17"
+## Deployment 示例 {#async-profiler-example}
+
+```yaml
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: movies-java
-  labels:
-    app: movies-java
+  namespace: production
 spec:
   replicas: 1
   selector:
@@ -41,63 +54,16 @@ spec:
       app: movies-java
   template:
     metadata:
-      name: movies-java
       labels:
         app: movies-java
-      annotations:
-        admission.datakit/java-profiler.version: "{{.K8sProfilersAsyncProfileVersion}}" # <-- add annotation here
+        profiling: async-profiler
     spec:
       containers:
-        - name: movies-java
-          image: your/app:v1.2.3
-          imagePullPolicy: IfNotPresent
+        - name: app
+          image: example/movies-java:1.2.3
           securityContext:
             seccompProfile:
               type: Unconfined
-          env:
-            - name: JAVA_OPTS
-              value: ""
-
-      restartPolicy: Always
 ```
 
-应用配置文件并检查是否生效：
-
-```shell
-$ kubectl apply -f deployment-movies-java.yaml
-
-$ kubectl get pods | grep movies-java
-movies-java-784f4bb8c7-59g6s   2/2     Running   0          47s
-
-$ kubectl describe pod movies-java-784f4bb8c7-59g6s | grep datakit-profiler
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler:
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler-volume:
-  Normal  Created    12m   kubelet            Created container datakit-profiler
-  Normal  Started    12m   kubelet            Started container datakit-profiler
-```
-
-稍等几分钟后即可在<<<custom_key.brand_name>>>控制台 [应用性能检监测-Profiling](https://console.<<<custom_key.brand_main_domain>>>/tracing/profile){:target="_blank"} 页面查看应用性能数据。
-
-<!-- markdownlint-disable MD046 -->
-???+ note
-
-    - 默认使用命令 `jps -q -J-XX:+PerfDisableSharedMem | head -n 20` 来查找容器中的 JVM 进程，出于性能的考虑，最多只会采集 20 个进程的数据。
-
-    - 可以通过修改 `datakit-operator.yaml` 配置文件中的 `datakit-operator-config` 下的环境变量来配置 profiling 的行为。
-
-
-    | 环境变量              | 说明                                                                                                                                               | 默认值                        |
-    | ----                  | --                                                                                                                                                 | -----                         |
-    | `DK_PROFILE_SCHEDULE` | profiling 的运行计划，使用与 Linux [Crontab](https://man7.org/linux/man-pages/man5/crontab.5.html){:target="_blank"} 相同的语法，如 `*/10 * * * *` | `0 * * * *`（每小时调度一次） |
-    | `DK_PROFILE_DURATION` | 每次 profiling 持续的时间，单位秒                                                                                                                  | 240（4 分钟）                 |
-
-
-    - 若无法看到数据，可以进入 `datakit-profiler` 容器查看相应日志进行排查：
-
-    ```shell
-    $ kubectl exec -it movies-java-784f4bb8c7-59g6s -c datakit-profiler -- bash
-    $ tail -n 2000 log/main.log
-    ```
-<!-- markdownlint-enable MD046 -->
+创建后执行 `kubectl get pod -n production -l app=movies-java -o yaml`，确认存在 `datakit-profiler`。没有数据时检查 Sidecar 日志、内核参数、capability 和 DataKit Profile 接收地址。

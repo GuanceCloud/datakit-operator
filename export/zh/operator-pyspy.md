@@ -1,24 +1,46 @@
-# DataKit Operator 注入 Python Profiling
+# 旧版 Python Profiler 注入
 
-## 前置条件 {#prerequisites}
+该功能通过 `datakit-profiler` Sidecar 运行 py-spy，属于兼容旧部署的注入方式，仅支持 CPython。新部署建议使用 [Flameshot](operator-flameshot.md)。
 
-- 当前只支持 Python 官方解释器（CPython）
+## Operator 配置 {#prerequisites}
 
-在你的 [Pod 控制器](https://kubernetes.io/docs/concepts/workloads/controllers/){:target="_blank"} 资源配置文件中的
-`.spec.template.metadata.annotations` 节点下添加如下 annotation，然后应用该资源配置文件，
-DataKit-Operator 会自动在相应的 Pod 中创建一个名为 `datakit-profiler` 的容器来辅助进行 profiling。
+当前版本必须先在 `admission_inject_v2.profilers` 中配置匹配规则；只添加 Annotation 不会触发注入。
 
-> **注解使用说明**：关于 `check_annotation` 配置如何影响版本注解的行为，以及各种注解的详细说明，请参考 [Annotation 配置注入](datakit-operator.md#annotation-injection) 和 [`check_annotation` 配置项说明](datakit-operator.md#check-annotation-config)。
+```json
+{
+    "admission_inject_v2": {
+        "profilers": [
+            {
+                "name": "legacy-python-profiler",
+                "language": "python",
+                "namespace_selectors": ["^production$"],
+                "label_selectors": ["profiling=py-spy"],
+                "check_annotation": false,
+                "image": "{{.K8sProfilersPySpyImage}}",
+                "envs": {
+                    "DK_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DK_AGENT_PORT": "9529",
+                    "DK_PROFILE_DURATION": "240",
+                    "DK_PROFILE_SCHEDULE": "0 * * * *"
+                }
+            }
+        ]
+    }
+}
+```
 
-接下来将以一个名为 "movies-python" 的 `Deployment` 资源配置文件为例进行说明。
+当 `check_annotation: true` 时，Pod 还必须提供 `admission.datakit/python-profiler.version`；其值只替换镜像 tag。`admission.datakit/profiler.enabled: "false"` 可以为单个 Pod 禁用旧版 Profiler。
 
-```yaml hl_lines="17"
+匹配后，Operator 会添加 `datakit-profiler` Sidecar、共享进程命名空间以及工作目录、`/tmp` 和 `/etc/localtime` 挂载，并将 Pod `restartPolicy` 设置为 `Always`。Sidecar 会增加 `SYS_PTRACE` 和 `SYS_ADMIN` capability，使用前应确认 Pod 安全策略允许。
+
+## Deployment 示例 {#pyspy-example}
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: movies-python
-  labels:
-    app: movies-python
+  namespace: production
 spec:
   replicas: 1
   selector:
@@ -26,62 +48,13 @@ spec:
       app: movies-python
   template:
     metadata:
-      name: movies-python
       labels:
         app: movies-python
-      annotations:
-        admission.datakit/python-profiler.version: {{.K8sProfilersPySpyVersion}} # <-- add annotation here
+        profiling: py-spy
     spec:
       containers:
-        - name: movies-python
-          image: zhangyicloud/movies-python:1.2.3
-          imagePullPolicy: Always
-          command:
-            - "gunicorn"
-            - "-w"
-            - "4"
-            - "--bind"
-            - "0.0.0.0:8080"
-            - "app:app"
+        - name: app
+          image: example/movies-python:1.2.3
 ```
 
-应用资源配置并验证是否生效：
-
-```shell
-$ kubectl apply -f deployment-movies-python.yaml
-
-$ kubectl get pods | grep movies-python
-movies-python-78b6cf55f-ptzxf   2/2     Running   0          64s
-
-
-$ kubectl describe pod movies-python-78b6cf55f-ptzxf | grep datakit-profiler
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler:
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler-volume:
-  Normal  Created    98s   kubelet            Created container datakit-profiler
-  Normal  Started    97s   kubelet            Started container datakit-profiler
-```
-
-稍等几分钟后即可在<<<custom_key.brand_name>>>控制台 [应用性能检监测-Profiling](https://console.<<<custom_key.brand_main_domain>>>/tracing/profile){:target="_blank"} 页面查看应用性能数据。
-
-<!-- markdownlint-disable MD046 -->
-???+ note
-
-    - 默认使用命令 `ps -e -o pid,cmd --no-headers | grep -v grep | grep "python" | head -n 20` 来查找容器中的 `Python` 进程，出于性能考虑，最多只会采集 20 个进程的数据。
-
-    - 可以通过修改 `datakit-operator.yaml` 配置文件中的 ConfigMap `datakit-operator-config`  下的环境变量来配置 profiling 的行为。
-
-    | 环境变量              | 说明                                                                                                                                               | 默认值                        |
-    | ----                  | --                                                                                                                                                 | -----                         |
-    | `DK_PROFILE_SCHEDULE` | profiling 的运行计划，使用与 Linux [Crontab](https://man7.org/linux/man-pages/man5/crontab.5.html){:target="_blank"} 相同的语法，如 `*/10 * * * *` | `0 * * * *`（每小时调度一次） |
-    | `DK_PROFILE_DURATION` | 每次 profiling 持续的时间，单位秒                                                                                                                  | 240（4 分钟）                 |
-
-
-    - 若无法看到数据，可以进入 `datakit-profiler` 容器查看相应日志进行排查：
-
-    ```shell
-    $ kubectl exec -it movies-python-78b6cf55f-ptzxf -c datakit-profiler -- bash
-    $ tail -n 2000 log/main.log
-    ```
-<!-- markdownlint-enable MD046 -->
+创建后执行 `kubectl get pod -n production -l app=movies-python -o yaml`，确认存在 `datakit-profiler`。没有数据时检查 Sidecar 日志、capability、目标进程是否为 CPython，以及 DataKit Profile 接收地址。

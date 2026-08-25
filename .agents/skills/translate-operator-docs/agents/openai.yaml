@@ -1,0 +1,4 @@
+interface:
+  display_name: "Translate Operator Docs"
+  short_description: "Translate Operator docs into English, Japanese, and Korean"
+  default_prompt: "Use $translate-operator-docs to update all translations affected by Chinese documentation changes."

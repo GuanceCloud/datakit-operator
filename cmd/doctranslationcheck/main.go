@@ -19,14 +19,9 @@ import (
 )
 
 type translationMetadata struct {
-	Version        int                              `json:"version"`
-	TargetLanguage string                           `json:"target_language"`
-	Files          map[string]translationFileStatus `json:"files"`
-}
-
-type translationFileStatus struct {
-	SourceHash string `json:"source_hash"`
-	Status     string `json:"status"`
+	Version        int               `json:"version"`
+	TargetLanguage string            `json:"target_language"`
+	SourceHashes   map[string]string `json:"source_hashes"`
 }
 
 var protectedSyntax = []struct {
@@ -71,7 +66,7 @@ func sameStrings(left, right []string) bool {
 }
 
 func loadMetadata(root, language string) (*translationMetadata, error) {
-	path := filepath.Join(root, language, ".mkdocs-translator", "metadata.json")
+	path := filepath.Join(root, language, ".translation", "metadata.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read translation metadata %s: %w", path, err)
@@ -80,7 +75,7 @@ func loadMetadata(root, language string) (*translationMetadata, error) {
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return nil, fmt.Errorf("decode translation metadata %s: %w", path, err)
 	}
-	if metadata.Version != 2 {
+	if metadata.Version != 1 {
 		return nil, fmt.Errorf("unsupported translation metadata version %d in %s", metadata.Version, path)
 	}
 	if metadata.TargetLanguage != language {
@@ -187,8 +182,8 @@ func checkTranslations(root, sourceLanguage string, targetLanguages []string) er
 			if err != nil {
 				return fmt.Errorf("hash source document %s: %w", sourcePath, err)
 			}
-			status, ok := metadata.Files[name]
-			if !ok || status.Status != "success" || status.SourceHash != sourceHash {
+			translatedSourceHash, ok := metadata.SourceHashes[name]
+			if !ok || translatedSourceHash != sourceHash {
 				return fmt.Errorf("stale translation metadata for %s/%s", language, name)
 			}
 			source, err := os.ReadFile(sourcePath)

@@ -250,7 +250,7 @@ MD048:
   style: "consistent"
 
 # MD049/emphasis-style - Emphasis style should be consistent
-MD049: 
+MD049:
   # Emphasis style should be consistent
   style: "asterisk"
 
@@ -272,5 +272,5 @@ MD053:
     "//"
   ]
 
-MD060: 
+MD060:
   style: "align"

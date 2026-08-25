@@ -1,24 +1,46 @@
-# DataKit Operator による Python プロファイリングの注入
+# 旧方式の Python Profiler 注入
 
-## 前提条件 {#prerequisites}
+この機能は `datakit-profiler` Sidecar で py-spy を実行する、既存デプロイとの互換性を維持するための注入方式で、CPython のみをサポートします。新規デプロイでは [Flameshot](operator-flameshot.md) の使用を推奨します。
 
-- 現在、Python 公式インタープリター（CPython）のみをサポートしています。
+## Operator の設定 {#prerequisites}
 
-お使いの [Pod コントローラー](https://kubernetes.io/docs/concepts/workloads/controllers/){:target="_blank"} リソース設定ファイルの
-`.spec.template.metadata.annotations` ノード配下に次のアノテーションを追加し、そのリソース設定ファイルを適用します。
-DataKit-Operator は、対応する Pod 内に `datakit-profiler` という名前のコンテナを自動的に作成し、プロファイリングを支援します。
+現行バージョンでは、先に `admission_inject_v2.profilers` へマッチングルールを設定する必要があります。Annotation を追加するだけでは注入されません。
 
-> **アノテーションの使用方法**：`check_annotation` 設定がバージョンアノテーションの動作に与える影響、および各種アノテーションの詳細については、[Annotation 設定による注入](datakit-operator.md#annotation-injection)および [`check_annotation` 設定項目の説明](datakit-operator.md#check-annotation-config)を参照してください。
+```json
+{
+    "admission_inject_v2": {
+        "profilers": [
+            {
+                "name": "legacy-python-profiler",
+                "language": "python",
+                "namespace_selectors": ["^production$"],
+                "label_selectors": ["profiling=py-spy"],
+                "check_annotation": false,
+                "image": "{{.K8sProfilersPySpyImage}}",
+                "envs": {
+                    "DK_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DK_AGENT_PORT": "9529",
+                    "DK_PROFILE_DURATION": "240",
+                    "DK_PROFILE_SCHEDULE": "0 * * * *"
+                }
+            }
+        ]
+    }
+}
+```
 
-以下では、"movies-python" という名前の `Deployment` リソース設定ファイルを例に説明します。
+`check_annotation: true` の場合、Pod に `admission.datakit/python-profiler.version` も指定する必要があります。この値で置き換わるのはイメージの tag だけです。`admission.datakit/profiler.enabled: "false"` を指定すると、Pod 単位で旧方式の Profiler を無効にできます。
 
-```yaml hl_lines="17"
+ルールに一致すると、Operator は `datakit-profiler` Sidecar、共有プロセス名前空間、作業ディレクトリ、`/tmp` および `/etc/localtime` のマウントを追加し、Pod の `restartPolicy` を `Always` に設定します。Sidecar には `SYS_PTRACE` および `SYS_ADMIN` capability が追加されるため、使用前に Pod のセキュリティポリシーで許可されていることを確認してください。
+
+## Deployment の例 {#pyspy-example}
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: movies-python
-  labels:
-    app: movies-python
+  namespace: production
 spec:
   replicas: 1
   selector:
@@ -26,62 +48,13 @@ spec:
       app: movies-python
   template:
     metadata:
-      name: movies-python
       labels:
         app: movies-python
-      annotations:
-        admission.datakit/python-profiler.version: {{.K8sProfilersPySpyVersion}} # <-- add annotation here
+        profiling: py-spy
     spec:
       containers:
-        - name: movies-python
-          image: zhangyicloud/movies-python:1.2.3
-          imagePullPolicy: Always
-          command:
-            - "gunicorn"
-            - "-w"
-            - "4"
-            - "--bind"
-            - "0.0.0.0:8080"
-            - "app:app"
+        - name: app
+          image: example/movies-python:1.2.3
 ```
 
-リソース設定を適用し、反映されていることを確認します：
-
-```shell
-$ kubectl apply -f deployment-movies-python.yaml
-
-$ kubectl get pods | grep movies-python
-movies-python-78b6cf55f-ptzxf   2/2     Running   0          64s
-
-
-$ kubectl describe pod movies-python-78b6cf55f-ptzxf | grep datakit-profiler
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler:
-      /app/datakit-profiler from datakit-profiler-volume (rw)
-  datakit-profiler-volume:
-  Normal  Created    98s   kubelet            Created container datakit-profiler
-  Normal  Started    97s   kubelet            Started container datakit-profiler
-```
-
-数分待つと、<<<custom_key.brand_name>>> コンソールの [APM-プロファイリング](https://console.<<<custom_key.brand_main_domain>>>/tracing/profile){:target="_blank"} ページでアプリケーションパフォーマンスデータを確認できます。
-
-<!-- markdownlint-disable MD046 -->
-???+ note
-
-    - デフォルトでは、コマンド `ps -e -o pid,cmd --no-headers | grep -v grep | grep "python" | head -n 20` を使用してコンテナ内の `Python` プロセスを検索します。パフォーマンス上の理由から、データを収集するプロセスは最大 20 個です。
-
-    - `datakit-operator.yaml` 設定ファイル内の ConfigMap `datakit-operator-config` 配下の環境変数を変更することで、プロファイリングの動作を設定できます。
-
-    | 環境変数              | 説明                                                                                                                                               | デフォルト値                        |
-    | ----                  | --                                                                                                                                                 | -----                         |
-    | `DK_PROFILE_SCHEDULE` | プロファイリングの実行スケジュール。Linux [Crontab](https://man7.org/linux/man-pages/man5/crontab.5.html){:target="_blank"} と同じ構文を使用します（例：`*/10 * * * *`） | `0 * * * *`（1 時間ごとに 1 回スケジュール） |
-    | `DK_PROFILE_DURATION` | 1 回のプロファイリングの継続時間（秒）                                                                                                                  | 240（4 分）                 |
-
-
-    - データを確認できない場合は、`datakit-profiler` コンテナに入り、該当するログを確認してトラブルシューティングできます：
-
-    ```shell
-    $ kubectl exec -it movies-python-78b6cf55f-ptzxf -c datakit-profiler -- bash
-    $ tail -n 2000 log/main.log
-    ```
-<!-- markdownlint-enable MD046 -->
+作成後、`kubectl get pod -n production -l app=movies-python -o yaml` を実行し、`datakit-profiler` が存在することを確認します。データがない場合は、Sidecar のログ、capability、対象プロセスが CPython であること、および DataKit の Profile 受信アドレスを確認してください。

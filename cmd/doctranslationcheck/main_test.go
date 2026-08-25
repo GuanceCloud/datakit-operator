@@ -81,23 +81,16 @@ func writeDocument(t *testing.T, root, lang, name, content string) {
 
 func writeMetadata(t *testing.T, root, lang string, hashes map[string]string) {
 	t.Helper()
-	files := make(map[string]map[string]string, len(hashes))
-	for name, hash := range hashes {
-		files[name] = map[string]string{
-			"source_hash": hash,
-			"status":      "success",
-		}
-	}
 	value := map[string]interface{}{
-		"version":         2,
+		"version":         1,
 		"target_language": lang,
-		"files":           files,
+		"source_hashes":   hashes,
 	}
 	data, err := json.Marshal(value)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(root, lang, ".mkdocs-translator")
+	dir := filepath.Join(root, lang, ".translation")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

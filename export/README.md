@@ -4,13 +4,13 @@
 
 Operator 始终导出四种语言；下游站点按品牌发布：Guance 发布中文、英文、日文和韩文，TrueWatch 发布英文、日文和韩文。
 
-安装 [MkDocs Translator](https://github.com/GuanceCloud/mkdocs-auto-translation) 后，配置兼容 OpenAI 格式的 `OPENAI_API_KEY`、`OPENAI_BASE_URL`，并按需设置 `DOC_TRANSLATION_MODEL`，然后运行：
+修改中文文档后，使用仓库中的 Codex Skill 同步英文、日文和韩文：
 
-```shell
-make docs_translate
+```text
+$translate-operator-docs
 ```
 
-该命令从中文增量生成英文、日文和韩文，并更新各语言目录中的 `.mkdocs-translator/metadata.json`。译文和 `metadata.json` 需要一起提交；包含运行时间的 `last-run.json` 和本地 `translation.log` 不提交。
+翻译完成后会更新各语言目录中的 `.translation/metadata.json`。译文和 `metadata.json` 需要一起提交。
 
 在仓库根目录运行以下命令，将文档导出到 `dataflux-doc` 的既有位置：
 

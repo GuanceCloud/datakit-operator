@@ -1,245 +1,148 @@
 # DataKit Operator 注入 Flameshot
 
-[:octicons-tag-24: Operator Version-1.8.0](operator-changelog.md#cl-1.8.0)
-
----
-
-Flameshot 是 DataKit-Operator 引入的性能分析工具，用于替代原有的 Profiler（async-profiler、py-spy 等）。
-
-```mermaid
-sequenceDiagram
-autonumber
-
-box User pod
-participant container as 业务容器
-participant flameshot as Flameshot sidecar
-end
-
-participant opr as DataKit Operator
-
-participant dk as DataKit
-
-opr ->> flameshot: 注入 Flameshot
-
-alt 目标容器资源阈值超限
-flameshot ->> container: 立即采集容器 profiling
-else
-flameshot ->> container: 定期采集容器 profiling
-end
-
-flameshot ->> dk: 上报 Profiling
-```
+DataKit Operator 从 [:octicons-tag-24: v1.8.0](operator-changelog.md#cl-1.8.0) 开始支持注入 Flameshot Sidecar。Flameshot 可以按计划或资源阈值采集 Java、Python 和 Go 应用的 Profiling 数据，用于替代旧版 Profiler 注入。
 
 ## 前置条件 {#flameshot-prerequisites}
 
 - 集群已安装 [DataKit](https://docs.<<<custom_key.brand_main_domain>>>/datakit/datakit-daemonset-deploy/){:target="_blank"}。
-- [开启 profile](https://docs.<<<custom_key.brand_main_domain>>>/datakit/datakit-daemonset-deploy/#using-k8-env){:target="_blank"} 采集器。
-- （可选）如需使用 Prometheus Annotations 自动注入功能，需要开启 DataKit 的 KubernetesPrometheus 采集器，并配置 `EnableDiscoveryOfPrometheusPodAnnotations = true` 启用 Pod Annotations 自动发现功能。
+- DataKit 已开启 [Profile 采集器](https://docs.<<<custom_key.brand_main_domain>>>/datakit/datakit-daemonset-deploy/#using-k8-env){:target="_blank"}。
+- 目标 Pod 的安全策略允许 Sidecar 增加 `SYS_PTRACE` capability。
+- 如果启用 Prometheus Annotation，DataKit 还需开启 KubernetesPrometheus，并启用 Pod Annotation 自动发现。
 
-## 使用说明 {#flameshot-usage}
+## Operator 配置 {#flameshot-usage}
 
-1. 在目标 Kubernetes 集群，[下载和安装 DataKit-Operator](datakit-operator.md#install)
-1. 在 DataKit Operator 配置中设置 `flameshots` 数组，配置 `namespace_selectors`/`label_selectors` 匹配规则和 `processes` 字段指定要监控的进程。
-1. （可选）在 Deployment 添加指定 Annotation `admission.datakit/flameshot.enabled: "true"`，允许注入 Flameshot（如果设置为 `"false"` 则会禁用注入）。
-
-Flameshot 配置示例：
+在 `admission_inject_v2.flameshots` 中添加规则：
 
 ```json
 {
     "admission_inject_v2": {
         "flameshots": [
             {
-                "namespace_selectors": [],
-                "label_selectors":     [],
+                "name": "flameshot-java",
+                "namespace_selectors": ["^production$"],
+                "label_selectors": ["profiling=flameshot"],
                 "image": "{{.FlameshotImage}}",
                 "envs": {
-                    "FLAMESHOT_DATAKIT_ADDR":     "http://datakit-service.datakit:9529/profiling/v1/input",
+                    "FLAMESHOT_DATAKIT_ADDR": "http://datakit-service.datakit:9529/profiling/v1/input",
                     "FLAMESHOT_MONITOR_INTERVAL": "10s",
-                    "FLAMESHOT_LOG_LEVEL":        "info",
-                    "FLAMESHOT_PROFILING_PATH":   "/flameshot-data",
-                    "FLAMESHOT_LOG_PATH":         "/var/log/flameshot.log",
-                    "FLAMESHOT_PROFILING_ENABLED": "true",
-                    "FLAMESHOT_AUTO_PROFILING":   "10m",
-                    "FLAMESHOT_AUTO_PROFILING_DURATION": "15s",
-                    "FLAMESHOT_OOM_HPROF_ENABLED": "true",
-                    "FLAMESHOT_OOM_HPROF_MATCH_WINDOW": "3m",
-                    "FLAMESHOT_HPROF_UPLOAD_ENABLED": "true",
-                    "FLAMESHOT_HPROF_UPLOAD_PROVIDER": "oss",
-                    "FLAMESHOT_HPROF_UPLOAD_AUTH_TYPE": "static",
-                    "FLAMESHOT_HPROF_UPLOAD_ENDPOINT": "https://oss-cn-hangzhou.aliyuncs.com",
-                    "FLAMESHOT_HPROF_UPLOAD_REGION": "cn-hangzhou",
-                    "FLAMESHOT_HPROF_UPLOAD_BUCKET": "heap-dumps",
-                    "FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID": "<access-key-id>",
-                    "FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_SECRET": "<access-key-secret>",
-                    "FLAMESHOT_HPROF_UPLOAD_SECURITY_TOKEN": "<sts-security-token>",
-                    "FLAMESHOT_HEAP_DUMP_ENABLED": "true",
-                    "FLAMESHOT_POD_MEM_LIMIT": "2048",
-                    "FLAMESHOT_HTTP_LOCAL_IP":    "{fieldRef:status.podIP}",
-                    "FLAMESHOT_HTTP_LOCAL_PORT":  "8089",
-                    "FLAMESHOT_SERVICE":  "{fieldRef:metadata.labels['app']}",
-                    "FLAMESHOT_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                    "FLAMESHOT_LOG_LEVEL": "info",
+                    "FLAMESHOT_PROFILING_PATH": "/flameshot-data",
+                    "FLAMESHOT_LOG_PATH": "/var/log/flameshot.log",
+                    "FLAMESHOT_HTTP_LOCAL_IP": "{fieldRef:status.podIP}",
+                    "FLAMESHOT_HTTP_LOCAL_PORT": "8089"
                 },
+                "processes": "[{\"service\":\"java-demo\",\"language\":\"java\",\"command\":\"^java\\\\b.*app\\\\.jar$\",\"events\":\"cpu\",\"duration\":\"30s\",\"cpu_usage_percent\":80}]",
+                "enable_prometheus_annotations": true,
                 "resources": {
                     "requests": {
-                        "cpu":    "100m",
+                        "cpu": "100m",
                         "memory": "128Mi"
                     },
                     "limits": {
-                        "cpu":    "200m",
+                        "cpu": "200m",
                         "memory": "256Mi"
                     }
-                },
-                "processes": "",
-                "enable_prometheus_annotations": true
+                }
             }
         ]
     }
 }
 ```
 
-配置字段说明：
+常用字段如下：
 
-| 字段                            | 类型    | 必填     | 说明                                                                                                  |
-| ------                          | ------  | ------   | ------                                                                                                |
-| `namespace_selectors`           | array   | 否       | 命名空间选择器数组，支持正则表达式匹配                                                                |
-| `label_selectors`               | array   | 否       | 标签选择器数组，使用 Kubernetes Label Selector 语法                                                  |
-| `image`                         | string  | 是       | Flameshot 容器镜像地址                                                                                |
-| `envs`                          | object  | 否       | 环境变量配置，支持 Downward API                                                                       |
-| `resources`                     | object  | 否       | 资源限制配置（requests 和 limits）                                                                   |
-| `processes`                     | string  | 是       | 进程监控配置（JSON 字符串），会作为 `FLAMESHOT_PROCESSES` 环境变量注入到 Flameshot 容器中。格式请参考 [Flameshot 相关文档](../integrations/flameshot.md) |
-| `enable_prometheus_annotations` | boolean | 否       | 是否自动添加 Prometheus 相关 Annotations。在默认配置模板中为 `true`，如果用户自定义配置且不设置该字段，则默认为 `false`。如果 Pod 已存在任意 `prometheus.io/` 开头的 Annotation，则不会注入 |
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 规则名称，用于日志定位，建议配置 |
+| `namespace_selectors` | Namespace 正则数组 |
+| `label_selectors` | Pod Label Selector 数组 |
+| `image` | Flameshot Sidecar 镜像 |
+| `envs` | Sidecar 环境变量 |
+| `processes` | 必填且不能为空；进程匹配和采集策略的 JSON 数组字符串 |
+| `enable_prometheus_annotations` | 是否自动添加 Flameshot 指标采集 Annotation，默认 `false` |
+| `resources` | Sidecar 资源配置；缺失或非法时使用默认值 |
 
-<!-- markdownlint-disable MD046 -->
-???+ important
+`FLAMESHOT_PROFILING_PATH` 和有效的 `FLAMESHOT_HTTP_LOCAL_PORT` 是注入必需项。缺少其中任意一项，或 `processes` 为空时，Operator 会跳过注入并记录 warning。
 
-    **重要说明**：`processes` 字段是一个 JSON 字符串，该值会直接作为 `FLAMESHOT_PROCESSES` 环境变量注入到 Flameshot 容器中。`processes` 字段的格式和含义请参考 [Flameshot 相关文档](../integrations/flameshot.md)。如果 `processes` 为空，Flameshot 注入将被跳过。
-<!-- markdownlint-enable MD046 -->
+Selector 和 Annotation 的通用规则参见 [DataKit Operator 注入规则](datakit-operator.md#datakit-operator-inject)。`admission.datakit/flameshot.enabled: "false"` 可以为单个 Pod 禁用 Flameshot。
 
-### 环境变量 {#envs}
+## 注入结果 {#flameshot-injection-result}
 
-| 环境变量名                   | 说明                                                                                      |
-| :---                         | :---                                                                                      |
-| `FLAMESHOT_DATAKIT_ADDR`     | DataKit profiling 接收地址，例如 `http://datakit-service.datakit:9529/profiling/v1/input` |
-| `FLAMESHOT_MONITOR_INTERVAL` | 监控间隔，例如 `10s`                                                                      |
-| `FLAMESHOT_LOG_LEVEL`        | 日志级别，例如 `info`                                                                     |
-| `FLAMESHOT_PROFILING_PATH`   | Profiling 数据存储路径，例如 `/flameshot-data`                                            |
-| `FLAMESHOT_LOG_PATH`         | 日志文件路径，例如 `/var/log/flameshot.log`                                               |
-| `FLAMESHOT_PROFILING_ENABLED` | 是否开启 JFR Profiling，例如 `true`                                                     |
-| `FLAMESHOT_AUTO_PROFILING`   | 定时采集间隔，例如 `10m`                                                                  |
-| `FLAMESHOT_AUTO_PROFILING_DURATION` | 定时采集单次时长，例如 `15s`                                                        |
-| `FLAMESHOT_OOM_HPROF_ENABLED` | 是否开启 OOM `.hprof` 摘要恢复，例如 `true`                                            |
-| `FLAMESHOT_OOM_HPROF_MATCH_WINDOW` | OOM 事件与 `.hprof` 的匹配窗口，例如 `3m`                                          |
-| `FLAMESHOT_HPROF_UPLOAD_ENABLED` | 是否开启 hprof 对象存储上传，例如 `true`                                            |
-| `FLAMESHOT_HPROF_UPLOAD_PROVIDER` | 对象存储类型，支持 `oss` 和 `s3`                                                    |
-| `FLAMESHOT_HPROF_UPLOAD_AUTH_TYPE` | hprof 上传认证类型。`static` 表示直接使用 AK/SK，可选 STS SecurityToken；`assume_role` 表示使用源 AK/SK 调用阿里云 STS AssumeRole 获取并刷新临时凭证。`assume_role` 仅支持 OSS，需使用 Flameshot 0.2.4 及以上版本。 |
-| `FLAMESHOT_HPROF_UPLOAD_ENDPOINT` | OSS/S3 endpoint                                                                      |
-| `FLAMESHOT_HPROF_UPLOAD_REGION` | OSS/S3 region，例如 `cn-hangzhou` 或 `us-east-1`                                   |
-| `FLAMESHOT_HPROF_UPLOAD_BUCKET` | 目标 bucket                                                                          |
-| `FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID` | 对象存储 AK                                                                    |
-| `FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_SECRET` | 对象存储 SK                                                                |
-| `FLAMESHOT_HPROF_UPLOAD_SECURITY_TOKEN` | 可选的阿里云 OSS STS SecurityToken；与临时 AK/SK 同时配置时使用 STS 认证。需使用 Flameshot 0.2.3 及以上版本，凭证过期前需重建 Pod。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_ARN` | `assume_role` 认证模式必填，目标 RAM Role ARN。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_SOURCE_ACCESS_KEY_ID` | `assume_role` 认证模式必填，调用 STS AssumeRole 的源身份 AK，建议只授予最小 `sts:AssumeRole` 权限。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_SOURCE_ACCESS_KEY_SECRET` | `assume_role` 认证模式必填，调用 STS AssumeRole 的源身份 SK。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_SOURCE_SECURITY_TOKEN` | 可选。如果源身份本身也是临时凭证，可配置源身份 SecurityToken。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_SESSION_NAME` | 可选，AssumeRole 角色会话名。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_DURATION_SECONDS` | 可选，AssumeRole 返回 STS 凭证的有效期，单位秒，默认 `3600`，最小 `900`。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_POLICY` | 可选 inline policy，用于进一步限制返回 STS 凭证权限。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_EXTERNAL_ID` | 可选 ExternalId，用于跨账号或防 confused deputy 场景。 |
-| `FLAMESHOT_HPROF_UPLOAD_ASSUME_ROLE_STS_ENDPOINT` | 可选 STS endpoint，例如 `sts.cn-hangzhou.aliyuncs.com`。 |
-| `FLAMESHOT_HEAP_DUMP_ENABLED` | 是否开启内存紧急阈值主动 Heap Dump，例如 `true`                                      |
-| `FLAMESHOT_HEAP_DUMP_JMAP_PATH` | `jmap` 可执行文件路径。官方 Sidecar 镜像默认不内置 JVM/JDK，开启主动 Heap Dump 时需显式提供可用 `jmap` |
-| `FLAMESHOT_POD_MEM_LIMIT`    | Pod 内存 limit，单位 Mi，例如 `2048`                                                      |
-| `FLAMESHOT_HTTP_LOCAL_IP`    | HTTP 服务本地 IP，通常通过 Downward API 注入，例如 `{fieldRef:status.podIP}`              |
-| `FLAMESHOT_HTTP_LOCAL_PORT`  | HTTP 服务端口，例如 `8089`                                                                |
-| `FLAMESHOT_PROCESSES`        | 进程监控配置（由 `processes` 字段自动注入），JSON 字符串格式                              |
+规则匹配后，Operator 会：
 
-如需让 Flameshot 主动调用阿里云 STS `AssumeRole` 获取临时 OSS 上传凭证，不需要修改 Operator，只需通过现有 `envs` 注入 AssumeRole 配置。源 AK/SK 建议使用 `{secretKeyRef:...}` 引用 Kubernetes Secret；Flameshot 会在进程内缓存并刷新 AssumeRole 返回的临时凭证。STS 调用失败或配置缺失时上传失败，不会回退到默认凭证链、节点角色或匿名上传。
+- 添加 `datakit-flameshot` Sidecar，并增加 `SYS_PTRACE` capability；
+- 将 Pod 设置为共享进程命名空间，使 Sidecar 能发现业务进程；
+- 创建 `flameshot-volume` EmptyDir，并挂载到所有普通容器的 `FLAMESHOT_PROFILING_PATH`；
+- 将 `processes` 作为 `FLAMESHOT_PROCESSES` 注入 Sidecar；
+- 将 Pod `restartPolicy` 设置为 `Always`。
 
-### Flameshot 自身直播采集 {#prom-anno}
+Flameshot 会直接访问业务进程。上线前应确认 Pod Security Admission、容器安全策略以及应用所在环境允许上述变更。
 
-当 `enable_prometheus_annotations` 设置为 `true` 时（在默认配置模板中为 `true`），DataKit-Operator 会自动为注入 Flameshot 的 Pod 添加以下 Prometheus 相关 Annotations，便于采集 Flameshot 的自身指标（通过 DataKit 的 KubernetesPrometheus 采集）：
+## 采集配置 {#envs}
 
-- `prometheus.io/scrape: "true"`：标识该 Pod 需要被采集
-- `prometheus.io/port: "<port>"`：指标暴露端口，取值来自环境变量 `FLAMESHOT_HTTP_LOCAL_PORT`（例如 `"8089"`）
-- `prometheus.io/scheme: "http"`：指标采集协议
-- `prometheus.io/path: "/metrics"`：指标路径
-- `prometheus.io/param_measurement: "flameshot"`：指定 measurement 名称
+常用环境变量：
 
-<!-- markdownlint-disable MD046 -->
-???+ warning
+| 环境变量 | 说明 |
+| --- | --- |
+| `FLAMESHOT_DATAKIT_ADDR` | DataKit Profiling 接收地址 |
+| `FLAMESHOT_MONITOR_INTERVAL` | 进程和资源监控间隔 |
+| `FLAMESHOT_LOG_LEVEL` | Flameshot 日志级别 |
+| `FLAMESHOT_PROFILING_PATH` | Profiling 临时文件共享目录，注入必需 |
+| `FLAMESHOT_LOG_PATH` | Flameshot 日志路径 |
+| `FLAMESHOT_HTTP_LOCAL_IP` | Flameshot HTTP 监听 IP |
+| `FLAMESHOT_HTTP_LOCAL_PORT` | Flameshot HTTP 和指标端口，注入必需 |
+| `FLAMESHOT_SERVICE` | 覆盖所有进程规则中的 service |
+| `FLAMESHOT_TAGS` | 全局 Profiling 标签 |
+| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit，单位为 millicore |
+| `FLAMESHOT_POD_MEM_LIMIT` | Pod 内存 limit，单位为 MiB |
 
-    1. 如果 Pod 已存在任意一个 `prometheus.io/` 开头的 Annotation，DataKit-Operator 将不会注入上述 Prometheus Annotations，避免覆盖已有的指标采集配置
-    1. 要使用此功能，需要在 DataKit 中开启 KubernetesPrometheus 采集器，并配置 `EnableDiscoveryOfPrometheusPodAnnotations = true` 启用 Pod Annotations 自动发现功能
-<!-- markdownlint-enable MD046 -->
+`processes` 支持 Java、Python 和 Go 的命令匹配、采集时长、CPU/内存阈值以及语言特定选项。Heap Dump 和对象存储上传也通过现有 `envs` 配置；敏感凭证建议使用 `{secretKeyRef:<SECRET>.<KEY>}`。完整字段参见 [Flameshot 文档](../integrations/flameshot.md)。
 
-## 用例 {#flameshot-example}
+### Prometheus Annotation {#prom-anno}
 
-> **注解使用说明**：关于 `check_annotation` 配置如何影响版本注解的行为，以及各种注解的详细说明，请参考 [Annotation 配置注入](datakit-operator.md#annotation-injection) 和 [`check_annotation` 配置项说明](datakit-operator.md#check-annotation-config)。
+当 `enable_prometheus_annotations: true` 时，Operator 会添加：
 
-<!-- markdownlint-disable MD046 -->
-???+ warning
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "8089"
+prometheus.io/scheme: "http"
+prometheus.io/path: "/metrics"
+prometheus.io/param_measurement: "flameshot"
+```
 
-    - 仅添加 `admission.datakit/flameshot.enabled: "true"` Annotation 不足以触发注入，还需要在 DataKit-Operator 配置中设置匹配的 `flameshots` 规则（包括 `namespace_selectors`/`label_selectors` 和 `processes` 字段）
-    - 如果 `processes` 字段为空，注入将被跳过。
-<!-- markdownlint-enable MD046 -->
+端口取自 `FLAMESHOT_HTTP_LOCAL_PORT`。如果 Pod 已存在任意 `prometheus.io/` 开头的 Annotation，Operator 会保留用户配置，不添加以上 Annotation。
 
-下面是一个 Deployment 示例，给 Deployment 创建的所有 Pod 注入 Flameshot（前提是 DataKit-Operator 配置中已设置匹配的规则）：
+## Deployment 示例 {#flameshot-example}
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-deployment
-  labels:
-    app: myapp
+  name: java-demo
+  namespace: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: myapp
+      app: java-demo
   template:
     metadata:
       labels:
-        app: myapp
+        app: java-demo
+        profiling: flameshot
       annotations:
         admission.datakit/flameshot.enabled: "true"
     spec:
       containers:
-      - name: app
-        image: myapp:latest
-        ports:
-        - containerPort: 8080
+        - name: app
+          image: example/java-demo:1.0.0
 ```
 
-使用 yaml 文件创建资源：
+创建后检查：
 
 ```shell
-$ kubectl apply -f app-deployment.yaml
-...
+kubectl -n production get pod -l app=java-demo -o jsonpath='{.items[0].spec.containers[*].name}'
+kubectl -n production logs -l app=java-demo -c datakit-flameshot
 ```
 
-验证如下：
-
-```shell
-$ kubectl get pod
-
-NAME                                   READY   STATUS    RESTARTS      AGE
-app-deployment-7bd8dd85f-fzmt2          2/2     Running   0             4s
-
-$ kubectl get pod app-deployment-7bd8dd85f-fzmt2 -o=jsonpath={.spec.containers\[\*\].name}
-app datakit-flameshot
-```
-
-稍等几分钟后即可在<<<custom_key.brand_name>>>控制台 [应用性能检监测-Profiling](https://console.<<<custom_key.brand_main_domain>>>/tracing/profile){:target="_blank"} 页面查看应用性能数据。
-
-<!-- markdownlint-disable MD046 -->
-???+ note
-
-    若无法看到数据，可以进入 `datakit-flameshot` 容器查看相应日志进行排查：
-
-    ```shell
-    $ kubectl exec -it app-deployment-7bd8dd85f-fzmt2 -c datakit-flameshot -- bash
-    $ cat /var/log/flameshot.log
-    ```
-<!-- markdownlint-enable MD046 -->
+结果应包含 `datakit-flameshot`。产生 Profiling 数据后，可在 <<<custom_key.brand_name>>> 的 Profiling 页面查看；没有数据时，先检查 Sidecar 日志、DataKit 地址、`processes` 的命令正则和目标进程权限。
