@@ -195,8 +195,8 @@ func (r *ddtraceResource) repairJavaAgentEnv() {
 		}
 		targets++
 		if err := injectDDTraceEnvToContainer(container, javaToolOptionsKey, appendJavaAgentIfMissing); err != nil {
-			log.Warnf("ddtrace java env repair failed: pod=%s, container=%s, error=%v", r.parent, container.Name, err)
-			return
+			log.Warnf("ddtrace java env repair skipped for container: pod=%s, container=%s, error=%v", r.parent, container.Name, err)
+			continue
 		}
 	}
 

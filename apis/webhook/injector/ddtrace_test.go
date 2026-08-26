@@ -89,6 +89,26 @@ func TestInjectDDTraceRepairsJavaReinvocation(t *testing.T) {
 	assert.Equal(t, afterRepair, pod)
 }
 
+func TestInjectDDTraceRepairsOtherContainersWhenJavaOptionsUsesValueFrom(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	pod := createTestPod("reinvoked-multi-container", nil)
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: "worker", Image: "worker:1"})
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) {
+		return
+	}
+
+	valueFromJavaOptions := fieldRefEnv(javaToolOptionsKey)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{valueFromJavaOptions}
+	pod.Spec.Containers[1].Env = nil
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []corev1.EnvVar{valueFromJavaOptions}, pod.Spec.Containers[0].Env)
+	assert.Equal(t, 1, countNamedEnv(pod.Spec.Containers[1].Env, javaToolOptionsKey))
+}
+
 func TestInjectDDTraceRepairRequiresCompleteMountChain(t *testing.T) {
 	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
 	complete := createTestPod("partial", nil)
