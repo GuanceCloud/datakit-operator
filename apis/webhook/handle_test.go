@@ -169,6 +169,63 @@ func TestMutateRequestProducesApplicableOTelPatch(t *testing.T) {
 	assert.Contains(t, string(mutatedRaw), `"hostIPs"`)
 }
 
+func TestMutateRequestMovesMergedDDTagsAfterItsDependencies(t *testing.T) {
+	useWebhookDDTraceConfig(t)
+	config.Cfg.AdmissionInject.DDTraces[0].Envs = config.Envs{
+		{Key: "POD_NAME", Value: "{fieldRef:metadata.name}"},
+		{Key: "DD_TAGS", Value: "pod_name:$(POD_NAME)"},
+	}
+	raw := []byte(`{
+  "apiVersion":"v1","kind":"Pod","metadata":{"name":"checkout-0","namespace":"default"},
+  "spec":{"containers":[{"name":"app","image":"example.com/app:1","env":[
+    {"name":"DD_TAGS","value":"user:value"},{"name":"EXISTING","value":"keep-me"}
+  ],"securityContext":{"appArmorProfile":{"type":"Unconfined"}}}]},
+  "status":{"hostIPs":[{"ip":"10.0.0.1"}]}
+}`)
+
+	patchBytes, err := mutateRequest(podAdmissionRequest(raw, admissionv1.Create))
+	if !assert.NoError(t, err) {
+		return
+	}
+	var operations []struct {
+		Operation string `json:"op"`
+		Path      string `json:"path"`
+	}
+	if !assert.NoError(t, json.Unmarshal(patchBytes, &operations)) {
+		return
+	}
+	var envOperation string
+	for _, operation := range operations {
+		if operation.Path == "/spec/containers/0/env" {
+			envOperation = operation.Operation
+		}
+		assert.NotEqual(t, "/spec/containers/0", operation.Path)
+		assert.NotEqual(t, "/spec", operation.Path)
+	}
+	assert.Equal(t, "replace", envOperation)
+
+	patch, err := jsonpatch.DecodePatch(patchBytes)
+	if !assert.NoError(t, err) {
+		return
+	}
+	mutatedRaw, err := patch.Apply(raw)
+	if !assert.NoError(t, err) {
+		return
+	}
+	var pod corev1.Pod
+	if !assert.NoError(t, json.Unmarshal(mutatedRaw, &pod)) || !assert.Len(t, pod.Spec.Containers, 1) {
+		return
+	}
+	names := make([]string, 0, len(pod.Spec.Containers[0].Env))
+	for _, env := range pod.Spec.Containers[0].Env {
+		names = append(names, env.Name)
+	}
+	assert.Equal(t, []string{"EXISTING", "JAVA_TOOL_OPTIONS", "POD_NAME", "DD_TAGS"}, names)
+	assert.Equal(t, "user:value,pod_name:$(POD_NAME)", pod.Spec.Containers[0].Env[3].Value)
+	assert.Contains(t, string(mutatedRaw), `"appArmorProfile"`)
+	assert.Contains(t, string(mutatedRaw), `"hostIPs"`)
+}
+
 func TestWebhookDeploymentSourcesEnableReinvocation(t *testing.T) {
 	for _, path := range []string{
 		"../../charts/datakit-operator/templates/mutatingwebhook.yaml",

@@ -286,27 +286,37 @@ func (r *ddtraceResource) injectGlobalVolume() {
 func (r *ddtraceResource) injectGlobalEnvs(envs []corev1.EnvVar) {
 	for idx := range envs {
 		incoming := envs[idx]
-		resolve := manager.KeepExistingEnvVar
 		if incoming.Name == ddtraceDDTagsKey {
 			if incoming.Value == "" || incoming.ValueFrom != nil {
 				continue
 			}
-			resolve = mergeDDTagsEnvVar
+			for containerIdx := range r.pod.Spec.Containers {
+				container := &r.pod.Spec.Containers[containerIdx]
+				container.Env = addOrMergeDDTagsEnvVar(container.Env, incoming)
+			}
+			continue
 		}
 
 		for containerIdx := range r.pod.Spec.Containers {
 			container := &r.pod.Spec.Containers[containerIdx]
-			container.Env = manager.AddOrUpdateEnvVar(container.Env, incoming, resolve)
+			container.Env = manager.AddOrUpdateEnvVar(container.Env, incoming, manager.KeepExistingEnvVar)
 		}
 	}
 }
 
-func mergeDDTagsEnvVar(existing, incoming corev1.EnvVar) corev1.EnvVar {
-	if existing.ValueFrom != nil {
-		return existing
+func addOrMergeDDTagsEnvVar(envs []corev1.EnvVar, incoming corev1.EnvVar) []corev1.EnvVar {
+	for idx := range envs {
+		if envs[idx].Name != ddtraceDDTagsKey {
+			continue
+		}
+		if envs[idx].ValueFrom != nil {
+			return envs
+		}
+
+		incoming.Value = appendKVPairs(envs[idx].Value, incoming.Value)
+		return append(DeleteSlice(envs, idx, idx+1), incoming)
 	}
-	existing.Value = appendKVPairs(existing.Value, incoming.Value)
-	return existing
+	return append(envs, incoming)
 }
 
 type ddtraceLibrary interface {
