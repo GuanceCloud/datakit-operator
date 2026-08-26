@@ -254,9 +254,9 @@ DDTrace、OTel、logfwd 和旧版 Profiler 规则支持 `check_annotation`：
 | `{fieldRef:status.hostIP}` | 节点主 IP |
 | `{fieldRef:status.hostIPs}` | 节点双栈 IP |
 | `{fieldRef:status.podIP}` | Pod 主 IP |
-| `{resourceFieldRef:limits.cpu}` | 第一个业务容器的 CPU limit，单位为 millicore |
+| `{resourceFieldRef:limits.cpu}` | 第一个业务容器的 CPU limit，单位为 CPU 核的 1/1000 |
 | `{resourceFieldRef:limits.memory}` | 第一个业务容器的内存 limit，单位为 MiB |
-| `{resourceFieldRef:requests.cpu}` | 第一个业务容器的 CPU request，单位为 millicore |
+| `{resourceFieldRef:requests.cpu}` | 第一个业务容器的 CPU request，单位为 CPU 核的 1/1000 |
 | `{resourceFieldRef:requests.memory}` | 第一个业务容器的内存 request，单位为 MiB |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Pod 所在命名空间中的 Secret key |
 

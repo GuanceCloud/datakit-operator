@@ -93,7 +93,7 @@ Flameshot はアプリケーションプロセスへ直接アクセスします�
 | `FLAMESHOT_HTTP_LOCAL_PORT` | Flameshot HTTP とメトリクスのポート。注入に必須 |
 | `FLAMESHOT_SERVICE` | すべてのプロセスルールの service を上書き |
 | `FLAMESHOT_TAGS` | グローバル Profiling タグ |
-| `FLAMESHOT_POD_CPU_LIMIT` | Pod の CPU limit。単位は millicore |
+| `FLAMESHOT_POD_CPU_LIMIT` | Pod の CPU limit。CPU コアの 1/1000 単位 |
 | `FLAMESHOT_POD_MEM_LIMIT` | Pod のメモリー limit。単位は MiB |
 
 `processes` は、Java、Python、および Go のコマンドマッチング、収集時間、CPU/メモリーしきい値、言語固有オプションをサポートします。Heap Dump とオブジェクトストレージへのアップロードも既存の `envs` で設定します。機密性の高い認証情報には `{secretKeyRef:<SECRET>.<KEY>}` の使用を推奨します。全フィールドについては [Flameshot ドキュメント](../integrations/flameshot.md)を参照してください。

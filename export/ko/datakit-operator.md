@@ -254,9 +254,9 @@ DDTrace, OTel, logfwd 및 레거시 Profiler 규칙은 `check_annotation`을 지
 | `{fieldRef:status.hostIP}` | 노드 기본 IP |
 | `{fieldRef:status.hostIPs}` | 노드 듀얼 스택 IP |
 | `{fieldRef:status.podIP}` | Pod 기본 IP |
-| `{resourceFieldRef:limits.cpu}` | 첫 번째 애플리케이션 컨테이너의 CPU limit. 단위는 millicore입니다. |
+| `{resourceFieldRef:limits.cpu}` | 첫 번째 애플리케이션 컨테이너의 CPU limit. CPU 코어의 1/1000 단위입니다. |
 | `{resourceFieldRef:limits.memory}` | 첫 번째 애플리케이션 컨테이너의 메모리 limit. 단위는 MiB입니다. |
-| `{resourceFieldRef:requests.cpu}` | 첫 번째 애플리케이션 컨테이너의 CPU request. 단위는 millicore입니다. |
+| `{resourceFieldRef:requests.cpu}` | 첫 번째 애플리케이션 컨테이너의 CPU request. CPU 코어의 1/1000 단위입니다. |
 | `{resourceFieldRef:requests.memory}` | 첫 번째 애플리케이션 컨테이너의 메모리 request. 단위는 MiB입니다. |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Pod가 속한 Namespace의 Secret key |
 

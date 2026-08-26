@@ -93,7 +93,7 @@ Common environment variables:
 | `FLAMESHOT_HTTP_LOCAL_PORT` | Flameshot HTTP and metrics port; required for injection |
 | `FLAMESHOT_SERVICE` | Overrides service in all process rules |
 | `FLAMESHOT_TAGS` | Global Profiling tags |
-| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit, in millicores |
+| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit, in thousandths of a CPU core |
 | `FLAMESHOT_POD_MEM_LIMIT` | Pod memory limit, in MiB |
 
 `processes` supports command matching, collection duration, CPU and memory thresholds, and language-specific options for Java, Python, and Go. Heap Dump and object storage uploads are also configured through the existing `envs`; use `{secretKeyRef:<SECRET>.<KEY>}` for sensitive credentials. For all fields, see the [Flameshot documentation](../integrations/flameshot.md).

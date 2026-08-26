@@ -254,9 +254,9 @@ The `envs` field in an injection rule supports literal values and placeholders t
 | `{fieldRef:status.hostIP}` | Primary node IP |
 | `{fieldRef:status.hostIPs}` | Dual-stack node IPs |
 | `{fieldRef:status.podIP}` | Primary Pod IP |
-| `{resourceFieldRef:limits.cpu}` | CPU limit of the first application container, in millicores |
+| `{resourceFieldRef:limits.cpu}` | CPU limit of the first application container, in thousandths of a CPU core |
 | `{resourceFieldRef:limits.memory}` | Memory limit of the first application container, in MiB |
-| `{resourceFieldRef:requests.cpu}` | CPU request of the first application container, in millicores |
+| `{resourceFieldRef:requests.cpu}` | CPU request of the first application container, in thousandths of a CPU core |
 | `{resourceFieldRef:requests.memory}` | Memory request of the first application container, in MiB |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Secret key in the Pod's Namespace |
 

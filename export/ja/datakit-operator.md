@@ -254,9 +254,9 @@ DDTrace、OTel、logfwd、および旧方式の Profiler ルールは `check_ann
 | `{fieldRef:status.hostIP}` | ノードのプライマリ IP |
 | `{fieldRef:status.hostIPs}` | ノードのデュアルスタック IP |
 | `{fieldRef:status.podIP}` | Pod のプライマリ IP |
-| `{resourceFieldRef:limits.cpu}` | 最初のアプリケーションコンテナの CPU limit。単位は millicore |
+| `{resourceFieldRef:limits.cpu}` | 最初のアプリケーションコンテナの CPU limit。CPU コアの 1/1000 単位 |
 | `{resourceFieldRef:limits.memory}` | 最初のアプリケーションコンテナのメモリー limit。単位は MiB |
-| `{resourceFieldRef:requests.cpu}` | 最初のアプリケーションコンテナの CPU request。単位は millicore |
+| `{resourceFieldRef:requests.cpu}` | 最初のアプリケーションコンテナの CPU request。CPU コアの 1/1000 単位 |
 | `{resourceFieldRef:requests.memory}` | 最初のアプリケーションコンテナのメモリー request。単位は MiB |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Pod と同じ Namespace にある Secret の key |
 

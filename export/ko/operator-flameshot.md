@@ -93,7 +93,7 @@ Flameshot은 애플리케이션 프로세스에 직접 접근합니다. 운영 �
 | `FLAMESHOT_HTTP_LOCAL_PORT` | Flameshot HTTP 및 메트릭 포트. 주입에 필요합니다. |
 | `FLAMESHOT_SERVICE` | 모든 프로세스 규칙의 service 덮어쓰기 |
 | `FLAMESHOT_TAGS` | 전역 Profiling 태그 |
-| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit. 단위는 millicore입니다. |
+| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit. CPU 코어의 1/1000 단위입니다. |
 | `FLAMESHOT_POD_MEM_LIMIT` | Pod 메모리 limit. 단위는 MiB입니다. |
 
 `processes`는 Java, Python 및 Go의 명령 일치, 수집 시간, CPU/메모리 임계값 및 언어별 옵션을 지원합니다. Heap Dump와 오브젝트 스토리지 업로드도 기존 `envs`로 구성합니다. 민감한 자격 증명에는 `{secretKeyRef:<SECRET>.<KEY>}` 사용을 권장합니다. 전체 필드는 [Flameshot 문서](../integrations/flameshot.md)를 참조하십시오.
