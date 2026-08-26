@@ -15,6 +15,20 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+func captureWarningLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var logs bytes.Buffer
+	originalLog := log
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(&logs),
+		zap.WarnLevel,
+	)
+	log = &logger.Logger{SugaredLogger: zap.New(core).Sugar()}
+	t.Cleanup(func() { log = originalLog })
+	return &logs
+}
+
 func TestInjectSelectorValidation(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -114,6 +128,30 @@ func TestInvalidInjectRuleDoesNotStopLaterRules(t *testing.T) {
 	}
 }
 
+func TestNullInjectRuleDoesNotStopLaterRules(t *testing.T) {
+	logs := captureWarningLogs(t)
+
+	rules := LogfwdRules{
+		nil,
+		&LogfwdRule{InjectRule: InjectRule{
+			Name:     "valid",
+			Selector: Selector{Namespaces: []string{"^production$"}},
+		}},
+	}
+	var matched bool
+	var rule *LogfwdRule
+	if !assert.NotPanics(t, func() {
+		rules.Setup()
+		matched, rule = rules.Matches("production", nil)
+	}) {
+		return
+	}
+	if assert.True(t, matched) && assert.NotNil(t, rule) {
+		assert.Equal(t, "valid", rule.Name)
+	}
+	assert.Contains(t, logs.String(), `ruleset=logfwds rule_index=0 reason=null_rule`)
+}
+
 func TestMatchAllSkipsInvalidRules(t *testing.T) {
 	rules := OTelRules{
 		&OTelRule{InjectRule: InjectRule{Selector: Selector{Labels: []string{""}}}},
@@ -143,16 +181,35 @@ func TestMutateRulesRequireBothSelectorDimensions(t *testing.T) {
 	}
 }
 
+func TestNullMutateRuleDoesNotStopLaterRules(t *testing.T) {
+	logs := captureWarningLogs(t)
+
+	rules := MutateRules{
+		nil,
+		&MutateRule{
+			Selector: Selector{
+				Namespaces: []string{"^production$"},
+				Labels:     []string{"app=web"},
+			},
+			Config: "valid",
+		},
+	}
+	var matched bool
+	var rule *MutateRule
+	if !assert.NotPanics(t, func() {
+		rules.Setup()
+		matched, rule = rules.Matches("production", map[string]string{"app": "web"})
+	}) {
+		return
+	}
+	if assert.True(t, matched) && assert.NotNil(t, rule) {
+		assert.Equal(t, "valid", rule.Config)
+	}
+	assert.Contains(t, logs.String(), `ruleset=loggings rule_index=0 reason=null_rule`)
+}
+
 func TestInvalidSelectorsProduceActionableWarnings(t *testing.T) {
-	var logs bytes.Buffer
-	originalLog := log
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
-		zapcore.AddSync(&logs),
-		zap.WarnLevel,
-	)
-	log = &logger.Logger{SugaredLogger: zap.New(core).Sugar()}
-	t.Cleanup(func() { log = originalLog })
+	logs := captureWarningLogs(t)
 
 	LogfwdRules{
 		&LogfwdRule{InjectRule: InjectRule{
