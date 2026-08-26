@@ -2,7 +2,7 @@
 
 DataKit Operator 从 [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0) 开始支持为 Java、Python 和 Node.js 应用注入 OpenTelemetry 自动探针。本功能使用 OpenTelemetry 官方自动注入镜像，并遵循其复制探针和设置启动环境的方式。
 
-注入只发生在 Pod 创建时。Operator 会修改 Pod 中的所有普通业务容器，不修改业务 init Container，也不检测容器内的语言版本或 libc。
+发布模板中的 `otels` 默认为空，OpenTelemetry 注入不会自动开启。启用时需要先添加本页所示规则。注入只发生在 Pod 创建时；Operator 会修改 Pod 中的所有普通业务容器，不修改业务 init Container，也不检测容器内的语言版本或 libc。
 
 ## 使用前准备 {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-默认 Operator 模板只开启 Trace。需要采集 Metric 或 Log 时，将对应的 `OTEL_METRICS_EXPORTER` 或 `OTEL_LOGS_EXPORTER` 从 `none` 改为 `otlp`，不需要配置新的 DataKit 地址。应用和自动探针本身还必须能够产生相应信号。
+本页的示例规则只开启 Trace。需要采集 Metric 或 Log 时，将对应的 `OTEL_METRICS_EXPORTER` 或 `OTEL_LOGS_EXPORTER` 从 `none` 改为 `otlp`，不需要配置新的 DataKit 地址。应用和自动探针本身还必须能够产生相应信号。
 
 ### 确认语言支持范围 {#otel-language-support}
 
@@ -39,7 +39,7 @@ Operator 不会自动判断这些条件。请使用互斥的 Namespace 或 Label
 
 ## Operator 配置 {#otel-config}
 
-`otels` 与 `ddtraces` 平级。下面是完整的 Java 规则：
+`otels` 与 `ddtraces` 平级，发布模板中的默认值为 `[]`。将下面的完整 Java 规则添加到该数组即可启用符合 Selector 条件的 Pod：
 
 ```json
 {

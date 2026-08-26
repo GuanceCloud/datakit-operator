@@ -2,7 +2,7 @@
 
 DataKit Operator는 [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0)부터 Java, Python 및 Node.js 애플리케이션에 OpenTelemetry 자동 계측 에이전트 주입을 지원합니다. 이 기능은 OpenTelemetry 공식 자동 주입 이미지를 사용하며 에이전트를 복사하고 시작 환경을 설정하는 공식 방식을 따릅니다.
 
-주입은 Pod 생성 시에만 수행됩니다. Operator는 Pod의 모든 일반 애플리케이션 컨테이너를 변경하지만 애플리케이션 init Container는 변경하지 않으며 컨테이너 내부의 언어 버전이나 libc도 감지하지 않습니다.
+배포 템플릿에서는 `otels`가 기본적으로 비어 있으므로 OpenTelemetry 주입은 자동으로 활성화되지 않습니다. 활성화하려면 먼저 이 페이지에 나온 규칙을 추가하십시오. 주입은 Pod 생성 시에만 수행됩니다. Operator는 Pod의 모든 일반 애플리케이션 컨테이너를 변경하지만 애플리케이션 init Container는 변경하지 않으며 컨테이너 내부의 언어 버전이나 libc도 감지하지 않습니다.
 
 ## 사전 준비 {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-기본 Operator 템플릿은 Trace만 활성화합니다. Metric 또는 Log를 수집하려면 해당 `OTEL_METRICS_EXPORTER` 또는 `OTEL_LOGS_EXPORTER`를 `none`에서 `otlp`로 변경하십시오. 새 DataKit 주소를 구성할 필요는 없습니다. 애플리케이션과 자동 계측 에이전트 자체도 해당 신호를 생성할 수 있어야 합니다.
+이 페이지의 예시 규칙은 Trace만 활성화합니다. Metric 또는 Log를 수집하려면 해당 `OTEL_METRICS_EXPORTER` 또는 `OTEL_LOGS_EXPORTER`를 `none`에서 `otlp`로 변경하십시오. 새 DataKit 주소를 구성할 필요는 없습니다. 애플리케이션과 자동 계측 에이전트 자체도 해당 신호를 생성할 수 있어야 합니다.
 
 ### 언어 지원 범위 확인 {#otel-language-support}
 
@@ -39,7 +39,7 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
 
 ## Operator 구성 {#otel-config}
 
-`otels`는 `ddtraces`와 같은 계층에 있습니다. 다음은 전체 Java 규칙입니다.
+`otels`는 `ddtraces`와 같은 계층에 있으며 배포 템플릿의 기본값은 `[]`입니다. 다음의 전체 Java 규칙을 이 배열에 추가하면 Selector 조건과 일치하는 Pod에 대한 주입이 활성화됩니다.
 
 ```json
 {

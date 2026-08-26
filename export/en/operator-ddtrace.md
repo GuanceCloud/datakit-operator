@@ -6,6 +6,8 @@ DataKit Operator injects DDTrace automatic instrumentation when a Pod is created
 
 Before use, [install DataKit Operator](datakit-operator.md#install) and confirm that application containers can access the DataKit Trace receiver address.
 
+The distributed templates retain one Java DDTrace rule by default, matching every Pod in the `default` Namespace. This preserves compatibility with existing deployments and does not mean that only Java is supported. The Operator does not detect the language in application containers automatically. When configuring Python, PHP, or Node.js, also change the default Java rule to use a mutually exclusive language label; otherwise, it matches those Pods first and prevents the later language rules from taking effect.
+
 ### Supported Runtimes and Images {#ddtrace-lib-image-selection}
 
 | Language | Application runtime | Default image |
@@ -26,7 +28,7 @@ The PHP init Container copies the loader configuration for the corresponding lib
 
 ### Rule Configuration {#ddtrace-config}
 
-Add rules to `admission_inject_v2.ddtraces`. The following Java rule matches only Pods in the `default` Namespace with the `admission.datakit/ddtrace-language=java` label:
+Add rules to `admission_inject_v2.ddtraces`. The following Java rule can coexist with rules for other languages and matches only Pods in the `default` Namespace with the `admission.datakit/ddtrace-language=java` label:
 
 ```json
 {

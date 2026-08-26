@@ -5,6 +5,7 @@ This Helm chart installs [DataKit Operator]() with configurable TLS, RBAC and mu
 - [Requirements](#requirements)
 - [Installing](#installing)
 - [Uninstalling](#uninstalling)
+- [Tracing injection](#tracing-injection)
 - [Configuration](#configuration)
 
 ## Requirements
@@ -27,6 +28,12 @@ $ helm install datakit-operator datakit-operator --repo https://pubrepo.(@BRAND_
 ```shell
 $ helm uninstall datakit-operator -n datakit
 ```
+
+## Tracing injection
+
+The shipped configuration enables one Java DDTrace rule for Pods in the `default` namespace. This preserves the existing default behavior; the Operator does not detect the application language automatically.
+
+DDTrace also supports Python, PHP, and Node.js. OpenTelemetry supports Java, Python, and Node.js, but is disabled by default with `otels: []`. To enable another language or OpenTelemetry, add explicit rules with mutually exclusive language labels. See the [DDTrace injection documentation](https://docs.(@BRAND_DOMAIN)/datakit/operator-ddtrace/) and [OpenTelemetry injection documentation](https://docs.(@BRAND_DOMAIN)/datakit/operator-otel/) for complete configuration examples.
 
 ## Configuration
 

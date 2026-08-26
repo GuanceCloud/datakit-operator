@@ -3,6 +3,7 @@
 ## 1.9.0 (Unreleased) {#cl-1.9.0}
 
 - Added OpenTelemetry automatic instrumentation injection for Java, Python, and Node.js applications (#98, #101, #102)
+- Adjusted the default injection configuration to retain only the Java DDTrace rule and keep OpenTelemetry disabled by default (#98)
 - When OTel injection encounters `runAsNonRoot: true` without an explicitly configured nonzero `runAsUser`, it now skips injection and logs a searchable warning, preventing the application Pod from failing to start (#105)
 - Fixed an issue where DDTrace Java Agent startup arguments could be missing when the Admission Webhook was re-entered (#100)
 - Operator documentation is now maintained independently in Chinese, English, Japanese, and Korean (#106)

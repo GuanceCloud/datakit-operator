@@ -2,7 +2,7 @@
 
 DataKit Operator は [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0) 以降、Java、Python、および Node.js アプリケーションへの OpenTelemetry 自動計装の注入をサポートします。この機能は OpenTelemetry 公式の自動計装イメージを使用し、そのプローブのコピー方法と起動環境の設定方法に従います。
 
-注入は Pod の作成時にだけ行われます。Operator は Pod 内のすべての通常のアプリケーションコンテナを変更しますが、アプリケーションの init Container は変更せず、コンテナ内の言語バージョンや libc も検出しません。
+配布テンプレートでは `otels` はデフォルトで空のため、OpenTelemetry の注入は自動的に有効になりません。有効にするには、まずこのページに示すルールを追加してください。注入は Pod の作成時にだけ行われます。Operator は Pod 内のすべての通常のアプリケーションコンテナを変更しますが、アプリケーションの init Container は変更せず、コンテナ内の言語バージョンや libc も検出しません。
 
 ## 使用前の準備 {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-Operator のデフォルトテンプレートでは Trace だけが有効です。Metric または Log を収集するには、対応する `OTEL_METRICS_EXPORTER` または `OTEL_LOGS_EXPORTER` を `none` から `otlp` に変更します。新しい DataKit アドレスを設定する必要はありません。アプリケーションと自動計装自体も、対応するシグナルを生成できる必要があります。
+このページのサンプルルールでは Trace だけが有効です。Metric または Log を収集するには、対応する `OTEL_METRICS_EXPORTER` または `OTEL_LOGS_EXPORTER` を `none` から `otlp` に変更します。新しい DataKit アドレスを設定する必要はありません。アプリケーションと自動計装自体も、対応するシグナルを生成できる必要があります。
 
 ### 対応言語の範囲 {#otel-language-support}
 
@@ -39,7 +39,7 @@ Operator はこれらの条件を自動判定しません。相互排他的な N
 
 ## Operator の設定 {#otel-config}
 
-`otels` は `ddtraces` と同じ階層にあります。次に Java ルールの完全な例を示します。
+`otels` は `ddtraces` と同じ階層にあり、配布テンプレートでのデフォルト値は `[]` です。次の完全な Java ルールをこの配列に追加すると、Selector 条件を満たす Pod への注入が有効になります。
 
 ```json
 {

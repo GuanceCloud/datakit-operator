@@ -3,6 +3,7 @@
 ## 1.9.0（リリース予定） {#cl-1.9.0}
 
 - Java、Python、および Node.js アプリケーションへの OpenTelemetry 自動計装の注入をサポート（#98、#101、#102）
+- デフォルトの注入設定を調整し、Java DDTrace ルールだけを残して OpenTelemetry をデフォルトで無効化（#98）
 - OTel の注入時に `runAsNonRoot: true` が設定され、ゼロ以外の `runAsUser` が明示されていない場合は注入をスキップし、検索可能な warning を記録してアプリケーション Pod の起動失敗を防止（#105）
 - Admission Webhook の再入時に DDTrace Java の Agent 起動パラメーターが欠落する可能性がある問題を修正（#100）
 - Operator の中国語、英語、日本語、および韓国語ドキュメントを個別に管理（#106）

@@ -2,7 +2,7 @@
 
 Starting with [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0), DataKit Operator supports injecting OpenTelemetry automatic instrumentation into Java, Python, and Node.js applications. This feature uses the official OpenTelemetry automatic instrumentation images and follows their approach for copying instrumentation and configuring the startup environment.
 
-Injection occurs only when a Pod is created. The Operator modifies all regular application containers in the Pod. It does not modify application init Containers or detect language versions or libc inside containers.
+The distributed templates set `otels` to an empty list by default, so OpenTelemetry injection is not enabled automatically. To enable it, first add the rules shown on this page. Injection occurs only when a Pod is created. The Operator modifies all regular application containers in the Pod. It does not modify application init Containers or detect language versions or libc inside containers.
 
 ## Before You Begin {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-The default Operator template enables only Traces. To collect Metrics or Logs, change the corresponding `OTEL_METRICS_EXPORTER` or `OTEL_LOGS_EXPORTER` from `none` to `otlp`; no new DataKit address is required. The application and automatic instrumentation must also be able to produce the corresponding signals.
+The example rules on this page enable only Traces. To collect Metrics or Logs, change the corresponding `OTEL_METRICS_EXPORTER` or `OTEL_LOGS_EXPORTER` from `none` to `otlp`; no new DataKit address is required. The application and automatic instrumentation must also be able to produce the corresponding signals.
 
 ### Confirm Language Support {#otel-language-support}
 
@@ -39,7 +39,7 @@ The Operator does not detect these conditions automatically. Use mutually exclus
 
 ## Operator Configuration {#otel-config}
 
-`otels` is at the same level as `ddtraces`. The following is a complete Java rule:
+`otels` is at the same level as `ddtraces`, and its default value in the distributed templates is `[]`. Add the following complete Java rule to that array to enable injection for Pods that match its Selectors:
 
 ```json
 {

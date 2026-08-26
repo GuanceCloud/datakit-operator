@@ -6,6 +6,8 @@ DataKit Operator는 Pod 생성 시 DDTrace 자동 계측 에이전트를 주입�
 
 먼저 [DataKit Operator를 설치](datakit-operator.md#install)하고 애플리케이션 컨테이너에서 DataKit Trace 수신 주소에 접근할 수 있는지 확인하십시오.
 
+배포 템플릿은 기본적으로 Java DDTrace 규칙 하나만 유지하며 `default` Namespace의 모든 Pod와 일치시킵니다. 이는 기존 배포와의 호환성을 유지하기 위한 것이며 Java만 지원한다는 의미는 아닙니다. Operator는 애플리케이션 컨테이너의 언어를 자동으로 감지하지 않습니다. Python, PHP 또는 Node.js를 구성할 때는 기본 Java 규칙도 상호 배타적인 언어 Label을 사용하도록 변경해야 합니다. 그렇지 않으면 해당 규칙이 먼저 Pod와 일치하여 뒤에 있는 언어 규칙이 적용되지 않습니다.
+
 ### 지원 범위 및 이미지 {#ddtrace-lib-image-selection}
 
 | 언어 | 애플리케이션 런타임 | 기본 이미지 |
@@ -26,7 +28,7 @@ PHP init Container는 해당 libc의 loader 구성을 복사합니다. 애플리
 
 ### 구성 규칙 {#ddtrace-config}
 
-`admission_inject_v2.ddtraces`에 규칙을 추가합니다. 다음 Java 규칙은 `default` Namespace에서 `admission.datakit/ddtrace-language=java` Label이 있는 Pod에만 일치합니다.
+`admission_inject_v2.ddtraces`에 규칙을 추가합니다. 다음 Java 규칙은 다른 언어 규칙과 함께 사용할 수 있으며 `default` Namespace에서 `admission.datakit/ddtrace-language=java` Label이 있는 Pod에만 일치합니다.
 
 ```json
 {

@@ -122,6 +122,10 @@ v1.8.0부터 `admission_inject_v2`를 사용합니다.
 }
 ```
 
+위 예시는 구성 구조만 보여 줍니다. 실제 배포 템플릿은 `default` Namespace의 Pod와 일치하는 Java DDTrace 규칙 하나만 유지하며, `otels`가 비어 있으므로 OpenTelemetry 주입은 자동으로 활성화되지 않습니다. 이 기본값은 기존 배포와의 호환성을 유지하기 위한 실행 정책이며 Operator가 Java만 지원한다는 의미는 아닙니다.
+
+Operator는 애플리케이션 컨테이너의 언어를 자동으로 감지하지 않습니다. DDTrace는 Python, PHP 및 Node.js도 지원하고 OpenTelemetry는 Java, Python 및 Node.js를 지원합니다. 이러한 기능을 활성화하려면 [DDTrace 자동 주입](operator-ddtrace.md) 및 [OpenTelemetry 자동 주입](operator-otel.md) 문서에 따라 상호 배타적인 언어 Label을 사용하는 규칙을 추가하십시오.
+
 레거시 `admission_inject` 구성도 계속 지원됩니다. 이전 구성에서 유효한 `ddtrace`, `logfwd` 또는 `profiler`는 각각 해당 v2 규칙을 덮어씁니다. 업그레이드할 때 두 구성에 유효한 규칙을 동시에 관리하지 마십시오.
 
 ## Cluster API {#cluster-api}

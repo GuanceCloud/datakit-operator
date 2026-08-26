@@ -6,6 +6,8 @@ DataKit Operator 在 Pod 创建时注入 DDTrace 自动探针，支持 Java、Py
 
 使用前，请先[安装 DataKit Operator](datakit-operator.md#install)，并确认业务容器可以访问 DataKit 的 Trace 接收地址。
 
+发布模板默认保留一条 Java DDTrace 规则，匹配 `default` 命名空间中的所有 Pod。这是为了兼容已有部署，并不代表只支持 Java。Operator 不会自动识别业务容器的语言；配置 Python、PHP 或 Node.js 时，需要同时把默认 Java 规则改成使用互斥语言标签，否则它会先匹配这些 Pod，使后续语言规则无法生效。
+
 ### 支持范围与镜像 {#ddtrace-lib-image-selection}
 
 | 语言 | 业务运行时 | 默认镜像 |
@@ -26,7 +28,7 @@ PHP init Container 会复制对应 libc 的 loader 配置。业务进程启动�
 
 ### 配置规则 {#ddtrace-config}
 
-在 `admission_inject_v2.ddtraces` 中添加规则。下面的 Java 规则只匹配 `default` 命名空间中带有 `admission.datakit/ddtrace-language=java` 标签的 Pod：
+在 `admission_inject_v2.ddtraces` 中添加规则。下面的 Java 规则适合与其他语言规则并存，只匹配 `default` 命名空间中带有 `admission.datakit/ddtrace-language=java` 标签的 Pod：
 
 ```json
 {
