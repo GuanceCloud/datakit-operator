@@ -66,6 +66,35 @@ func TestInjectSelectorValidation(t *testing.T) {
 	}
 }
 
+func TestSelectorsWithinOneDimensionUseOR(t *testing.T) {
+	tests := []struct {
+		name      string
+		selector  Selector
+		namespace string
+		labels    map[string]string
+	}{
+		{
+			name:      "namespace",
+			selector:  Selector{Namespaces: []string{"^staging$", "^production$"}},
+			namespace: "production",
+		},
+		{
+			name:     "label",
+			selector: Selector{Labels: []string{"app=api", "app=web"}},
+			labels:   map[string]string{"app": "web"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rules := LogfwdRules{&LogfwdRule{InjectRule: InjectRule{Selector: tc.selector}}}
+			rules.Setup()
+			matched, _ := rules.Matches(tc.namespace, tc.labels)
+			assert.True(t, matched)
+		})
+	}
+}
+
 func TestInvalidInjectRuleDoesNotStopLaterRules(t *testing.T) {
 	rules := LogfwdRules{
 		&LogfwdRule{InjectRule: InjectRule{

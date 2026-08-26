@@ -44,6 +44,87 @@ func TestInjectOTelRejectsConflictingEnvironments(t *testing.T) {
 	}
 }
 
+func TestInjectOTelRejectsStructuralConflicts(t *testing.T) {
+	image := "example.com/otel-java:1"
+	tests := []struct {
+		name   string
+		image  string
+		mutate func(*corev1.Pod)
+	}{
+		{
+			name:  "no application container",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers = nil
+			},
+		},
+		{name: "empty image"},
+		{
+			name:  "existing DDTrace init container",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.InitContainers = []corev1.Container{{Name: ddtraceInitContainerName, Image: "ddtrace:1"}}
+			},
+		},
+		{
+			name:  "conflicting OTel init container",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.InitContainers = []corev1.Container{{Name: otelInitContainerName, Image: "other:1"}}
+			},
+		},
+		{
+			name:  "conflicting OTel volume",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Volumes = []corev1.Volume{{
+					Name:         otelVolumeName,
+					VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "existing"}},
+				}}
+			},
+		},
+		{
+			name:  "conflicting OTel mount name",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: otelVolumeName, MountPath: "/other"}}
+			},
+		},
+		{
+			name:  "conflicting OTel mount path",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "other", MountPath: otelJavaMountPath}}
+			},
+		},
+		{
+			name:  "OTel mount with subPath",
+			image: image,
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{
+					Name: otelVolumeName, MountPath: otelJavaMountPath, SubPath: "agent",
+				}}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			useOTelRules(t, newTestOTelRule(tc.image))
+			pod := createTestPod("structural-conflict", nil)
+			if tc.mutate != nil {
+				tc.mutate(pod)
+			}
+			before := pod.DeepCopy()
+
+			changed, err := InjectOTelToPod("default", pod.Name, pod)
+			assert.NoError(t, err)
+			assert.False(t, changed)
+			assert.Equal(t, before, pod)
+		})
+	}
+}
+
 func TestInjectOTelReinvocationHandlesDefaultsAndLateSidecar(t *testing.T) {
 	tests := []struct {
 		language, envName, expected string

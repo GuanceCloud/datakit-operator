@@ -88,6 +88,10 @@ func TestBuildPodInjectionPatchOnlyAddsOwnedFields(t *testing.T) {
 	newPod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{
 		Name: "datakit-auto-instrument", MountPath: "/datadog-lib",
 	}}
+	newPod.Spec.Containers = append(newPod.Spec.Containers, corev1.Container{Name: "datakit-sidecar"})
+	shareProcessNamespace := true
+	newPod.Spec.ShareProcessNamespace = &shareProcessNamespace
+	newPod.Spec.RestartPolicy = corev1.RestartPolicyNever
 
 	patches := buildPodInjectionPatch(oldPod, newPod)
 	assert.NotEmpty(t, patches)
@@ -100,6 +104,23 @@ func TestBuildPodInjectionPatchOnlyAddsOwnedFields(t *testing.T) {
 	}
 	assert.Equal(t, "replace", operations["/spec/containers/0/env/0"])
 	assert.Equal(t, "add", operations["/spec/containers/0/env/-"])
+
+	oldRaw, err := json.Marshal(oldPod)
+	assert.NoError(t, err)
+	patchRaw, err := json.Marshal(patches)
+	assert.NoError(t, err)
+	patch, err := jsonpatch.DecodePatch(patchRaw)
+	assert.NoError(t, err)
+	mutatedRaw, err := patch.Apply(oldRaw)
+	assert.NoError(t, err)
+	var patchedPod corev1.Pod
+	assert.NoError(t, json.Unmarshal(mutatedRaw, &patchedPod))
+	assert.Equal(t, newPod.Annotations, patchedPod.Annotations)
+	assert.Equal(t, newPod.Spec.Containers, patchedPod.Spec.Containers)
+	assert.Equal(t, newPod.Spec.InitContainers, patchedPod.Spec.InitContainers)
+	assert.Equal(t, newPod.Spec.Volumes, patchedPod.Spec.Volumes)
+	assert.Equal(t, newPod.Spec.ShareProcessNamespace, patchedPod.Spec.ShareProcessNamespace)
+	assert.Equal(t, newPod.Spec.RestartPolicy, patchedPod.Spec.RestartPolicy)
 }
 
 func TestMutateRequestProducesApplicableOTelPatch(t *testing.T) {
