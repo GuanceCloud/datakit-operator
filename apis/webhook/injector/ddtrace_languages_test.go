@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/config"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -86,4 +87,30 @@ func TestInjectDDTraceConfigErrorIsAtomic(t *testing.T) {
 			assert.Equal(t, before, pod)
 		})
 	}
+}
+
+func TestInjectDDTraceVersionAnnotationSelectsLaterRule(t *testing.T) {
+	javaRule := newTestDDTraceRule("java", "example.com/dd-java:1")
+	javaRule.CheckAnnotation = true
+	pythonRule := newTestDDTraceRule("python", "example.com/dd-python:1")
+	pythonRule.CheckAnnotation = true
+	original := ddtraceMatchAllNamespaceOrLabelsForConfig
+	ddtraceMatchAllNamespaceOrLabelsForConfig = func(string, map[string]string) (bool, []*config.DDTraceRule) {
+		return true, []*config.DDTraceRule{javaRule, pythonRule}
+	}
+	t.Cleanup(func() { ddtraceMatchAllNamespaceOrLabelsForConfig = original })
+	pod := createTestPod("versioned-python", map[string]string{
+		"admission.datakit/python-lib.version": "2.0.0",
+	})
+
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	if assert.Len(t, pod.Spec.InitContainers, 1) {
+		assert.Equal(t, "example.com/dd-python:2.0.0", pod.Spec.InitContainers[0].Image)
+	}
+	_, hasPythonPath := findEnv(pod.Spec.Containers[0].Env, "PYTHONPATH")
+	_, hasJavaOptions := findEnv(pod.Spec.Containers[0].Env, javaToolOptionsKey)
+	assert.True(t, hasPythonPath)
+	assert.False(t, hasJavaOptions)
 }

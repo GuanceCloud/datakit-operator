@@ -52,10 +52,10 @@ func TestInjectTracingDoesNotFallbackAfterDDTraceSelection(t *testing.T) {
 	assert.Equal(t, before, pod)
 }
 
-func TestInjectTracingUsesOTelWhenDDTraceDoesNotMatch(t *testing.T) {
-	useUnmatchedDDTrace(t)
+func TestInjectTracingUsesOTelWhenDDTraceIsDisabled(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1"))
 	useOTelRules(t, newTestOTelRuleForLanguage("nodejs", "example.com/otel-node:1"))
-	pod := createTestPod("otel", nil)
+	pod := createTestPod("otel", map[string]string{ddtraceEnabledAnnotationKey: "false"})
 
 	changed, err := InjectTracingToPod("default", pod.Name, pod)
 	assert.NoError(t, err)
