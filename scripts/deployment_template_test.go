@@ -48,6 +48,49 @@ func TestDeploymentTemplatesUseTracingDefaults(t *testing.T) {
 	}
 }
 
+func TestFlameshotDocumentationImageMatchesDeploymentDefaults(t *testing.T) {
+	wantTag := readExportImageTag(t, "../export/config.env", "FlameshotImage")
+	for _, path := range []string{
+		"../templates/charts-values.template.yaml",
+		"../templates/datakit-operator.template.yaml",
+	} {
+		t.Run(path, func(t *testing.T) {
+			cfg, _ := readTemplateConfiguration(t, path)
+			if len(cfg.AdmissionInject.Flameshots) != 1 {
+				t.Fatalf("default flameshots must contain one rule, got %d", len(cfg.AdmissionInject.Flameshots))
+			}
+			if got := imageTag(t, cfg.AdmissionInject.Flameshots[0].Image); got != wantTag {
+				t.Fatalf("default Flameshot image tag = %q, documentation uses %q", got, wantTag)
+			}
+		})
+	}
+}
+
+func readExportImageTag(t *testing.T, path, key string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	prefix := key + "="
+	for _, line := range strings.Split(string(data), "\n") {
+		if image, found := strings.CutPrefix(line, prefix); found {
+			return imageTag(t, image)
+		}
+	}
+	t.Fatalf("%s does not define %s", path, key)
+	return ""
+}
+
+func imageTag(t *testing.T, image string) string {
+	t.Helper()
+	idx := strings.LastIndex(image, ":")
+	if idx == -1 || idx < strings.LastIndex(image, "/") {
+		t.Fatalf("image %q does not contain a tag", image)
+	}
+	return image[idx+1:]
+}
+
 func readTemplateConfiguration(t *testing.T, path string) (config.Configuration, string) {
 	t.Helper()
 
