@@ -1,13 +1,10 @@
 # Operator 변경 내역
 
-## 1.9.0(출시 예정) {#cl-1.9.0}
+## 1.9.0(2026-08-26) {#cl-1.9.0}
 
-- Java, Python 및 Node.js 애플리케이션에 OpenTelemetry 자동 계측 에이전트 주입 지원 (#98, #101, #102)
-- 기본 주입 구성을 조정하여 Java DDTrace 규칙만 유지하고 OpenTelemetry는 기본적으로 비활성화 (#98)
-- OTel 주입 시 `runAsNonRoot: true`이지만 0이 아닌 `runAsUser`를 명시하지 않은 경우 주입을 건너뛰고 검색 가능한 warning을 기록하여 애플리케이션 Pod가 시작되지 않는 문제 방지 (#105)
-- Admission Webhook 재진입 시 DDTrace Java Agent 시작 인수가 누락될 수 있는 문제 수정 (#100)
-- Operator의 중국어, 영어, 일본어 및 한국어 문서를 독립적으로 관리 (#106)
-- 유효하지 않거나 비어 있는 Admission selector에 대해 warning을 기록하고 해당 규칙만 비활성화하여 Pod 일치 범위가 의도치 않게 확대되는 문제 방지 (#87)
+- Java, Python 및 Node.js 애플리케이션에 OpenTelemetry 자동 계측 주입 지원 (#98, #101, #102)
+- 호환되지 않는 설정이 애플리케이션 Pod에 영향을 주지 않도록 계측 주입의 안전성과 설정 오류 허용성 개선 (#87, #105)
+- Admission Webhook 재호출 시 DDTrace Java가 적용되지 않을 수 있는 문제 수정 (#100)
 
 ## 1.8.10(2026-07-06) {#cl-1.8.10}
 
