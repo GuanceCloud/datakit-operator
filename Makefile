@@ -2,7 +2,7 @@ default: local
 
 .PHONY: check_rc_version docs_lint pub_rc_image
 
-VERSION=v1.8.10
+VERSION=v1.9.0
 RC_VERSION ?=
 
 BIN           = datakit-operator

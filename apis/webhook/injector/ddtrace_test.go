@@ -89,6 +89,26 @@ func TestInjectDDTraceRepairsJavaReinvocation(t *testing.T) {
 	assert.Equal(t, afterRepair, pod)
 }
 
+func TestInjectDDTraceRepairsOtherContainersWhenJavaOptionsUsesValueFrom(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	pod := createTestPod("reinvoked-multi-container", nil)
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: "worker", Image: "worker:1"})
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) {
+		return
+	}
+
+	valueFromJavaOptions := fieldRefEnv(javaToolOptionsKey)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{valueFromJavaOptions}
+	pod.Spec.Containers[1].Env = nil
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []corev1.EnvVar{valueFromJavaOptions}, pod.Spec.Containers[0].Env)
+	assert.Equal(t, 1, countNamedEnv(pod.Spec.Containers[1].Env, javaToolOptionsKey))
+}
+
 func TestInjectDDTraceRepairRequiresCompleteMountChain(t *testing.T) {
 	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
 	complete := createTestPod("partial", nil)
@@ -119,13 +139,13 @@ func TestInjectDDTraceRepairRequiresCompleteMountChain(t *testing.T) {
 	}
 }
 
-func TestInjectDDTracePreservesEnvironmentOrder(t *testing.T) {
+func TestInjectDDTraceMovesMergedDDTagsAfterItsDependencies(t *testing.T) {
 	rule := newTestDDTraceRule("java", "example.com/dd-java:1.0.0")
 	rule.Envs = config.Envs{
 		{Key: "NEW_FIRST", Value: "one"},
-		{Key: ddtraceDDTagsKey, Value: "cluster:prod"},
+		{Key: "POD_NAME", Value: "checkout-0"},
 		{Key: "EXISTING", Value: "replace-me"},
-		{Key: "NEW_LAST", Value: "$(NEW_FIRST)"},
+		{Key: ddtraceDDTagsKey, Value: "pod_name:$(POD_NAME),cluster:prod"},
 	}
 	useDDTraceRule(t, rule)
 	pod := createTestPod("ordered", nil)
@@ -140,11 +160,11 @@ func TestInjectDDTracePreservesEnvironmentOrder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, []string{
-		"BEFORE", ddtraceDDTagsKey, "EXISTING", "AFTER",
-		javaToolOptionsKey, "NEW_FIRST", "NEW_LAST",
+		"BEFORE", "EXISTING", "AFTER", javaToolOptionsKey,
+		"NEW_FIRST", "POD_NAME", ddtraceDDTagsKey,
 	}, envNames(pod.Spec.Containers[0].Env))
 	tags, _ := findEnv(pod.Spec.Containers[0].Env, ddtraceDDTagsKey)
-	assert.Equal(t, "user:value,cluster:prod", tags.Value)
+	assert.Equal(t, "user:value,pod_name:$(POD_NAME),cluster:prod", tags.Value)
 	existing, _ := findEnv(pod.Spec.Containers[0].Env, "EXISTING")
 	assert.Equal(t, "keep-me", existing.Value)
 }

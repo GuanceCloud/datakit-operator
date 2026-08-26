@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.0] - 2026-08-26
+
+- 支持为 Java、Python 和 Node.js 应用注入 OpenTelemetry 自动探针（#98、#101、#102）
+- 优化探针注入的安全性和配置容错，避免不兼容配置影响业务 Pod（#87、#105）
+- 修复 DDTrace Java 在 Admission Webhook 重入时可能未生效的问题（#100）
+
 ## [1.8.10] - 2026-07-06
 
 - 支持 secretKeyRef 环境变量类型（#95）

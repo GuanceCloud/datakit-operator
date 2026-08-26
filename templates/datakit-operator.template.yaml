@@ -112,7 +112,7 @@ data:
                 {
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
-                    "image": "(@BRAND_REPO_DATAKIT)/flameshot:0.2.1",
+                    "image": "(@BRAND_REPO_DATAKIT)/flameshot:0.2.4",
                     "envs": {
                         "FLAMESHOT_DATAKIT_ADDR":     "http://datakit-service.datakit:9529/profiling/v1/input",
                         "FLAMESHOT_MONITOR_INTERVAL": "10s",

@@ -61,6 +61,7 @@ type (
 	}
 
 	injectRule interface {
+		comparable
 		commonRule() *InjectRule
 	}
 )
@@ -111,6 +112,10 @@ func (rs ProfilerRules) Matches(ns string, labels map[string]string) (bool, *Pro
 
 func setupInjectRules[T injectRule](ruleset string, rs []T) {
 	for idx := range rs {
+		if isNullInjectRule(rs[idx]) {
+			log.Warnf("admission rule disabled: ruleset=%s rule_index=%d reason=null_rule", ruleset, idx)
+			continue
+		}
 		rule := rs[idx].commonRule()
 		if rule.Resources.Nil() {
 			rule.Resources = defaultResourceRequirements()
@@ -131,6 +136,9 @@ func setupInjectRules[T injectRule](ruleset string, rs []T) {
 func matchInjectRule[T injectRule](rs []T, ns string, labels map[string]string) (bool, T) {
 	var zero T
 	for idx := range rs {
+		if isNullInjectRule(rs[idx]) {
+			continue
+		}
 		rule := rs[idx].commonRule()
 		if injectRuleMatches(rule, ns, labels) {
 			return true, rs[idx]
@@ -142,12 +150,20 @@ func matchInjectRule[T injectRule](rs []T, ns string, labels map[string]string) 
 func matchAllInjectRules[T injectRule](rs []T, ns string, labels map[string]string) (bool, []T) {
 	var rules []T
 	for idx := range rs {
+		if isNullInjectRule(rs[idx]) {
+			continue
+		}
 		rule := rs[idx].commonRule()
 		if injectRuleMatches(rule, ns, labels) {
 			rules = append(rules, rs[idx])
 		}
 	}
 	return len(rules) > 0, rules
+}
+
+func isNullInjectRule[T injectRule](rule T) bool {
+	var zero T
+	return rule == zero
 }
 
 func injectRuleMatches(rule *InjectRule, ns string, labels map[string]string) bool {
@@ -200,6 +216,10 @@ type (
 
 func (rs MutateRules) Setup() {
 	for idx := range rs {
+		if rs[idx] == nil {
+			log.Warnf("admission rule disabled: ruleset=loggings rule_index=%d reason=null_rule", idx)
+			continue
+		}
 		rs[idx].setup("loggings", idx, "")
 		if len(rs[idx].Namespaces) == 0 {
 			log.Warnf("admission rule disabled: ruleset=loggings rule_index=%d rule_name=%q reason=no_namespace_selectors", idx, "")
@@ -212,6 +232,9 @@ func (rs MutateRules) Setup() {
 
 func (rs MutateRules) Matches(ns string, labels map[string]string) (bool, *MutateRule) {
 	for idx := range rs {
+		if rs[idx] == nil {
+			continue
+		}
 		if rs[idx].matchNamespace(ns) && rs[idx].matchLabels(labels) {
 			return true, rs[idx]
 		}
