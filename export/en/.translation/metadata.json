@@ -2,14 +2,14 @@
   "version": 1,
   "target_language": "en",
   "source_hashes": {
-    "datakit-operator.md": "504ceaaffe3a3815b8fa155099cf7fb33ab45d6291ed4557593f2039cd37bcf8",
+    "datakit-operator.md": "fbf33d6038f2688592baec986b22bc9a3123129c7700247bdfb87c5832594d34",
     "operator-asyncprofile.md": "3bfb35bd4636e69d6f5464a99512f0cb5327f468e9e7f1ed8f4e8817486cbe4d",
-    "operator-changelog.md": "2f36ef1beaf92f5d4aaf67693140392ba42341e5190414ff5b7eb53345443c15",
-    "operator-ddtrace.md": "70ebdb81cc1853ba274cacf63b967b3fc79124dea9dfc9667352a9b9ef133ae1",
-    "operator-flameshot.md": "6030d6fa2bbf335b7c6643f193f76af81bc4a8e1eedf5e7af187d20f4c0aa0fb",
+    "operator-changelog.md": "b27fb5011904d5dd887b6f1c567be871bcd2599652d799e95a80283ff3677e8b",
+    "operator-ddtrace.md": "967d2e7eba85b7eadf6e1e185cc2849c96b0a4f51be82ff08fb76cb68d0af625",
+    "operator-flameshot.md": "67090d1e32d27e75578da89356cace7c0947d5770bb9fef6e70354b63753ffad",
     "operator-logfwd.md": "da4605d1ef1d43468f8aa7fb59b119bb6ed2c52ee794b24d78cb7d1ef5dcc2aa",
     "operator-logging.md": "8292b36a7ec4b2d154915c9f8ea4c3917f79184900f31b1168e8ede1f3201935",
-    "operator-otel.md": "edc0f655b98b41444f200ae153e19b65d8bbba343143fdcda33ee1747d2409a4",
+    "operator-otel.md": "331431ac671e75490cd7ffdae409e1b36d34d9005ab7acb0555583ca0f7ffe02",
     "operator-pyspy.md": "ce6b89628e259d2b912f01ab46494738c0c36708871d9730327bd6fa2e48c8dc",
     "operator-v1.6.0-logfwd.md": "0a704627dcc7f4a3f86c7160ee39851486892fa56549ba0ce6283e17dcda9975"
   }

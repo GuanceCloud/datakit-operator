@@ -2,7 +2,7 @@
 
 Starting with [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0), DataKit Operator supports injecting OpenTelemetry automatic instrumentation into Java, Python, and Node.js applications. This feature uses the official OpenTelemetry automatic instrumentation images and follows their approach for copying instrumentation and configuring the startup environment.
 
-Injection occurs only when a Pod is created. The Operator modifies all regular application containers in the Pod. It does not modify application init Containers or detect language versions or libc inside containers.
+The distributed templates set `otels` to an empty list by default, so OpenTelemetry injection is not enabled automatically. To enable it, first add the rules shown on this page. Injection occurs only when a Pod is created. The Operator modifies all regular application containers in the Pod. It does not modify application init Containers or detect language versions or libc inside containers.
 
 ## Before You Begin {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-The default Operator template enables only Traces. To collect Metrics or Logs, change the corresponding `OTEL_METRICS_EXPORTER` or `OTEL_LOGS_EXPORTER` from `none` to `otlp`; no new DataKit address is required. The application and automatic instrumentation must also be able to produce the corresponding signals.
+The example rules on this page enable only Traces. To collect Metrics or Logs, change the corresponding `OTEL_METRICS_EXPORTER` or `OTEL_LOGS_EXPORTER` from `none` to `otlp`; no new DataKit address is required. The application and automatic instrumentation must also be able to produce the corresponding signals.
 
 ### Confirm Language Support {#otel-language-support}
 
@@ -39,7 +39,9 @@ The Operator does not detect these conditions automatically. Use mutually exclus
 
 ## Operator Configuration {#otel-config}
 
-`otels` is at the same level as `ddtraces`. The following is a complete Java rule:
+`otels` is at the same level as `ddtraces`, and its default value in the distributed templates is `[]`. The following configuration contains Java, Python, and Node.js rules. When editing an existing `jsonconfig`, replace the entire `otels` array at `admission_inject_v2.otels` and retain the other settings under `admission_inject_v2`.
+
+Every rule uses `"namespace_selectors": ["*"]`, but only Pods with the corresponding language label match. The rules can therefore be used across Namespaces without injecting unlabelled Pods automatically. All three rules export only Traces by default.
 
 ```json
 {
@@ -48,10 +50,74 @@ The Operator does not detect these conditions automatically. Use mutually exclus
             {
                 "name": "otel-java",
                 "language": "java",
-                "namespace_selectors": ["^production$"],
+                "namespace_selectors": ["*"],
                 "label_selectors": ["admission.datakit/otel-language=java"],
                 "check_annotation": false,
                 "image": "{{.OTelJavaImage}}",
+                "envs": {
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "OTEL_SERVICE_NAME": "{fieldRef:metadata.labels['app']}",
+                    "OTEL_RESOURCE_ATTRIBUTES": "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)",
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "OTEL_LOGS_EXPORTER": "none",
+                    "OTEL_METRICS_EXPORTER": "none",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces",
+                    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs",
+                    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "otel-python",
+                "language": "python",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/otel-language=python"],
+                "check_annotation": false,
+                "image": "{{.OTelPythonImage}}",
+                "envs": {
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "OTEL_SERVICE_NAME": "{fieldRef:metadata.labels['app']}",
+                    "OTEL_RESOURCE_ATTRIBUTES": "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)",
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "OTEL_LOGS_EXPORTER": "none",
+                    "OTEL_METRICS_EXPORTER": "none",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces",
+                    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs",
+                    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "otel-nodejs",
+                "language": "nodejs",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/otel-language=nodejs"],
+                "check_annotation": false,
+                "image": "{{.OTelNodeJSImage}}",
                 "envs": {
                     "POD_NAME": "{fieldRef:metadata.name}",
                     "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
@@ -82,7 +148,7 @@ The Operator does not detect these conditions automatically. Use mutually exclus
 }
 ```
 
-Environment variables preserve configuration order. In the preceding example, `POD_NAME`, `POD_NAMESPACE`, and `NODE_NAME` must appear before `OTEL_RESOURCE_ATTRIBUTES`, which references them.
+Environment variables preserve configuration order. In every rule, `POD_NAME`, `POD_NAMESPACE`, and `NODE_NAME` must appear before `OTEL_RESOURCE_ATTRIBUTES`, which references them.
 
 Common fields:
 
@@ -97,12 +163,15 @@ Common fields:
 | `envs` | Environment variables injected into all regular application containers |
 | `resources` | Resource configuration for the init Container; defaults are used when missing or invalid |
 
-Python and Node.js rules use the same fields. Change only `name`, `language`, the language label, and the image:
+The three rules use the following language labels and images:
 
 | Language | Label | Image |
 | --- | --- | --- |
+| Java | `admission.datakit/otel-language=java` | `{{.OTelJavaImage}}` |
 | Python | `admission.datakit/otel-language=python` | `{{.OTelPythonImage}}` |
 | Node.js | `admission.datakit/otel-language=nodejs` | `{{.OTelNodeJSImage}}` |
+
+Set exactly one corresponding language label on each Pod. The distributed template's default Java DDTrace rule matches Pods in the `default` Namespace, so OTel Pods should also set `admission.datakit/ddtrace.enabled: "false"` explicitly; see the complete Deployment later in this document.
 
 For the general rules governing selectors and Annotations, see [DataKit Operator injection rules](datakit-operator.md#datakit-operator-inject). If a Pod matches multiple OTel rules, the Operator uses only the first rule that satisfies the Annotation conditions. It does not fall back if that rule has an invalid language or image configuration.
 

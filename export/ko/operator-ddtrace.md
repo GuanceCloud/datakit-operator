@@ -6,6 +6,8 @@ DataKit Operator는 Pod 생성 시 DDTrace 자동 계측 에이전트를 주입�
 
 먼저 [DataKit Operator를 설치](datakit-operator.md#install)하고 애플리케이션 컨테이너에서 DataKit Trace 수신 주소에 접근할 수 있는지 확인하십시오.
 
+배포 템플릿은 기본적으로 Java DDTrace 규칙 하나만 유지하며 `default` Namespace의 모든 Pod와 일치시킵니다. 이는 기존 배포와의 호환성을 유지하기 위한 것이며 Java만 지원한다는 의미는 아닙니다. Operator는 애플리케이션 컨테이너의 언어를 자동으로 감지하지 않습니다. Python, PHP 또는 Node.js를 구성할 때는 기본 Java 규칙도 상호 배타적인 언어 Label을 사용하도록 변경해야 합니다. 그렇지 않으면 해당 규칙이 먼저 Pod와 일치하여 뒤에 있는 언어 규칙이 적용되지 않습니다.
+
 ### 지원 범위 및 이미지 {#ddtrace-lib-image-selection}
 
 | 언어 | 애플리케이션 런타임 | 기본 이미지 |
@@ -26,36 +28,137 @@ PHP init Container는 해당 libc의 loader 구성을 복사합니다. 애플리
 
 ### 구성 규칙 {#ddtrace-config}
 
-`admission_inject_v2.ddtraces`에 규칙을 추가합니다. 다음 Java 규칙은 `default` Namespace에서 `admission.datakit/ddtrace-language=java` Label이 있는 Pod에만 일치합니다.
+다음 구성에는 Java, Python, PHP 및 Node.js 규칙이 모두 포함되어 있습니다. 기존 `jsonconfig`를 편집할 때는 이 `ddtraces` 배열 전체로 `admission_inject_v2.ddtraces`를 교체하고 `admission_inject_v2` 아래의 다른 구성은 유지하십시오. 배포 템플릿의 기본 Java 규칙 뒤에 이 규칙들을 그대로 추가하지 마십시오. 기본 규칙이 먼저 일치합니다.
+
+모든 규칙은 `"namespace_selectors": ["*"]`를 사용하지만 해당 언어 Label이 있는 Pod만 일치합니다. 따라서 Label이 없는 Pod에 자동으로 주입하지 않으면서 여러 Namespace에서 사용할 수 있습니다. 예시의 Python 이미지는 Python 3.9~3.14, PHP는 `linux-gnu`, Node.js 이미지는 Node.js 18~25용입니다. 다른 런타임에서는 앞의 표에 따라 이미지 또는 `php_loader_flavor`를 변경하십시오.
 
 ```json
 {
-    "name": "ddtrace-java",
-    "language": "java",
-    "namespace_selectors": ["^default$"],
-    "label_selectors": ["admission.datakit/ddtrace-language=java"],
-    "check_annotation": false,
-    "image": "{{.DDTraceJavaImage}}",
-    "envs": {
-        "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
-        "DD_TRACE_AGENT_PORT": "9529",
-        "DD_SERVICE": "{fieldRef:metadata.labels['app']}",
-        "POD_NAME": "{fieldRef:metadata.name}",
-        "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
-        "NODE_NAME": "{fieldRef:spec.nodeName}",
-        "DD_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
-    },
-    "resources": {
-        "requests": {
-            "cpu": "100m",
-            "memory": "64Mi"
-        },
-        "limits": {
-            "cpu": "500m",
-            "memory": "512Mi"
-        }
+    "admission_inject_v2": {
+        "ddtraces": [
+            {
+                "name": "ddtrace-java",
+                "language": "java",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/ddtrace-language=java"],
+                "check_annotation": false,
+                "image": "{{.DDTraceJavaImage}}",
+                "envs": {
+                    "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DD_TRACE_AGENT_PORT": "9529",
+                    "DD_JMXFETCH_STATSD_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DD_JMXFETCH_STATSD_PORT": "8125",
+                    "DD_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "DD_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "ddtrace-python",
+                "language": "python",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/ddtrace-language=python"],
+                "check_annotation": false,
+                "image": "{{.DDTracePythonImage}}",
+                "envs": {
+                    "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DD_TRACE_AGENT_PORT": "9529",
+                    "DD_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "DD_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "ddtrace-php",
+                "language": "php",
+                "php_loader_flavor": "linux-gnu",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/ddtrace-language=php"],
+                "check_annotation": false,
+                "image": "{{.DDTracePHPImage}}",
+                "envs": {
+                    "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DD_TRACE_AGENT_PORT": "9529",
+                    "DD_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "DD_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "ddtrace-nodejs",
+                "language": "nodejs",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/ddtrace-language=nodejs"],
+                "check_annotation": false,
+                "image": "{{.DDTraceNodeJSImage}}",
+                "envs": {
+                    "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
+                    "DD_TRACE_AGENT_PORT": "9529",
+                    "DD_SERVICE": "{fieldRef:metadata.labels['app']}",
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "DD_TAGS": "pod_name:$(POD_NAME),pod_namespace:$(POD_NAMESPACE),host:$(NODE_NAME)"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            }
+        ]
     }
 }
+```
+
+Pod에는 해당 언어 Label을 하나만 설정하십시오. 예:
+
+```yaml
+metadata:
+  labels:
+    app: payment-service
+    admission.datakit/ddtrace-language: python
 ```
 
 주요 필드는 다음과 같습니다.
@@ -73,25 +176,6 @@ PHP init Container는 해당 libc의 loader 구성을 복사합니다. 애플리
 | `php_loader_flavor` | PHP에서만 사용. `linux-gnu` 또는 `linux-musl`을 선택할 수 있습니다. |
 
 Selector, Annotation, 기본 리소스 및 환경 변수 참조의 공통 규칙은 [DataKit Operator 주입 규칙](datakit-operator.md#datakit-operator-inject)을 참조하십시오. 하나의 Pod가 여러 규칙에 일치하지 않도록 언어별 규칙에 상호 배타적인 Label을 사용하십시오.
-
-Python, PHP 및 Node.js 규칙은 위 예시의 `name`, `language`, `label_selectors`, `image`만 변경하면 됩니다. PHP에는 `php_loader_flavor`도 추가해야 합니다. 예:
-
-```json
-{
-    "name": "ddtrace-php-musl",
-    "language": "php",
-    "namespace_selectors": ["^default$"],
-    "label_selectors": ["admission.datakit/ddtrace-language=php"],
-    "check_annotation": false,
-    "image": "{{.DDTracePHPImage}}",
-    "php_loader_flavor": "linux-musl",
-    "envs": {
-        "DD_AGENT_HOST": "datakit-service.datakit.svc.cluster.local",
-        "DD_TRACE_AGENT_PORT": "9529",
-        "DD_SERVICE": "{fieldRef:metadata.labels['app']}"
-    }
-}
-```
 
 ## 주입 방식 {#ddtrace-injection}
 

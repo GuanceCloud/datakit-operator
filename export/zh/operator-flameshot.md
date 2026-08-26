@@ -93,7 +93,7 @@ Flameshot 会直接访问业务进程。上线前应确认 Pod Security Admissio
 | `FLAMESHOT_HTTP_LOCAL_PORT` | Flameshot HTTP 和指标端口，注入必需 |
 | `FLAMESHOT_SERVICE` | 覆盖所有进程规则中的 service |
 | `FLAMESHOT_TAGS` | 全局 Profiling 标签 |
-| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit，单位为 millicore |
+| `FLAMESHOT_POD_CPU_LIMIT` | Pod CPU limit，单位为 CPU 核的 1/1000 |
 | `FLAMESHOT_POD_MEM_LIMIT` | Pod 内存 limit，单位为 MiB |
 
 `processes` 支持 Java、Python 和 Go 的命令匹配、采集时长、CPU/内存阈值以及语言特定选项。Heap Dump 和对象存储上传也通过现有 `envs` 配置；敏感凭证建议使用 `{secretKeyRef:<SECRET>.<KEY>}`。完整字段参见 [Flameshot 文档](../integrations/flameshot.md)。

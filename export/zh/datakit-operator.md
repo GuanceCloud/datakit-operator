@@ -122,6 +122,10 @@ Operator 配置使用 JSON 格式。部署清单通常将配置保存在 ConfigM
 }
 ```
 
+上例仅展示配置结构。实际发布模板默认保留一条 Java DDTrace 规则，匹配 `default` 命名空间中的 Pod；`otels` 默认为空，不会自动开启 OpenTelemetry 注入。这个默认值是兼容已有部署的运行策略，并不代表 Operator 只能处理 Java。
+
+Operator 不会自动识别业务容器的语言。DDTrace 还支持 Python、PHP 和 Node.js，OpenTelemetry 支持 Java、Python 和 Node.js；启用这些能力时，应根据 [DDTrace 自动注入](operator-ddtrace.md)和 [OpenTelemetry 自动注入](operator-otel.md)文档添加使用互斥语言标签的规则。
+
 旧版 `admission_inject` 配置仍然兼容。旧配置中有效的 `ddtrace`、`logfwd` 或 `profiler` 会分别覆盖对应的 v2 规则，升级时不要同时维护两套有效配置。
 
 ## Cluster API {#cluster-api}
@@ -250,9 +254,9 @@ DDTrace、OTel、logfwd 和旧版 Profiler 规则支持 `check_annotation`：
 | `{fieldRef:status.hostIP}` | 节点主 IP |
 | `{fieldRef:status.hostIPs}` | 节点双栈 IP |
 | `{fieldRef:status.podIP}` | Pod 主 IP |
-| `{resourceFieldRef:limits.cpu}` | 第一个业务容器的 CPU limit，单位为 millicore |
+| `{resourceFieldRef:limits.cpu}` | 第一个业务容器的 CPU limit，单位为 CPU 核的 1/1000 |
 | `{resourceFieldRef:limits.memory}` | 第一个业务容器的内存 limit，单位为 MiB |
-| `{resourceFieldRef:requests.cpu}` | 第一个业务容器的 CPU request，单位为 millicore |
+| `{resourceFieldRef:requests.cpu}` | 第一个业务容器的 CPU request，单位为 CPU 核的 1/1000 |
 | `{resourceFieldRef:requests.memory}` | 第一个业务容器的内存 request，单位为 MiB |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Pod 所在命名空间中的 Secret key |
 

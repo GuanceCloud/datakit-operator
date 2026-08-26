@@ -122,6 +122,10 @@ The Operator uses JSON configuration. Deployment manifests generally store the c
 }
 ```
 
+The preceding example shows only the configuration structure. The distributed deployment templates retain one Java DDTrace rule that matches Pods in the `default` Namespace; `otels` is empty, so OpenTelemetry injection is not enabled automatically. This default is a runtime policy that preserves compatibility with existing deployments and does not mean that the Operator supports only Java.
+
+The Operator does not detect the language in application containers automatically. DDTrace also supports Python, PHP, and Node.js, while OpenTelemetry supports Java, Python, and Node.js. To enable these capabilities, follow the [DDTrace automatic injection](operator-ddtrace.md) and [OpenTelemetry automatic injection](operator-otel.md) documentation and add rules that use mutually exclusive language labels.
+
 The legacy `admission_inject` configuration remains supported. A valid `ddtrace`, `logfwd`, or `profiler` entry in the legacy configuration overrides the corresponding v2 rules. Do not maintain two valid configurations for the same feature during an upgrade.
 
 ## Cluster API {#cluster-api}
@@ -250,9 +254,9 @@ The `envs` field in an injection rule supports literal values and placeholders t
 | `{fieldRef:status.hostIP}` | Primary node IP |
 | `{fieldRef:status.hostIPs}` | Dual-stack node IPs |
 | `{fieldRef:status.podIP}` | Primary Pod IP |
-| `{resourceFieldRef:limits.cpu}` | CPU limit of the first application container, in millicores |
+| `{resourceFieldRef:limits.cpu}` | CPU limit of the first application container, in thousandths of a CPU core |
 | `{resourceFieldRef:limits.memory}` | Memory limit of the first application container, in MiB |
-| `{resourceFieldRef:requests.cpu}` | CPU request of the first application container, in millicores |
+| `{resourceFieldRef:requests.cpu}` | CPU request of the first application container, in thousandths of a CPU core |
 | `{resourceFieldRef:requests.memory}` | Memory request of the first application container, in MiB |
 | `{secretKeyRef:<SECRET_NAME>.<KEY>}` | Secret key in the Pod's Namespace |
 

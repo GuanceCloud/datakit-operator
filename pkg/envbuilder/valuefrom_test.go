@@ -14,72 +14,52 @@ import (
 )
 
 func TestConvertFieldRefPath(t *testing.T) {
-	cases := []struct {
-		in     string
-		output string
-	}{
-		{
-			in:     "{fieldRef:metadata.name}",
-			output: "metadata.name",
-		},
-		{
-			in:     "{fieldRef:metadata.labels['app']}",
-			output: "metadata.labels['app']",
-		},
-		{
-			in:     "prefix{fieldRef:metadata.labels['app']}suffix",
-			output: "",
-		},
-		{
-			in:     "{fieldRef:metadataXlabels['app']}",
-			output: "",
-		},
-		{
-			in:     "unmatched",
-			output: "",
-		},
+	tests := map[string]string{
+		"{fieldRef:metadata.name}":             "metadata.name",
+		"{fieldRef:metadata.labels['app']}":    "metadata.labels['app']",
+		"prefix{fieldRef:metadata.name}suffix": "",
+		"{fieldRef:metadataXlabels['app']}":    "",
+		"unmatched":                            "",
 	}
+	for input, expected := range tests {
+		assert.Equal(t, expected, convertFieldRefPath(input))
+	}
+}
 
-	for _, tc := range cases {
-		res := convertFieldRefPath(tc.in)
-		assert.Equal(t, tc.output, res)
+func TestConvertResourceFieldRefPath(t *testing.T) {
+	tests := map[string]string{
+		"{resourceFieldRef:limits.cpu}":      "limits.cpu",
+		"{resourceFieldRef:requests.memory}": "requests.memory",
+		"unmatched":                          "",
+	}
+	for input, expected := range tests {
+		assert.Equal(t, expected, convertResourceFieldRefPath(input))
 	}
 }
 
 func TestConvertSecretKeyRef(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-		name, key, ok := convertSecretKeyRef("{secretKeyRef:flameshot-oss.access_key_id}")
+	name, key, ok := convertSecretKeyRef("{secretKeyRef:flameshot-oss.access_key_id}")
+	assert.True(t, ok)
+	assert.Equal(t, "flameshot-oss", name)
+	assert.Equal(t, "access_key_id", key)
 
-		assert.True(t, ok)
-		assert.Equal(t, "flameshot-oss", name)
-		assert.Equal(t, "access_key_id", key)
-	})
-
-	invalidValues := []string{
+	for _, invalid := range []string{
 		"{secretKeyRef:flameshot-oss}",
 		"{secretKeyRef:FLAMESHOT-OSS.access_key_id}",
 		"{secretKeyRef:flameshot-oss.access/key}",
 		"prefix{secretKeyRef:flameshot-oss.access_key_id}suffix",
-	}
-	for _, value := range invalidValues {
-		t.Run(value, func(t *testing.T) {
-			name, key, ok := convertSecretKeyRef(value)
-			assert.False(t, ok)
-			assert.Empty(t, name)
-			assert.Empty(t, key)
-		})
+	} {
+		name, key, ok := convertSecretKeyRef(invalid)
+		assert.False(t, ok, invalid)
+		assert.Empty(t, name, invalid)
+		assert.Empty(t, key, invalid)
 	}
 }
 
 func TestBuildEnvWithSecretKeyRef(t *testing.T) {
-	got := BuildEnv(
-		"FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID",
-		"{secretKeyRef:flameshot-oss.access_key_id}",
-		true,
-	)
-
+	got := BuildEnv("ACCESS_KEY", "{secretKeyRef:flameshot-oss.access_key_id}", true)
 	assert.Equal(t, corev1.EnvVar{
-		Name: "FLAMESHOT_HPROF_UPLOAD_ACCESS_KEY_ID",
+		Name: "ACCESS_KEY",
 		ValueFrom: &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{Name: "flameshot-oss"},
@@ -87,124 +67,38 @@ func TestBuildEnvWithSecretKeyRef(t *testing.T) {
 			},
 		},
 	}, got)
-}
 
-func TestBuildEnvWithInvalidSecretKeyRef(t *testing.T) {
-	value := "{secretKeyRef:INVALID-NAME.access/key}"
-
-	got := BuildEnv("ACCESS_KEY", value, true)
-
-	assert.Equal(t, corev1.EnvVar{
-		Name:  "ACCESS_KEY",
-		Value: value,
-	}, got)
-}
-
-func TestConvertResourceFieldRefPath(t *testing.T) {
-	cases := []struct {
-		in     string
-		output string
-	}{
-		{
-			in:     "{resourceFieldRef:limits.cpu}",
-			output: "limits.cpu",
-		},
-		{
-			in:     "{resourceFieldRef:requests.memory}",
-			output: "requests.memory",
-		},
-		{
-			in:     "unmatched",
-			output: "",
-		},
-	}
-
-	for _, tc := range cases {
-		res := convertResourceFieldRefPath(tc.in)
-		assert.Equal(t, tc.output, res)
-	}
+	invalid := "{secretKeyRef:INVALID-NAME.access/key}"
+	assert.Equal(t, corev1.EnvVar{Name: "ACCESS_KEY", Value: invalid}, BuildEnv("ACCESS_KEY", invalid, true))
 }
 
 func TestFilterAndSetResourceFieldRefEnvVars(t *testing.T) {
-	t.Run("resourceFieldRef with matching resources", func(t *testing.T) {
-		pod := &corev1.Pod{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name: "app-container",
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("1"),
-								corev1.ResourceMemory: resource.MustParse("512Mi"),
-							},
-						},
-					},
-				},
-			},
-		}
+	pod := &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+		Name: "app",
+		Resources: corev1.ResourceRequirements{Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		}},
+	}}}}
+	envs := []corev1.EnvVar{
+		{
+			Name: "LIMITS_CPU",
+			ValueFrom: &corev1.EnvVarSource{ResourceFieldRef: &corev1.ResourceFieldSelector{
+				Resource: "limits.cpu",
+			}},
+		},
+		{
+			Name: "LIMITS_MEMORY",
+			ValueFrom: &corev1.EnvVarSource{ResourceFieldRef: &corev1.ResourceFieldSelector{
+				Resource: "limits.memory",
+			}},
+		},
+		{Name: "NORMAL_ENV", Value: "normal-value"},
+	}
 
-		envs := []corev1.EnvVar{
-			{
-				Name:  "LIMITS_CPU",
-				Value: "test",
-				ValueFrom: &corev1.EnvVarSource{
-					ResourceFieldRef: &corev1.ResourceFieldSelector{
-						Resource: "limits.cpu",
-					},
-				},
-			},
-			{
-				Name:  "NORMAL_ENV",
-				Value: "normal-value",
-			},
-		}
-
-		result := FilterAndSetResourceFieldRefEnvVars(envs, pod)
-		assert.Len(t, result, 2)
-		assert.Equal(t, "app-container", result[0].ValueFrom.ResourceFieldRef.ContainerName)
-		assert.Equal(t, "NORMAL_ENV", result[1].Name)
-	})
-
-	t.Run("resourceFieldRef without matching resources", func(t *testing.T) {
-		pod := &corev1.Pod{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name: "app-container",
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceMemory: resource.MustParse("512Mi"),
-							},
-						},
-					},
-				},
-			},
-		}
-
-		envs := []corev1.EnvVar{
-			{
-				Name:  "LIMITS_CPU",
-				Value: "test",
-				ValueFrom: &corev1.EnvVarSource{
-					ResourceFieldRef: &corev1.ResourceFieldSelector{
-						Resource: "limits.cpu",
-					},
-				},
-			},
-			{
-				Name:  "LIMITS_MEMORY",
-				Value: "test",
-				ValueFrom: &corev1.EnvVarSource{
-					ResourceFieldRef: &corev1.ResourceFieldSelector{
-						Resource: "limits.memory",
-					},
-				},
-			},
-		}
-
-		result := FilterAndSetResourceFieldRefEnvVars(envs, pod)
-		assert.Len(t, result, 1)
+	result := FilterAndSetResourceFieldRefEnvVars(envs, pod)
+	if assert.Len(t, result, 2) {
 		assert.Equal(t, "LIMITS_MEMORY", result[0].Name)
-		assert.Equal(t, "app-container", result[0].ValueFrom.ResourceFieldRef.ContainerName)
-	})
+		assert.Equal(t, "app", result[0].ValueFrom.ResourceFieldRef.ContainerName)
+		assert.Equal(t, "NORMAL_ENV", result[1].Name)
+	}
 }

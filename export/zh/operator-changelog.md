@@ -3,6 +3,7 @@
 ## 1.9.0（待发布） {#cl-1.9.0}
 
 - 支持为 Java、Python 和 Node.js 应用注入 OpenTelemetry 自动探针（#98、#101、#102）
+- 调整默认注入配置：仅保留 Java DDTrace 规则，OpenTelemetry 默认为关闭状态（#98）
 - OTel 注入遇到 `runAsNonRoot: true` 但未明确配置非零 `runAsUser` 时，跳过注入并记录可检索的 warning，避免业务 Pod 无法启动（#105）
 - 修复 DDTrace Java 在 Admission Webhook 重入时可能缺少 Agent 启动参数的问题（#100）
 - Operator 独立维护中文、英文、日文和韩文文档（#106）

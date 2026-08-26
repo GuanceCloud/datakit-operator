@@ -2,7 +2,7 @@
 
 DataKit Operator는 [:octicons-tag-24: v1.9.0](operator-changelog.md#cl-1.9.0)부터 Java, Python 및 Node.js 애플리케이션에 OpenTelemetry 자동 계측 에이전트 주입을 지원합니다. 이 기능은 OpenTelemetry 공식 자동 주입 이미지를 사용하며 에이전트를 복사하고 시작 환경을 설정하는 공식 방식을 따릅니다.
 
-주입은 Pod 생성 시에만 수행됩니다. Operator는 Pod의 모든 일반 애플리케이션 컨테이너를 변경하지만 애플리케이션 init Container는 변경하지 않으며 컨테이너 내부의 언어 버전이나 libc도 감지하지 않습니다.
+배포 템플릿에서는 `otels`가 기본적으로 비어 있으므로 OpenTelemetry 주입은 자동으로 활성화되지 않습니다. 활성화하려면 먼저 이 페이지에 나온 규칙을 추가하십시오. 주입은 Pod 생성 시에만 수행됩니다. Operator는 Pod의 모든 일반 애플리케이션 컨테이너를 변경하지만 애플리케이션 init Container는 변경하지 않으며 컨테이너 내부의 언어 버전이나 libc도 감지하지 않습니다.
 
 ## 사전 준비 {#otel-prerequisites}
 
@@ -23,7 +23,7 @@ Metric: http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics
 Log:    http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs
 ```
 
-기본 Operator 템플릿은 Trace만 활성화합니다. Metric 또는 Log를 수집하려면 해당 `OTEL_METRICS_EXPORTER` 또는 `OTEL_LOGS_EXPORTER`를 `none`에서 `otlp`로 변경하십시오. 새 DataKit 주소를 구성할 필요는 없습니다. 애플리케이션과 자동 계측 에이전트 자체도 해당 신호를 생성할 수 있어야 합니다.
+이 페이지의 예시 규칙은 Trace만 활성화합니다. Metric 또는 Log를 수집하려면 해당 `OTEL_METRICS_EXPORTER` 또는 `OTEL_LOGS_EXPORTER`를 `none`에서 `otlp`로 변경하십시오. 새 DataKit 주소를 구성할 필요는 없습니다. 애플리케이션과 자동 계측 에이전트 자체도 해당 신호를 생성할 수 있어야 합니다.
 
 ### 언어 지원 범위 확인 {#otel-language-support}
 
@@ -39,7 +39,9 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
 
 ## Operator 구성 {#otel-config}
 
-`otels`는 `ddtraces`와 같은 계층에 있습니다. 다음은 전체 Java 규칙입니다.
+`otels`는 `ddtraces`와 같은 계층에 있으며 배포 템플릿의 기본값은 `[]`입니다. 다음 구성에는 Java, Python 및 Node.js 규칙이 모두 포함되어 있습니다. 기존 `jsonconfig`를 편집할 때는 이 `otels` 배열 전체로 `admission_inject_v2.otels`를 교체하고 `admission_inject_v2` 아래의 다른 구성은 유지하십시오.
+
+모든 규칙은 `"namespace_selectors": ["*"]`를 사용하지만 해당 언어 Label이 있는 Pod만 일치합니다. 따라서 Label이 없는 Pod에 자동으로 주입하지 않으면서 여러 Namespace에서 사용할 수 있습니다. 세 규칙은 기본적으로 Trace만 내보냅니다.
 
 ```json
 {
@@ -48,10 +50,74 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
             {
                 "name": "otel-java",
                 "language": "java",
-                "namespace_selectors": ["^production$"],
+                "namespace_selectors": ["*"],
                 "label_selectors": ["admission.datakit/otel-language=java"],
                 "check_annotation": false,
                 "image": "{{.OTelJavaImage}}",
+                "envs": {
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "OTEL_SERVICE_NAME": "{fieldRef:metadata.labels['app']}",
+                    "OTEL_RESOURCE_ATTRIBUTES": "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)",
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "OTEL_LOGS_EXPORTER": "none",
+                    "OTEL_METRICS_EXPORTER": "none",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces",
+                    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs",
+                    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "otel-python",
+                "language": "python",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/otel-language=python"],
+                "check_annotation": false,
+                "image": "{{.OTelPythonImage}}",
+                "envs": {
+                    "POD_NAME": "{fieldRef:metadata.name}",
+                    "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
+                    "NODE_NAME": "{fieldRef:spec.nodeName}",
+                    "OTEL_SERVICE_NAME": "{fieldRef:metadata.labels['app']}",
+                    "OTEL_RESOURCE_ATTRIBUTES": "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)",
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "OTEL_LOGS_EXPORTER": "none",
+                    "OTEL_METRICS_EXPORTER": "none",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/traces",
+                    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/logs",
+                    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://datakit-service.datakit.svc.cluster.local:9529/otel/v1/metrics"
+                },
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    },
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "512Mi"
+                    }
+                }
+            },
+            {
+                "name": "otel-nodejs",
+                "language": "nodejs",
+                "namespace_selectors": ["*"],
+                "label_selectors": ["admission.datakit/otel-language=nodejs"],
+                "check_annotation": false,
+                "image": "{{.OTelNodeJSImage}}",
                 "envs": {
                     "POD_NAME": "{fieldRef:metadata.name}",
                     "POD_NAMESPACE": "{fieldRef:metadata.namespace}",
@@ -82,7 +148,7 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
 }
 ```
 
-환경 변수는 구성 순서를 유지합니다. 위 예시의 `POD_NAME`, `POD_NAMESPACE` 및 `NODE_NAME`은 이를 참조하는 `OTEL_RESOURCE_ATTRIBUTES`보다 앞에 있어야 합니다.
+환경 변수는 구성 순서를 유지합니다. 모든 규칙에서 `POD_NAME`, `POD_NAMESPACE` 및 `NODE_NAME`은 이를 참조하는 `OTEL_RESOURCE_ATTRIBUTES`보다 앞에 있어야 합니다.
 
 주요 필드는 다음과 같습니다.
 
@@ -97,12 +163,15 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
 | `envs` | 모든 일반 애플리케이션 컨테이너에 주입할 환경 변수 |
 | `resources` | init Container 리소스 구성. 없거나 잘못된 경우 기본값을 사용합니다. |
 
-Python과 Node.js 규칙의 필드는 동일합니다. `name`, `language`, 언어 Label 및 이미지만 변경하면 됩니다.
+세 규칙에서 사용하는 언어 Label과 이미지는 다음과 같습니다.
 
 | 언어 | Label | 이미지 |
 | --- | --- | --- |
+| Java | `admission.datakit/otel-language=java` | `{{.OTelJavaImage}}` |
 | Python | `admission.datakit/otel-language=python` | `{{.OTelPythonImage}}` |
 | Node.js | `admission.datakit/otel-language=nodejs` | `{{.OTelNodeJSImage}}` |
+
+Pod에는 해당 언어 Label을 하나만 설정하십시오. 배포 템플릿의 기본 Java DDTrace 규칙은 `default` Namespace의 Pod와 일치하므로 OTel Pod에는 `admission.datakit/ddtrace.enabled: "false"`도 명시적으로 설정해야 합니다. 전체 Deployment는 이 문서 뒤의 예시를 참조하십시오.
 
 Selector 및 Annotation의 공통 규칙은 [DataKit Operator 주입 규칙](datakit-operator.md#datakit-operator-inject)을 참조하십시오. 하나의 Pod가 여러 OTel 규칙과 일치하면 Operator는 Annotation 조건을 충족하는 첫 번째 규칙만 사용합니다. 첫 번째 규칙의 언어 또는 이미지 구성이 잘못되어도 이후 규칙으로 대체하지 않습니다.
 
