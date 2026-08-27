@@ -96,9 +96,9 @@ func buildContainerFieldPatch(oldContainers, newContainers []corev1.Container) [
 			continue
 		}
 
-		basePath := fmt.Sprintf("/spec/containers/%d", idx)
-		patches = append(patches, buildEnvPatch(basePath+"/env", oldContainer.Env, newContainer.Env)...)
-		patches = append(patches, buildNamedAppendPatch(basePath+"/volumeMounts", oldContainer.VolumeMounts, newContainer.VolumeMounts, volumeMountName)...)
+		containerPath := fmt.Sprintf("/spec/containers/%d", idx)
+		patches = append(patches, buildEnvPatch(containerPath+"/env", oldContainer.Env, newContainer.Env)...)
+		patches = append(patches, buildNamedAppendPatch(containerPath+"/volumeMounts", oldContainer.VolumeMounts, newContainer.VolumeMounts, volumeMountName)...)
 	}
 	return patches
 }
@@ -113,26 +113,20 @@ func buildEnvPatch(basePath string, oldEnvs, newEnvs []corev1.EnvVar) []jsonpatc
 	if len(newEnvs) < len(oldEnvs) {
 		return []jsonpatch.JsonPatchOperation{replacePatch(basePath, newEnvs)}
 	}
-	for idx := range oldEnvs {
-		if !reflect.DeepEqual(oldEnvs[idx], newEnvs[idx]) {
-			return []jsonpatch.JsonPatchOperation{replacePatch(basePath, newEnvs)}
-		}
-	}
-
-	oldByName := map[string]int{}
-	for idx := range oldEnvs {
-		if _, exists := oldByName[oldEnvs[idx].Name]; !exists {
-			oldByName[oldEnvs[idx].Name] = idx
-		}
-	}
 
 	var patches []jsonpatch.JsonPatchOperation
-	for idx := range newEnvs {
-		newEnv := newEnvs[idx]
-		_, exists := oldByName[newEnv.Name]
-		if !exists {
-			patches = append(patches, addPatch(basePath+"/-", newEnv))
+	for idx := range oldEnvs {
+		if oldEnvs[idx].Name != newEnvs[idx].Name {
+			return []jsonpatch.JsonPatchOperation{replacePatch(basePath, newEnvs)}
 		}
+		if !reflect.DeepEqual(oldEnvs[idx], newEnvs[idx]) {
+			path := fmt.Sprintf("%s/%d", basePath, idx)
+			patches = append(patches, replacePatch(path, newEnvs[idx]))
+		}
+	}
+
+	for idx := len(oldEnvs); idx < len(newEnvs); idx++ {
+		patches = append(patches, addPatch(basePath+"/-", newEnvs[idx]))
 	}
 	return patches
 }

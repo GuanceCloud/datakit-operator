@@ -9,51 +9,44 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type EnvVarManager interface {
-	AddEnvVar(newEnvVar *corev1.EnvVar)
-	AddEnvVarToContainer(containerName string, newEnvVar *corev1.EnvVar)
-	AddEnvVarToInitContainer(containerName string, newEnvVar *corev1.EnvVar)
+// EnvVarConflictResolver decides how to combine an incoming environment
+// variable with an existing variable of the same name.
+type EnvVarConflictResolver func(existing, incoming corev1.EnvVar) corev1.EnvVar
+
+// KeepExistingEnvVar leaves an existing environment variable unchanged.
+func KeepExistingEnvVar(existing, _ corev1.EnvVar) corev1.EnvVar {
+	return existing
 }
 
-func NewEnvVarManager(pod *corev1.Pod) EnvVarManager {
-	return &envVarManagerImpl{pod}
+// ReplaceExistingEnvVar replaces an existing variable without changing its
+// position in the environment list.
+func ReplaceExistingEnvVar(_, incoming corev1.EnvVar) corev1.EnvVar {
+	return incoming
 }
 
-type envVarManagerImpl struct {
-	pod *corev1.Pod
-}
-
-func (m *envVarManagerImpl) AddEnvVar(newEnvVar *corev1.EnvVar) {
-	for idx := range m.pod.Spec.Containers {
-		_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
-	}
-}
-
-func (m *envVarManagerImpl) AddEnvVarToContainer(containerName string, newEnvVar *corev1.EnvVar) {
-	for idx := range m.pod.Spec.Containers {
-		if m.pod.Spec.Containers[idx].Name == containerName {
-			_ = AddEnvVarToContainer(&m.pod.Spec.Containers[idx], newEnvVar)
+// AddOrUpdateEnvVar preserves an existing environment variable's position. If
+// the variable does not exist, it is appended to the end of the slice.
+func AddOrUpdateEnvVar(envs []corev1.EnvVar, incoming corev1.EnvVar, resolve EnvVarConflictResolver) []corev1.EnvVar {
+	for idx := range envs {
+		if envs[idx].Name != incoming.Name {
+			continue
 		}
+
+		if resolve == nil {
+			return envs
+		}
+		envs[idx] = resolve(envs[idx], incoming)
+		return envs
 	}
+
+	return append(envs, incoming)
 }
 
-func (m *envVarManagerImpl) AddEnvVarToInitContainer(initContainerName string, newEnvVar *corev1.EnvVar) {
-	for idx := range m.pod.Spec.InitContainers {
-		if m.pod.Spec.InitContainers[idx].Name == initContainerName {
-			_ = AddEnvVarToContainer(&m.pod.Spec.InitContainers[idx], newEnvVar)
-		}
+// AddOrUpdateEnvVars applies incoming variables in order. Missing variables
+// are therefore appended in the same order in which they are provided.
+func AddOrUpdateEnvVars(envs, incoming []corev1.EnvVar, resolve EnvVarConflictResolver) []corev1.EnvVar {
+	for idx := range incoming {
+		envs = AddOrUpdateEnvVar(envs, incoming[idx], resolve)
 	}
-}
-
-func AddEnvVarToContainer(container *corev1.Container, newEnvVar *corev1.EnvVar) []corev1.EnvVar {
-	found := false
-	for idx := range container.Env {
-		if container.Env[idx].Name == newEnvVar.Name {
-			found = true
-		}
-	}
-	if !found {
-		container.Env = append(container.Env, *newEnvVar)
-	}
-	return container.Env
+	return envs
 }

@@ -85,13 +85,14 @@ func (r *profilerResource) process() {
 	r.resetSpec()
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
+	envs = manager.AddOrUpdateEnvVars(nil, envs, manager.ReplaceExistingEnvVar)
 	r.injectContainer(image, rule.Resources, envs)
 	r.injectVolume()
 	r.injectVolumeMount()
 	log.Infof("profiler injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
 }
 
-func (r *profilerResource) getMatchingRule() (matched bool, ruleConfig *config.InjectRule, lang language, imageVersion string) {
+func (r *profilerResource) getMatchingRule() (matched bool, ruleConfig *config.ProfilerRule, lang language, imageVersion string) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), profilerEnabledAnnotationKey) {
 		log.Debugf("profiler annotation disabled: pod=%s", r.parent)
 		return false, nil, "", ""
@@ -136,7 +137,7 @@ func (r *profilerResource) getMatchingRule() (matched bool, ruleConfig *config.I
 	}
 }
 
-func (r *profilerResource) getImageFromRule(rule *config.InjectRule, lang language) string {
+func (r *profilerResource) getImageFromRule(rule *config.ProfilerRule, lang language) string {
 	// 从 rule.Images map 中获取对应 language 的 image
 	var imageKey string
 	switch lang {

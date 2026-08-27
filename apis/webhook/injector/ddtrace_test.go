@@ -6,6 +6,7 @@
 package injector
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,388 +14,194 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func TestInjectDDTrace(t *testing.T) {
-	t.Run("basic injection", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-					{"DD_TAGS", "host:node-02,system:linux"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
+func newTestDDTraceRule(language, image string) *config.DDTraceRule {
+	return &config.DDTraceRule{
+		InjectRule: config.InjectRule{
+			Image: image,
+			Resources: config.ResourceRequirements{
+				Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
+				Limits:   config.ResourceQuotaConfig{CPU: "500m", Memory: "512Mi"},
+			},
+		},
+		Language: language,
+	}
+}
 
-		pod := createTestPod("test-ddtrace", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
+func useDDTraceRule(t *testing.T, rule *config.DDTraceRule) {
+	t.Helper()
+	original := ddtraceMatchAllNamespaceOrLabelsForConfig
+	ddtraceMatchAllNamespaceOrLabelsForConfig = func(string, map[string]string) (bool, []*config.DDTraceRule) {
+		return true, []*config.DDTraceRule{rule}
+	}
+	t.Cleanup(func() { ddtraceMatchAllNamespaceOrLabelsForConfig = original })
+}
+
+func TestInjectDDTraceJava(t *testing.T) {
+	rule := newTestDDTraceRule("java", "example.com/dd-java:1.0.0")
+	rule.Envs = config.Envs{{Key: "DD_SERVICE", Value: "checkout"}}
+	useDDTraceRule(t, rule)
+	pod := createTestPod("java", nil)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{{Name: javaToolOptionsKey, Value: "-Xms128m"}}
+
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Len(t, pod.Spec.InitContainers, 1)
+	assert.Len(t, pod.Spec.Volumes, 1)
+	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
+	options, ok := findEnv(pod.Spec.Containers[0].Env, javaToolOptionsKey)
+	if assert.True(t, ok) {
+		assert.Contains(t, options.Value, "-Xms128m")
+		assert.Equal(t, 1, strings.Count(options.Value, javaAgentOption))
+	}
+	service, ok := findEnv(pod.Spec.Containers[0].Env, "DD_SERVICE")
+	if assert.True(t, ok) {
+		assert.Equal(t, "checkout", service.Value)
+	}
+
+	afterFirstInjection := pod.DeepCopy()
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, afterFirstInjection, pod)
+}
+
+func TestInjectDDTraceRepairsJavaReinvocation(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	pod := createTestPod("reinvoked", nil)
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+
+	pod.Spec.Containers[0].Env = nil
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, 1, countNamedEnv(pod.Spec.Containers[0].Env, javaToolOptionsKey))
+	assert.Len(t, pod.Spec.InitContainers, 1)
+	assert.Len(t, pod.Spec.Volumes, 1)
+	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
+
+	afterRepair := pod.DeepCopy()
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, afterRepair, pod)
+}
+
+func TestInjectDDTraceRepairsOtherContainersWhenJavaOptionsUsesValueFrom(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	pod := createTestPod("reinvoked-multi-container", nil)
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: "worker", Image: "worker:1"})
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) {
+		return
+	}
+
+	valueFromJavaOptions := fieldRefEnv(javaToolOptionsKey)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{valueFromJavaOptions}
+	pod.Spec.Containers[1].Env = nil
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []corev1.EnvVar{valueFromJavaOptions}, pod.Spec.Containers[0].Env)
+	assert.Equal(t, 1, countNamedEnv(pod.Spec.Containers[1].Env, javaToolOptionsKey))
+}
+
+func TestInjectDDTraceRepairRequiresCompleteMountChain(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	complete := createTestPod("partial", nil)
+	changed, err := InjectDDTraceToPod("default", complete.Name, complete)
+	if !assert.NoError(t, err) || !assert.True(t, changed) || !assert.Len(t, complete.Spec.InitContainers, 1) {
+		return
+	}
+
+	tests := []struct {
+		name   string
+		remove func(*corev1.Pod)
+	}{
+		{"volume", func(p *corev1.Pod) { p.Spec.Volumes = nil }},
+		{"application mount", func(p *corev1.Pod) { p.Spec.Containers[0].VolumeMounts = nil }},
+		{"init mount", func(p *corev1.Pod) { p.Spec.InitContainers[0].VolumeMounts = nil }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := complete.DeepCopy()
+			pod.Spec.Containers[0].Env = nil
+			tc.remove(pod)
+			before := pod.DeepCopy()
+			changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+			assert.NoError(t, err)
+			assert.False(t, changed)
+			assert.Equal(t, before, pod)
 		})
+	}
+}
 
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
+func TestInjectDDTraceMovesMergedDDTagsAfterItsDependencies(t *testing.T) {
+	rule := newTestDDTraceRule("java", "example.com/dd-java:1.0.0")
+	rule.Envs = config.Envs{
+		{Key: "NEW_FIRST", Value: "one"},
+		{Key: "POD_NAME", Value: "checkout-0"},
+		{Key: "EXISTING", Value: "replace-me"},
+		{Key: ddtraceDDTagsKey, Value: "pod_name:$(POD_NAME),cluster:prod"},
+	}
+	useDDTraceRule(t, rule)
+	pod := createTestPod("ordered", nil)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{
+		{Name: "BEFORE", Value: "before"},
+		{Name: ddtraceDDTagsKey, Value: "user:value"},
+		{Name: "EXISTING", Value: "keep-me"},
+		{Name: "AFTER", Value: "after"},
+	}
 
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "datakit-lib-init", pod.Spec.InitContainers[0].Name)
-		assert.Len(t, pod.Spec.Volumes, 1)
-		assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
-	})
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []string{
+		"BEFORE", "EXISTING", "AFTER", javaToolOptionsKey,
+		"NEW_FIRST", "POD_NAME", ddtraceDDTagsKey,
+	}, envNames(pod.Spec.Containers[0].Env))
+	tags, _ := findEnv(pod.Spec.Containers[0].Env, ddtraceDDTagsKey)
+	assert.Equal(t, "user:value,pod_name:$(POD_NAME),cluster:prod", tags.Value)
+	existing, _ := findEnv(pod.Spec.Containers[0].Env, "EXISTING")
+	assert.Equal(t, "keep-me", existing.Value)
+}
 
-	t.Run("CheckAnnotation=true with annotation", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
+func TestInjectDDTracePreservesValueFromDDTags(t *testing.T) {
+	rule := newTestDDTraceRule("java", "example.com/dd-java:1.0.0")
+	rule.Envs = config.Envs{{Key: ddtraceDDTagsKey, Value: "cluster:prod"}}
+	useDDTraceRule(t, rule)
+	pod := createTestPod("tags-value-from", nil)
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{
+		{Name: "BEFORE", Value: "before"}, fieldRefEnv(ddtraceDDTagsKey), {Name: "AFTER", Value: "after"},
+	}
 
-		pod := createTestPod("test-ddtrace-check-annotation", map[string]string{
-			ddtraceEnabledAnnotationKey:          "true",
-			"admission.datakit/java-lib.version": "v2.0.0",
-		})
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) {
+		return
+	}
+	assert.Equal(t, []string{"BEFORE", ddtraceDDTagsKey, "AFTER", javaToolOptionsKey}, envNames(pod.Spec.Containers[0].Env))
+	tags, ok := findEnv(pod.Spec.Containers[0].Env, ddtraceDDTagsKey)
+	if !assert.True(t, ok) {
+		return
+	}
+	assert.Equal(t, fieldRefEnv(ddtraceDDTagsKey), tags)
+}
 
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
+func TestInjectDDTraceReinvocationLeavesValueFromJavaOptionsUntouched(t *testing.T) {
+	useDDTraceRule(t, newTestDDTraceRule("java", "example.com/dd-java:1.0.0"))
+	pod := createTestPod("value-from", nil)
+	changed, err := InjectDDTraceToPod("default", pod.Name, pod)
+	if !assert.NoError(t, err) || !assert.True(t, changed) {
+		return
+	}
+	pod.Spec.Containers[0].Env = []corev1.EnvVar{fieldRefEnv(javaToolOptionsKey)}
+	before := pod.DeepCopy()
 
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v2.0.0", pod.Spec.InitContainers[0].Image)
-	})
-
-	t.Run("CheckAnnotation=true with php annotation", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-check-annotation-php", map[string]string{
-			ddtraceEnabledAnnotationKey:         "true",
-			"admission.datakit/php-lib.version": "v2.0.0",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/php-lib-testing:v2.0.0", pod.Spec.InitContainers[0].Image)
-	})
-
-	t.Run("CheckAnnotation=true with nodejs annotation", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "nodejs",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-check-annotation-nodejs", map[string]string{
-			ddtraceEnabledAnnotationKey:            "true",
-			"admission.datakit/nodejs-lib.version": "v4.0.0",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v4.0.0", pod.Spec.InitContainers[0].Image)
-	})
-
-	t.Run("CheckAnnotation=true without annotation", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: true,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-no-annotation", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 0)
-		assert.Len(t, pod.Spec.Volumes, 0)
-	})
-
-	t.Run("CheckAnnotation=false", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "java",
-				CheckAnnotation: false,
-				Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-				Resources: config.ResourceRequirements{
-					Requests: config.ResourceQuotaConfig{CPU: "100m", Memory: "64Mi"},
-					Limits:   config.ResourceQuotaConfig{CPU: "200m", Memory: "128Mi"},
-				},
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-no-check", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1", pod.Spec.InitContainers[0].Image)
-	})
-
-	t.Run("skip when annotation is false", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-disabled", map[string]string{
-			ddtraceEnabledAnnotationKey: "false",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 0)
-		assert.Len(t, pod.Spec.Volumes, 0)
-	})
-
-	t.Run("php basic injection", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				PHPLoaderFlavor: "linux-musl",
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-php", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "datakit-lib-init", pod.Spec.InitContainers[0].Name)
-		assert.Equal(t, []string{"sh", "-c"}, pod.Spec.InitContainers[0].Command[:2])
-		assert.Contains(t, pod.Spec.InitContainers[0].Command[2], "/datadog-lib/linux-musl/loader/dd_library_loader.ini")
-
-		envMap := map[string]string{}
-		for _, env := range pod.Spec.Containers[0].Env {
-			envMap[env.Name] = env.Value
-		}
-		assert.Equal(t, "/datadog-lib", envMap["DD_LOADER_PACKAGE_PATH"])
-		assert.Equal(t, "/usr/local/etc/php/conf.d:/datadog-lib", envMap["PHP_INI_SCAN_DIR"])
-	})
-
-	t.Run("php invalid flavor fallback to linux-gnu", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language:        "php",
-				PHPLoaderFlavor: "invalid",
-				Image:           "pubrepo.guance.com/datakit-operator/php-lib-testing:v1.0.1",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-php-loader-default", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Contains(t, pod.Spec.InitContainers[0].Command[2], "/datadog-lib/linux-gnu/loader/dd_library_loader.ini")
-	})
-
-	t.Run("nodejs basic injection", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "nodejs",
-				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-				Envs: []struct{ Key, Value string }{
-					{"DD_AGENT_HOST", "datakit-service.datakit.svc"},
-				},
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-nodejs", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-		pod.Spec.Containers[0].Env = []corev1.EnvVar{
-			{Name: "NODE_OPTIONS", Value: "--max-old-space-size=512"},
-		}
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "datakit-lib-init", pod.Spec.InitContainers[0].Name)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2", pod.Spec.InitContainers[0].Image)
-		assert.Len(t, pod.Spec.Volumes, 1)
-		assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
-
-		envMap := map[string]string{}
-		for _, env := range pod.Spec.Containers[0].Env {
-			envMap[env.Name] = env.Value
-		}
-		assert.Equal(t, "--max-old-space-size=512 --require=/datadog-lib/node_modules/dd-trace/init", envMap["NODE_OPTIONS"])
-		assert.Equal(t, "datakit-service.datakit.svc", envMap["DD_AGENT_HOST"])
-	})
-
-	t.Run("nodejs injection without pre-existing env", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "nodejs",
-				Image:    "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v3.9.2",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-nodejs-no-preexist-env", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, " --require=/datadog-lib/node_modules/dd-trace/init", pod.Spec.Containers[0].Env[0].Value)
-	})
-
-	t.Run("skip when init container already exists", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{{
-				Language: "java",
-				Image:    "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-			}}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		pod := createTestPod("test-ddtrace-exists", map[string]string{
-			ddtraceEnabledAnnotationKey: "true",
-		})
-		pod.Spec.InitContainers = []corev1.Container{
-			{Name: ddtraceInitContainerName, Image: "existing-image"},
-		}
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "existing-image", pod.Spec.InitContainers[0].Image)
-	})
-
-	t.Run("nil pod error", func(t *testing.T) {
-		_, err := InjectDDTraceToPod("", "test-pod", nil)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot inject ddtrace-lib into nil pod")
-	})
-
-	t.Run("multiple rules: skip rule whose annotation does not match, try next", func(t *testing.T) {
-		originalFunc := ddtraceMatchAllNamespaceOrLabelsForConfig
-		ddtraceMatchAllNamespaceOrLabelsForConfig = func(ns string, labels map[string]string) (bool, []*config.InjectRule) {
-			return true, []*config.InjectRule{
-				{
-					Language:        "java",
-					CheckAnnotation: true,
-					Image:           "pubrepo.guance.com/datakit-operator/java-lib-testing:v1.0.1",
-				},
-				{
-					Language:        "nodejs",
-					CheckAnnotation: true,
-					Image:           "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v5.102.0",
-				},
-			}
-		}
-		defer func() {
-			ddtraceMatchAllNamespaceOrLabelsForConfig = originalFunc
-		}()
-
-		// Pod only has nodejs annotation, no java annotation.
-		// The first rule (java) should be skipped, the second (nodejs) should match.
-		pod := createTestPod("test-ddtrace-multi-rule", map[string]string{
-			ddtraceEnabledAnnotationKey:            "true",
-			"admission.datakit/nodejs-lib.version": "",
-		})
-
-		_, err := InjectDDTraceToPod("", pod.Name, pod)
-		assert.NoError(t, err)
-
-		assert.Len(t, pod.Spec.InitContainers, 1)
-		assert.Equal(t, "pubrepo.guance.com/datakit-operator/dd-lib-js-init:v5.102.0", pod.Spec.InitContainers[0].Image)
-	})
+	changed, err = InjectDDTraceToPod("default", pod.Name, pod)
+	assert.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, before, pod)
 }

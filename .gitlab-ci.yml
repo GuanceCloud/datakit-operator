@@ -4,12 +4,51 @@ before_script:
   - cp -r ./. /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
   - cd /root/go/src/gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
   - source ~/.ossenv
-  - export PATH=/usr/local/go1.18.3/bin:$PATH
-  - export GOROOT=/usr/local/go1.18.3
+  - |
+    export GO_DIST_ARCH="$(uname -m)"
+    if [ "$GO_DIST_ARCH" = "x86_64" ] || [ "$GO_DIST_ARCH" = "amd64" ]; then
+      export GO_DIST_ARCH="amd64"
+    elif [ "$GO_DIST_ARCH" = "aarch64" ] || [ "$GO_DIST_ARCH" = "arm64" ]; then
+      export GO_DIST_ARCH="arm64"
+    else
+      echo "unsupported architecture: $GO_DIST_ARCH"
+      exit 1
+    fi
+    export GO_VERSION_NORMALIZED="${DK_GO_VERSION#go}"
+    export GO_DIST_TARBALL="go${GO_VERSION_NORMALIZED}.linux-${GO_DIST_ARCH}.tar.gz"
+    export GO_DIST_URL="https://dl.google.com/go/${GO_DIST_TARBALL}"
+    export GO_CACHE_ROOT="/tmp/datakit-operator-ci/go"
+    export GOROOT="${GO_CACHE_ROOT}/${GO_VERSION_NORMALIZED}"
+    mkdir -p "$GO_CACHE_ROOT"
+    rm -rf "$GOROOT"
+    echo "download golang from $GO_DIST_URL"
+    https_proxy="$CC_HTTP_PROXY" curl -sSfL "$GO_DIST_URL" -o "${GO_CACHE_ROOT}/${GO_DIST_TARBALL}"
+    tar -C "$GO_CACHE_ROOT" -xzf "${GO_CACHE_ROOT}/${GO_DIST_TARBALL}"
+    mv "${GO_CACHE_ROOT}/go" "$GOROOT"
+    export PATH="$GOROOT/bin:$PATH"
   - go version
+  - |
+    export GOLANGCI_LINT_VERSION_NORMALIZED="${GOLANGCI_LINT_VERSION#v}"
+    export GOLANGCI_LINT_ARCHIVE="golangci-lint-${GOLANGCI_LINT_VERSION_NORMALIZED}-linux-${GO_DIST_ARCH}.tar.gz"
+    export GOLANGCI_LINT_URL="https://github.com/golangci/golangci-lint/releases/download/${GOLANGCI_LINT_VERSION}/${GOLANGCI_LINT_ARCHIVE}"
+    export GOLANGCI_LINT_CACHE_ROOT="/tmp/datakit-operator-ci/golangci-lint"
+    if [ "$GO_DIST_ARCH" = "amd64" ]; then
+      export GOLANGCI_LINT_SHA256="200c5b7503f67b59a6743ccf32133026c174e272b930ee79aa2aa6f37aca7ef1"
+    else
+      export GOLANGCI_LINT_SHA256="3bcfa2e6f3d32b2bf5cd75eaa876447507025e0303698633f722a05331988db4"
+    fi
+    mkdir -p "$GOLANGCI_LINT_CACHE_ROOT" ./bin
+    https_proxy="$CC_HTTP_PROXY" curl -sSfL "$GOLANGCI_LINT_URL" -o "${GOLANGCI_LINT_CACHE_ROOT}/${GOLANGCI_LINT_ARCHIVE}"
+    echo "${GOLANGCI_LINT_SHA256}  ${GOLANGCI_LINT_CACHE_ROOT}/${GOLANGCI_LINT_ARCHIVE}" | sha256sum -c -
+    tar -C ./bin --strip-components=1 -xzf "${GOLANGCI_LINT_CACHE_ROOT}/${GOLANGCI_LINT_ARCHIVE}" \
+      "golangci-lint-${GOLANGCI_LINT_VERSION_NORMALIZED}-linux-${GO_DIST_ARCH}/golangci-lint"
+  - ./bin/golangci-lint version
 
 variables:
   PROJECT: "datakit-operator"
+  DK_GO_VERSION: "1.26.2"
+  GOLANGCI_LINT_VERSION: "v2.11.4"
+  GOLANGCI_LINT_BIN: "./bin/golangci-lint"
 
 stages:
   - test
@@ -21,7 +60,8 @@ test:
   only:
     - /^.*$/
   script:
-    - make lint
+    - nvm use v16.14.0
+    - make lint GOLINT_BINARY="$GOLANGCI_LINT_BIN"
   tags:
     - cloudcare-ft
 
@@ -35,6 +75,18 @@ release-testing:
     - make clean
     - make
     - make pub_testing_image
+  tags:
+    - cloudcare-ft
+
+release-rc-image:
+  stage: deploy
+  resource_group: production
+  needs: [test]
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$/'
+  script:
+    - make VERSION="$CI_COMMIT_TAG"
+    - make pub_rc_image RC_VERSION="$CI_COMMIT_TAG"
   tags:
     - cloudcare-ft
 

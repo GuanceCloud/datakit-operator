@@ -1,6 +1,9 @@
 default: local
 
-VERSION=v1.8.10
+.PHONY: check_rc_version docs_lint pub_rc_image
+
+VERSION=v1.9.0
+RC_VERSION ?=
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -9,19 +12,22 @@ DOCKERFILE_DIR= dockerfiles
 ARCH_AMD64    = amd64
 ARCH_ARM64    = arm64
 IMAGE_ARCHS   = linux/arm64,linux/amd64
-GOLINT_BINARY = golangci-lint
+GOLINT_BINARY ?= golangci-lint
+GO_VERSION_EXPECTED ?= 1.26.2
 # UNAME_S     = $(shell uname -s)
 # UNAME_M     = $(shell uname -m | sed -e s/x86_64/x86_64/ -e s/aarch64.\*/arm64/)
 
-SUPPORTED_GOLINT_VERSION         = 1.46.2
-SUPPORTED_GOLINT_VERSION_ANOTHER = v1.46.2
+SUPPORTED_GOLINT_VERSION         = 2.11.4
+SUPPORTED_GOLINT_VERSION_ANOTHER = v2.11.4
 
 # Make them evaluate(expand) only once
 DATE                   := $(shell date -u +'%Y-%m-%d %H:%M:%S')
 GOVERSION              := $(shell go version)
 COMMIT                 := $(shell git rev-parse --short HEAD)
 GIT_BRANCH             := $(shell git rev-parse --abbrev-ref HEAD)
-GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version | cut -c 27- | cut -d' ' -f1)
+GO_VERSION_ACTUAL      := $(shell go version | awk '{print $$3}' | sed 's/^go//')
+GO_VERSION_LOCK_ERR_MSG := Golang version mismatch: expect $(GO_VERSION_EXPECTED), got $(GO_VERSION_ACTUAL) from go
+GOLINT_VERSION         := $(shell $(GOLINT_BINARY) --version 2>/dev/null | cut -c 27- | cut -d' ' -f1)
 GOLINT_VERSION_ERR_MSG := golangci-lint version($(GOLINT_VERSION)) is not supported, please use version $(SUPPORTED_GOLINT_VERSION)
 
 # Generate 'pkg/git' package
@@ -57,6 +63,14 @@ endef
 define build_image
 	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:$(VERSION) -f $(DOCKERFILE_DIR)/Dockerfile . --push
 	sudo docker buildx build --platform $(1) -t $(2)/datakit-operator:latest -f $(DOCKERFILE_DIR)/Dockerfile . --push
+endef
+
+define build_rc_image
+	sudo docker buildx build --platform $(IMAGE_ARCHS) \
+		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/truewatch/datakit-operator:$(RC_VERSION) \
+		-f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
 define build_uos_image
@@ -122,17 +136,54 @@ pub_testing_image:
 	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
+check_rc_version:
+	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
+		echo "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD, got $(RC_VERSION)" >&2; \
+		exit 1; \
+	fi
+	@rc_base="$(RC_VERSION)"; \
+	rc_base="$${rc_base%-rc-*}"; \
+	if [ "$$rc_base" != "$(VERSION)" ]; then \
+		echo "RC base version must match VERSION $(VERSION), got $$rc_base" >&2; \
+		exit 1; \
+	fi
+	@rc_date="$(RC_VERSION)"; \
+	rc_date="$${rc_date##*-rc-}"; \
+	today="$$(TZ=Asia/Shanghai date +%Y%m%d)"; \
+	if [ "$$rc_date" != "$$today" ]; then \
+		echo "RC date must match current date $$today (Asia/Shanghai), got $$rc_date" >&2; \
+		exit 1; \
+	fi
+	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
+	if ! grep -Fq "## [$$changelog_version]" CHANGELOG.md; then \
+		echo "CHANGELOG.md must contain ## [$$changelog_version]" >&2; \
+		exit 1; \
+	fi
+
+pub_rc_image: check_rc_version
+	$(call build_rc_image)
+
 pub_uos_image:
 	$(call build_uos_image,$(IMAGE_ARCHS),pubrepo.guance.com/uos-dataflux)
 
-lint: deps test
+lint: deps test docs_lint
+	$(call check_golint_version)
 	@bash scripts/check_copyright.sh
 	$(GOLINT_BINARY) run --allow-parallel-runners;
 	@if [ $$? != 0 ]; then \
 		exit -1; \
 	fi
 
-deps: prepare gofmt
+docs_lint:
+	@bash export.sh -c
+
+deps: check_go_version prepare gofmt
+
+check_go_version:
+	@if [ "$(GO_VERSION_ACTUAL)" != "$(GO_VERSION_EXPECTED)" ]; then \
+		echo '$(GO_VERSION_LOCK_ERR_MSG)'; \
+		exit 1; \
+	fi
 
 # ignore files under vendor/.git/git
 gofmt:

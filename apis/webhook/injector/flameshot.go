@@ -75,9 +75,12 @@ func (r *flameshotResource) process() {
 
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
-
-	// 添加 FLAMESHOT_PROCESSES 环境变量（如果已存在会被后面的值覆盖）
-	envs = append(envs, corev1.EnvVar{Name: flameshotProcessesKey, Value: rule.Processes})
+	envs = manager.AddOrUpdateEnvVars(nil, envs, manager.ReplaceExistingEnvVar)
+	envs = manager.AddOrUpdateEnvVar(
+		envs,
+		corev1.EnvVar{Name: flameshotProcessesKey, Value: rule.Processes},
+		manager.ReplaceExistingEnvVar,
+	)
 
 	profilingPath := getFlameshotProfilingPath(envs)
 	if profilingPath == "" {
@@ -105,7 +108,7 @@ func (r *flameshotResource) process() {
 	log.Infof("flameshot injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
 
-func (r *flameshotResource) getMatchingRule() (bool, *config.InjectRule) {
+func (r *flameshotResource) getMatchingRule() (bool, *config.FlameshotRule) {
 	if !CheckAnnotationIsTrue(r.pod.GetAnnotations(), flameshotEnabledAnnotationKey) {
 		log.Debugf("flameshot annotation disabled: pod=%s", r.parent)
 		return false, nil

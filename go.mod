@@ -1,8 +1,9 @@
 module gitlab.jiagouyun.com/cloudcare-tools/datakit-operator
 
-go 1.19
+go 1.26
 
 require (
+	github.com/GuanceCloud/mdcheck v0.0.2-0.20250110081153-61d47275e386
 	github.com/ake-persson/mapslice-json v0.0.0-20210720081907-22c8edf57807
 	github.com/gin-gonic/gin v1.7.4
 	github.com/gobwas/glob v0.2.3
@@ -39,6 +40,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/ugorji/go/codec v1.1.7 // indirect
+	github.com/yuin/goldmark v1.5.4 // indirect
+	github.com/yuin/goldmark-meta v1.1.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
@@ -58,7 +61,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
+	github.com/evanphx/json-patch v5.7.0+incompatible
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
