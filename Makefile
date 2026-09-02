@@ -3,9 +3,10 @@ default: local
 .PHONY: check_rc_metadata docs_lint pub_rc_image
 
 VERSION=v1.9.0
-RC_DATE    := $(shell TZ=Asia/Shanghai date +%Y%m%d)
-RC_VERSION := $(VERSION)-rc-$(RC_DATE)
-SHA_VERSION := sha-$(shell git rev-parse HEAD | cut -c1-12)
+override RC_BASE_VERSION := $(VERSION)
+override RC_DATE := $(shell TZ=Asia/Shanghai date +%Y%m%d)
+override RC_VERSION := $(RC_BASE_VERSION)-rc-$(RC_DATE)
+override SHA_VERSION := sha-$(shell git rev-parse HEAD 2>/dev/null | cut -c1-12)
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -142,18 +143,27 @@ pub_testing_image:
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 check_rc_metadata:
-	@if ! printf '%s\n' "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
-		echo "VERSION must match vX.Y.Z, got $(VERSION)" >&2; \
+	@if ! printf '%s\n' "$(RC_BASE_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "VERSION must match vX.Y.Z, got $(RC_BASE_VERSION)" >&2; \
 		exit 1; \
 	fi
-	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
+	@if ! printf '%s\n' "$(RC_DATE)" | grep -Eq '^[0-9]{8}$$'; then \
+		echo "failed to generate RC date in YYYYMMDD format, got $(RC_DATE)" >&2; \
+		exit 1; \
+	fi
+	@if ! printf '%s\n' "$(SHA_VERSION)" | grep -Eq '^sha-[0-9a-f]{12}$$'; then \
+		echo "failed to generate sha-<12 character commit> tag, got $(SHA_VERSION)" >&2; \
+		exit 1; \
+	fi
+	@changelog_version="$(patsubst v%,%,$(RC_BASE_VERSION))"; \
 	if ! grep -Fq "## [$$changelog_version]" CHANGELOG.md; then \
 		echo "CHANGELOG.md must contain ## [$$changelog_version]" >&2; \
 		exit 1; \
 	fi
 
-pub_rc_image: check_rc_metadata
-	$(MAKE) local VERSION="$(RC_VERSION)"
+pub_rc_image: override VERSION := $(RC_VERSION)
+pub_rc_image: check_rc_metadata deps
+	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 	$(call build_rc_image)
 
 pub_uos_image:

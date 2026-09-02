@@ -8,6 +8,7 @@ package scripts
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -46,9 +47,31 @@ func repositoryCommitTag(t *testing.T) string {
 
 func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 	const releaseDate = "20000101"
+	dateBinDir := t.TempDir()
+	dateBin := filepath.Join(dateBinDir, "date")
+	if err := os.WriteFile(dateBin, []byte(`#!/bin/sh
+if [ "$*" = "+%Y%m%d" ] && [ "${TZ:-}" = "Asia/Shanghai" ]; then
+	printf '%s\n' rc-date-sample >&2
+	printf '%s\n' 20000101
+	exit 0
+fi
+printf '%s\n' '2000-01-01 00:00:00'
+`), 0o755); err != nil {
+		t.Fatalf("write fake date command: %v", err)
+	}
+
 	rcVersion := repositoryVersion(t) + "-rc-" + releaseDate
 	shaVersion := repositoryCommitTag(t)
-	cmd := exec.Command("make", "--dry-run", "pub_rc_image", "RC_DATE="+releaseDate)
+	cmd := exec.Command(
+		"env",
+		"PATH="+dateBinDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"make",
+		"--dry-run",
+		"pub_rc_image",
+		"RC_DATE=19990101",
+		"RC_VERSION=latest",
+		"SHA_VERSION=latest",
+	)
 	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -56,6 +79,9 @@ func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 	}
 
 	releasePlan := string(output)
+	if count := strings.Count(releasePlan, "rc-date-sample"); count != 1 {
+		t.Errorf("RC release must sample the Shanghai release date once, got %d samples:\n%s", count, releasePlan)
+	}
 	expectedImages := []string{
 		"registry.jiagouyun.com/datakit-operator/datakit-operator:" + rcVersion,
 		"registry.jiagouyun.com/datakit-operator/datakit-operator:" + shaVersion,
@@ -79,8 +105,13 @@ func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 	if !strings.Contains(releasePlan, "--platform linux/arm64,linux/amd64") {
 		t.Errorf("RC release must build both supported architectures:\n%s", releasePlan)
 	}
-	if !strings.Contains(releasePlan, `make local VERSION="`+rcVersion+`"`) {
-		t.Errorf("RC release must build binaries with version %q:\n%s", rcVersion, releasePlan)
+	for _, build := range []string{
+		"GOARCH=arm64 go build -o dist/arm64/datakit-operator",
+		"GOARCH=amd64 go build -o dist/amd64/datakit-operator",
+	} {
+		if !strings.Contains(releasePlan, build) {
+			t.Errorf("RC release must build both image binaries; missing %q:\n%s", build, releasePlan)
+		}
 	}
 
 	for _, forbidden := range []string{":latest", "helm ", "brand.sh", "upload.sh", "Dockerfile.uos"} {
