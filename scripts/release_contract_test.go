@@ -35,15 +35,38 @@ func repositoryVersion(t *testing.T) string {
 	return ""
 }
 
+func repositoryCommitTag(t *testing.T) string {
+	t.Helper()
+
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = ".."
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("resolve repository commit: %v", err)
+	}
+	commit := strings.TrimSpace(string(output))
+	if len(commit) < 12 {
+		t.Fatalf("repository commit %q is shorter than 12 characters", commit)
+	}
+	return "sha-" + commit[:12]
+}
+
 func checkRCVersion(version string) ([]byte, error) {
 	cmd := exec.Command("make", "check_rc_version", "RC_VERSION="+version)
 	cmd.Dir = ".."
 	return cmd.CombinedOutput()
 }
 
-func TestRCImageReleasePublishesOnlyImmutableImageTags(t *testing.T) {
+func checkSHAImageVersion(version string) ([]byte, error) {
+	cmd := exec.Command("make", "check_sha_version", "SHA_VERSION="+version)
+	cmd.Dir = ".."
+	return cmd.CombinedOutput()
+}
+
+func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 	rcVersion := rcVersionForDate(repositoryVersion(t), time.Now())
-	cmd := exec.Command("make", "--dry-run", "pub_rc_image", "RC_VERSION="+rcVersion)
+	shaVersion := repositoryCommitTag(t)
+	cmd := exec.Command("make", "--dry-run", "pub_rc_image", "RC_VERSION="+rcVersion, "SHA_VERSION="+shaVersion)
 	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -53,8 +76,11 @@ func TestRCImageReleasePublishesOnlyImmutableImageTags(t *testing.T) {
 	releasePlan := string(output)
 	expectedImages := []string{
 		"registry.jiagouyun.com/datakit-operator/datakit-operator:" + rcVersion,
+		"registry.jiagouyun.com/datakit-operator/datakit-operator:" + shaVersion,
 		"pubrepo.guance.com/datakit-operator/datakit-operator:" + rcVersion,
+		"pubrepo.guance.com/datakit-operator/datakit-operator:" + shaVersion,
 		"pubrepo.guance.com/truewatch/datakit-operator:" + rcVersion,
+		"pubrepo.guance.com/truewatch/datakit-operator:" + shaVersion,
 	}
 	for _, image := range expectedImages {
 		if !strings.Contains(releasePlan, "-t "+image) {
@@ -136,7 +162,53 @@ func TestRCImageReleaseValidatesVersion(t *testing.T) {
 	}
 }
 
-func TestGitLabCIPublishesRCImagesFromRCTags(t *testing.T) {
+func TestRCImageReleaseValidatesCommitTag(t *testing.T) {
+	validVersion := repositoryCommitTag(t)
+	output, err := checkSHAImageVersion(validVersion)
+	if err != nil {
+		t.Fatalf("valid SHA image version was rejected: %v\n%s", err, output)
+	}
+
+	tests := []struct {
+		name      string
+		version   string
+		wantError string
+	}{
+		{
+			name:      "missing",
+			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
+		},
+		{
+			name:      "short commit",
+			version:   "sha-1234567",
+			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
+		},
+		{
+			name:      "uppercase commit",
+			version:   "sha-ABCDEF123456",
+			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
+		},
+		{
+			name:      "different commit",
+			version:   "sha-000000000000",
+			wantError: "SHA_VERSION must identify current commit " + validVersion,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := checkSHAImageVersion(tc.version)
+			if err == nil {
+				t.Fatalf("invalid SHA image version %q was accepted", tc.version)
+			}
+			if !strings.Contains(string(output), tc.wantError) {
+				t.Fatalf("unexpected validation error for %q:\n%s", tc.version, output)
+			}
+		})
+	}
+}
+
+func TestGitLabCIExposesManualRCImageReleaseForBranchPipelines(t *testing.T) {
 	data, err := os.ReadFile("../.gitlab-ci.yml")
 	if err != nil {
 		t.Fatalf("read GitLab CI config: %v", err)
@@ -160,15 +232,19 @@ func TestGitLabCIPublishesRCImagesFromRCTags(t *testing.T) {
 
 	for _, required := range []string{
 		"needs: [test]",
-		`$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$/`,
-		`make VERSION="$CI_COMMIT_TAG"`,
-		`make pub_rc_image RC_VERSION="$CI_COMMIT_TAG"`,
+		`if: '$CI_COMMIT_BRANCH'`,
+		"when: manual",
+		"allow_failure: true",
+		`export RC_VERSION="$(make --no-print-directory print_rc_version)"`,
+		`export SHA_VERSION="sha-$(printf '%.12s' "$CI_COMMIT_SHA")"`,
+		`make VERSION="$RC_VERSION"`,
+		`make pub_rc_image RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"`,
 	} {
 		if !strings.Contains(job, required) {
 			t.Errorf("RC release job does not contain %q:\n%s", required, job)
 		}
 	}
-	for _, forbidden := range []string{"pub_image", "pub_testing_image", "pub_uos_image"} {
+	for _, forbidden := range []string{"CI_COMMIT_TAG", "pub_image", "pub_testing_image", "pub_uos_image"} {
 		if strings.Contains(job, forbidden) {
 			t.Errorf("RC release job unexpectedly contains %q:\n%s", forbidden, job)
 		}

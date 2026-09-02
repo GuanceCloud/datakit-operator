@@ -83,10 +83,16 @@ release-rc-image:
   resource_group: production
   needs: [test]
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$/'
+    - if: '$CI_COMMIT_BRANCH'
+      when: manual
+      allow_failure: true
   script:
-    - make VERSION="$CI_COMMIT_TAG"
-    - make pub_rc_image RC_VERSION="$CI_COMMIT_TAG"
+    - |
+      export RC_VERSION="$(make --no-print-directory print_rc_version)"
+      export SHA_VERSION="sha-$(printf '%.12s' "$CI_COMMIT_SHA")"
+      echo "publishing RC images with tags $RC_VERSION and $SHA_VERSION"
+      make VERSION="$RC_VERSION"
+      make pub_rc_image RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"
   tags:
     - cloudcare-ft
 

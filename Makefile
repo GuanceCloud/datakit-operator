@@ -1,9 +1,10 @@
 default: local
 
-.PHONY: check_rc_version docs_lint pub_rc_image
+.PHONY: check_rc_version check_sha_version docs_lint print_rc_version pub_rc_image
 
 VERSION=v1.9.0
 RC_VERSION ?=
+SHA_VERSION ?=
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -68,8 +69,11 @@ endef
 define build_rc_image
 	sudo docker buildx build --platform $(IMAGE_ARCHS) \
 		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(SHA_VERSION) \
 		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(SHA_VERSION) \
 		-t pubrepo.guance.com/truewatch/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/truewatch/datakit-operator:$(SHA_VERSION) \
 		-f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
@@ -136,6 +140,9 @@ pub_testing_image:
 	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
+print_rc_version:
+	@printf '%s\n' "$(VERSION)-rc-$$(TZ=Asia/Shanghai date +%Y%m%d)"
+
 check_rc_version:
 	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
 		echo "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD, got $(RC_VERSION)" >&2; \
@@ -160,7 +167,18 @@ check_rc_version:
 		exit 1; \
 	fi
 
-pub_rc_image: check_rc_version
+check_sha_version:
+	@if ! printf '%s\n' "$(SHA_VERSION)" | grep -Eq '^sha-[0-9a-f]{12}$$'; then \
+		echo "SHA_VERSION must match sha-<12 lowercase hex characters>, got $(SHA_VERSION)" >&2; \
+		exit 1; \
+	fi
+	@expected="sha-$$(git rev-parse HEAD | cut -c1-12)"; \
+	if [ "$(SHA_VERSION)" != "$$expected" ]; then \
+		echo "SHA_VERSION must identify current commit $$expected, got $(SHA_VERSION)" >&2; \
+		exit 1; \
+	fi
+
+pub_rc_image: check_rc_version check_sha_version
 	$(call build_rc_image)
 
 pub_uos_image:
