@@ -10,14 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 )
-
-var chinaStandardTime = time.FixedZone("China Standard Time", 8*60*60)
-
-func rcVersionForDate(base string, date time.Time) string {
-	return base + "-rc-" + date.In(chinaStandardTime).Format("20060102")
-}
 
 func repositoryVersion(t *testing.T) string {
 	t.Helper()
@@ -51,28 +44,11 @@ func repositoryCommitTag(t *testing.T) string {
 	return "sha-" + commit[:12]
 }
 
-func checkRCVersion(version string) ([]byte, error) {
-	cmd := exec.Command("make", "check_rc_version", "RC_VERSION="+version)
-	cmd.Dir = ".."
-	return cmd.CombinedOutput()
-}
-
-func checkRCVersionForReleaseDate(version, releaseDate string) ([]byte, error) {
-	cmd := exec.Command("make", "check_rc_version", "RC_VERSION="+version, "RC_DATE="+releaseDate)
-	cmd.Dir = ".."
-	return cmd.CombinedOutput()
-}
-
-func checkSHAImageVersion(version string) ([]byte, error) {
-	cmd := exec.Command("make", "check_sha_version", "SHA_VERSION="+version)
-	cmd.Dir = ".."
-	return cmd.CombinedOutput()
-}
-
 func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
-	rcVersion := rcVersionForDate(repositoryVersion(t), time.Now())
+	const releaseDate = "20000101"
+	rcVersion := repositoryVersion(t) + "-rc-" + releaseDate
 	shaVersion := repositoryCommitTag(t)
-	cmd := exec.Command("make", "--dry-run", "pub_rc_image", "RC_VERSION="+rcVersion, "SHA_VERSION="+shaVersion)
+	cmd := exec.Command("make", "--dry-run", "pub_rc_image", "RC_DATE="+releaseDate)
 	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -93,6 +69,9 @@ func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 			t.Errorf("RC release does not publish %q:\n%s", image, releasePlan)
 		}
 	}
+	if count := strings.Count(releasePlan, "-t "); count != len(expectedImages) {
+		t.Errorf("RC release must publish exactly %d image tags, got %d:\n%s", len(expectedImages), count, releasePlan)
+	}
 
 	if count := strings.Count(releasePlan, "docker buildx build"); count != 1 {
 		t.Errorf("RC images must come from one buildx invocation, got %d:\n%s", count, releasePlan)
@@ -100,125 +79,14 @@ func TestRCImageReleasePublishesDateAndCommitTags(t *testing.T) {
 	if !strings.Contains(releasePlan, "--platform linux/arm64,linux/amd64") {
 		t.Errorf("RC release must build both supported architectures:\n%s", releasePlan)
 	}
+	if !strings.Contains(releasePlan, `make local VERSION="`+rcVersion+`"`) {
+		t.Errorf("RC release must build binaries with version %q:\n%s", rcVersion, releasePlan)
+	}
 
 	for _, forbidden := range []string{":latest", "helm ", "brand.sh", "upload.sh", "Dockerfile.uos"} {
 		if strings.Contains(releasePlan, forbidden) {
 			t.Errorf("RC image-only release unexpectedly contains %q:\n%s", forbidden, releasePlan)
 		}
-	}
-}
-
-func TestRCImageReleaseValidatesVersion(t *testing.T) {
-	baseVersion := repositoryVersion(t)
-	t.Run("valid current release", func(t *testing.T) {
-		version := rcVersionForDate(baseVersion, time.Now())
-		output, err := checkRCVersion(version)
-		if err != nil {
-			t.Fatalf("valid RC version was rejected: %v\n%s", err, output)
-		}
-	})
-	t.Run("captured release date remains valid", func(t *testing.T) {
-		const releaseDate = "20000101"
-		version := baseVersion + "-rc-" + releaseDate
-		output, err := checkRCVersionForReleaseDate(version, releaseDate)
-		if err != nil {
-			t.Fatalf("RC version from captured release date was rejected: %v\n%s", err, output)
-		}
-	})
-
-	tests := []struct {
-		name      string
-		version   string
-		wantError string
-	}{
-		{
-			name:      "invalid format",
-			version:   baseVersion + "-rc.1",
-			wantError: "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD",
-		},
-		{
-			name:      "missing version prefix",
-			version:   "1.8.10-rc-20260818",
-			wantError: "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD",
-		},
-		{
-			name:      "incomplete semantic version",
-			version:   "v1.8-rc-20260818",
-			wantError: "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD",
-		},
-		{
-			name:      "invalid date width",
-			version:   baseVersion + "-rc-2026081",
-			wantError: "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD",
-		},
-		{
-			name:      "different base version",
-			version:   "v999.999.999-rc-20000101",
-			wantError: "RC base version must match VERSION " + baseVersion,
-		},
-		{
-			name:      "non-current date",
-			version:   baseVersion + "-rc-20000101",
-			wantError: "RC date must match captured release date ",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			output, err := checkRCVersion(tc.version)
-			if err == nil {
-				t.Fatalf("invalid RC version %q was accepted", tc.version)
-			}
-			if !strings.Contains(string(output), tc.wantError) {
-				t.Fatalf("unexpected validation error for %q:\n%s", tc.version, output)
-			}
-		})
-	}
-}
-
-func TestRCImageReleaseValidatesCommitTag(t *testing.T) {
-	validVersion := repositoryCommitTag(t)
-	output, err := checkSHAImageVersion(validVersion)
-	if err != nil {
-		t.Fatalf("valid SHA image version was rejected: %v\n%s", err, output)
-	}
-
-	tests := []struct {
-		name      string
-		version   string
-		wantError string
-	}{
-		{
-			name:      "missing",
-			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
-		},
-		{
-			name:      "short commit",
-			version:   "sha-1234567",
-			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
-		},
-		{
-			name:      "uppercase commit",
-			version:   "sha-ABCDEF123456",
-			wantError: "SHA_VERSION must match sha-<12 lowercase hex characters>",
-		},
-		{
-			name:      "different commit",
-			version:   "sha-000000000000",
-			wantError: "SHA_VERSION must identify current commit " + validVersion,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			output, err := checkSHAImageVersion(tc.version)
-			if err == nil {
-				t.Fatalf("invalid SHA image version %q was accepted", tc.version)
-			}
-			if !strings.Contains(string(output), tc.wantError) {
-				t.Fatalf("unexpected validation error for %q:\n%s", tc.version, output)
-			}
-		})
 	}
 }
 
@@ -249,20 +117,25 @@ func TestGitLabCIExposesManualRCImageReleaseForBranchPipelines(t *testing.T) {
 		`if: '$CI_COMMIT_BRANCH'`,
 		"when: manual",
 		"allow_failure: true",
-		`export RC_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"`,
-		`export RC_VERSION="$(make --no-print-directory print_rc_version RC_DATE="$RC_DATE")"`,
-		`export SHA_VERSION="sha-$(printf '%.12s' "$CI_COMMIT_SHA")"`,
-		`make VERSION="$RC_VERSION"`,
-		`make pub_rc_image RC_DATE="$RC_DATE" RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"`,
+		"script:\n    - make pub_rc_image",
 	} {
 		if !strings.Contains(job, required) {
 			t.Errorf("RC release job does not contain %q:\n%s", required, job)
 		}
 	}
-	if count := strings.Count(job, "TZ=Asia/Shanghai date +%Y%m%d"); count != 1 {
-		t.Errorf("RC release job must capture the Shanghai release date once, got %d samples:\n%s", count, job)
+	if count := strings.Count(job, "\n    - make "); count != 1 {
+		t.Errorf("RC release job must delegate to exactly one Make target, got %d calls:\n%s", count, job)
 	}
-	for _, forbidden := range []string{"CI_COMMIT_TAG", "pub_image", "pub_testing_image", "pub_uos_image"} {
+	for _, forbidden := range []string{
+		"CI_COMMIT_TAG",
+		"CI_COMMIT_SHA",
+		"RC_DATE",
+		"RC_VERSION",
+		"SHA_VERSION",
+		"pub_image",
+		"pub_testing_image",
+		"pub_uos_image",
+	} {
 		if strings.Contains(job, forbidden) {
 			t.Errorf("RC release job unexpectedly contains %q:\n%s", forbidden, job)
 		}

@@ -1,11 +1,11 @@
 default: local
 
-.PHONY: check_rc_version check_sha_version docs_lint print_rc_version pub_rc_image
+.PHONY: check_rc_metadata docs_lint pub_rc_image
 
 VERSION=v1.9.0
-RC_DATE ?= $(shell TZ=Asia/Shanghai date +%Y%m%d)
-RC_VERSION ?=
-SHA_VERSION ?=
+RC_DATE    := $(shell TZ=Asia/Shanghai date +%Y%m%d)
+RC_VERSION := $(VERSION)-rc-$(RC_DATE)
+SHA_VERSION := sha-$(shell git rev-parse HEAD | cut -c1-12)
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -141,24 +141,9 @@ pub_testing_image:
 	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
-print_rc_version:
-	@printf '%s\n' "$(VERSION)-rc-$(RC_DATE)"
-
-check_rc_version:
-	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
-		echo "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD, got $(RC_VERSION)" >&2; \
-		exit 1; \
-	fi
-	@rc_base="$(RC_VERSION)"; \
-	rc_base="$${rc_base%-rc-*}"; \
-	if [ "$$rc_base" != "$(VERSION)" ]; then \
-		echo "RC base version must match VERSION $(VERSION), got $$rc_base" >&2; \
-		exit 1; \
-	fi
-	@rc_date="$(RC_VERSION)"; \
-	rc_date="$${rc_date##*-rc-}"; \
-	if [ "$$rc_date" != "$(RC_DATE)" ]; then \
-		echo "RC date must match captured release date $(RC_DATE) (Asia/Shanghai), got $$rc_date" >&2; \
+check_rc_metadata:
+	@if ! printf '%s\n' "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "VERSION must match vX.Y.Z, got $(VERSION)" >&2; \
 		exit 1; \
 	fi
 	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
@@ -167,18 +152,8 @@ check_rc_version:
 		exit 1; \
 	fi
 
-check_sha_version:
-	@if ! printf '%s\n' "$(SHA_VERSION)" | grep -Eq '^sha-[0-9a-f]{12}$$'; then \
-		echo "SHA_VERSION must match sha-<12 lowercase hex characters>, got $(SHA_VERSION)" >&2; \
-		exit 1; \
-	fi
-	@expected="sha-$$(git rev-parse HEAD | cut -c1-12)"; \
-	if [ "$(SHA_VERSION)" != "$$expected" ]; then \
-		echo "SHA_VERSION must identify current commit $$expected, got $(SHA_VERSION)" >&2; \
-		exit 1; \
-	fi
-
-pub_rc_image: check_rc_version check_sha_version
+pub_rc_image: check_rc_metadata
+	$(MAKE) local VERSION="$(RC_VERSION)"
 	$(call build_rc_image)
 
 pub_uos_image:
