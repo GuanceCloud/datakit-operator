@@ -88,11 +88,12 @@ release-rc-image:
       allow_failure: true
   script:
     - |
-      export RC_VERSION="$(make --no-print-directory print_rc_version)"
+      export RC_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"
+      export RC_VERSION="$(make --no-print-directory print_rc_version RC_DATE="$RC_DATE")"
       export SHA_VERSION="sha-$(printf '%.12s' "$CI_COMMIT_SHA")"
       echo "publishing RC images with tags $RC_VERSION and $SHA_VERSION"
       make VERSION="$RC_VERSION"
-      make pub_rc_image RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"
+      make pub_rc_image RC_DATE="$RC_DATE" RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"
   tags:
     - cloudcare-ft
 

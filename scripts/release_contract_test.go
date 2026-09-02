@@ -57,6 +57,12 @@ func checkRCVersion(version string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
+func checkRCVersionForReleaseDate(version, releaseDate string) ([]byte, error) {
+	cmd := exec.Command("make", "check_rc_version", "RC_VERSION="+version, "RC_DATE="+releaseDate)
+	cmd.Dir = ".."
+	return cmd.CombinedOutput()
+}
+
 func checkSHAImageVersion(version string) ([]byte, error) {
 	cmd := exec.Command("make", "check_sha_version", "SHA_VERSION="+version)
 	cmd.Dir = ".."
@@ -111,6 +117,14 @@ func TestRCImageReleaseValidatesVersion(t *testing.T) {
 			t.Fatalf("valid RC version was rejected: %v\n%s", err, output)
 		}
 	})
+	t.Run("captured release date remains valid", func(t *testing.T) {
+		const releaseDate = "20000101"
+		version := baseVersion + "-rc-" + releaseDate
+		output, err := checkRCVersionForReleaseDate(version, releaseDate)
+		if err != nil {
+			t.Fatalf("RC version from captured release date was rejected: %v\n%s", err, output)
+		}
+	})
 
 	tests := []struct {
 		name      string
@@ -145,7 +159,7 @@ func TestRCImageReleaseValidatesVersion(t *testing.T) {
 		{
 			name:      "non-current date",
 			version:   baseVersion + "-rc-20000101",
-			wantError: "RC date must match current date ",
+			wantError: "RC date must match captured release date ",
 		},
 	}
 
@@ -235,14 +249,18 @@ func TestGitLabCIExposesManualRCImageReleaseForBranchPipelines(t *testing.T) {
 		`if: '$CI_COMMIT_BRANCH'`,
 		"when: manual",
 		"allow_failure: true",
-		`export RC_VERSION="$(make --no-print-directory print_rc_version)"`,
+		`export RC_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"`,
+		`export RC_VERSION="$(make --no-print-directory print_rc_version RC_DATE="$RC_DATE")"`,
 		`export SHA_VERSION="sha-$(printf '%.12s' "$CI_COMMIT_SHA")"`,
 		`make VERSION="$RC_VERSION"`,
-		`make pub_rc_image RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"`,
+		`make pub_rc_image RC_DATE="$RC_DATE" RC_VERSION="$RC_VERSION" SHA_VERSION="$SHA_VERSION"`,
 	} {
 		if !strings.Contains(job, required) {
 			t.Errorf("RC release job does not contain %q:\n%s", required, job)
 		}
+	}
+	if count := strings.Count(job, "TZ=Asia/Shanghai date +%Y%m%d"); count != 1 {
+		t.Errorf("RC release job must capture the Shanghai release date once, got %d samples:\n%s", count, job)
 	}
 	for _, forbidden := range []string{"CI_COMMIT_TAG", "pub_image", "pub_testing_image", "pub_uos_image"} {
 		if strings.Contains(job, forbidden) {

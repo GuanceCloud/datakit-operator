@@ -3,6 +3,7 @@ default: local
 .PHONY: check_rc_version check_sha_version docs_lint print_rc_version pub_rc_image
 
 VERSION=v1.9.0
+RC_DATE ?= $(shell TZ=Asia/Shanghai date +%Y%m%d)
 RC_VERSION ?=
 SHA_VERSION ?=
 
@@ -141,7 +142,7 @@ pub_testing_image:
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
 print_rc_version:
-	@printf '%s\n' "$(VERSION)-rc-$$(TZ=Asia/Shanghai date +%Y%m%d)"
+	@printf '%s\n' "$(VERSION)-rc-$(RC_DATE)"
 
 check_rc_version:
 	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
@@ -156,9 +157,8 @@ check_rc_version:
 	fi
 	@rc_date="$(RC_VERSION)"; \
 	rc_date="$${rc_date##*-rc-}"; \
-	today="$$(TZ=Asia/Shanghai date +%Y%m%d)"; \
-	if [ "$$rc_date" != "$$today" ]; then \
-		echo "RC date must match current date $$today (Asia/Shanghai), got $$rc_date" >&2; \
+	if [ "$$rc_date" != "$(RC_DATE)" ]; then \
+		echo "RC date must match captured release date $(RC_DATE) (Asia/Shanghai), got $$rc_date" >&2; \
 		exit 1; \
 	fi
 	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
