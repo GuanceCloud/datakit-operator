@@ -11,7 +11,7 @@ Currently, Datakit-Operator provides the following functions:
 - [x] Injection DDTrace Java/Python/PHP/Node.js Agent and related environments.
 - [x] Injection Sidecar logfwd to collect Pod logging.
 - [x] Injection Flameshot and related environments.
-- [x] Support task distribution for Datakit plugins.
+- [x] Coordinate in-cluster DataKit central election with Kubernetes Leases.
    
 Prerequisites:
 

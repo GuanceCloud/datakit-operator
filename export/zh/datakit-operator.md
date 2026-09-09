@@ -6,7 +6,7 @@
 
 ---
 
-DataKit Operator 通过 Kubernetes Admission Webhook 为新建 Pod 注入链路追踪、日志采集和性能分析组件，并提供集群内 Pod 查询接口。
+DataKit Operator 通过 Kubernetes Admission Webhook 为新建 Pod 注入链路追踪、日志采集和性能分析组件，并提供集群内 Pod 查询和 DataKit 中心选举协调接口。
 
 ## 概述 {#overview}
 
@@ -21,6 +21,7 @@ DataKit Operator 提供以下功能：
 | Profiler 注入 | 兼容旧版 async-profiler、py-spy 等注入方式 |
 | Logging 配置注入 | 添加 `datakit/logs` 注解以及对应的文件卷挂载 |
 | Cluster API | 代理查询集群内 Pod 数据，降低 DataKit 直接访问 API Server 的压力 |
+| 中心选举协调 | 使用 Kubernetes Lease 为集群内 DataKit 裁决 Collection Leader |
 
 注入发生在 Pod `CREATE` 阶段，不会修改已经运行的 Pod。修改 Operator 配置、注入镜像或工作负载注解后，需要重新创建 Pod 才能生效。
 
@@ -95,7 +96,7 @@ Admission 采用 fail-open：注入失败时 Operator 会记录日志，但不�
 
 ???+ attention
 
-    - Operator 程序与部署清单需要配套使用。升级 Operator 时，应同时更新 YAML 或 Helm Chart。
+    - Operator 程序与部署清单需要配套使用。升级 Operator 时，应同时更新 YAML 或 Helm Chart；仅启用中心选举时，也可按[增量升级说明](#central-election-upgrade)补充权限。
     - 出现 `InvalidImageName` 或镜像拉取失败时，请检查镜像地址、仓库权限和节点网络。
 <!-- markdownlint-enable MD046 -->
 
@@ -132,7 +133,7 @@ Operator 不会自动识别业务容器的语言。DDTrace 还支持 Python、PH
 
 DataKit Operator [:octicons-tag-24: v1.8.1](operator-changelog.md#cl-1.8.1) 及以后版本提供 Cluster API。该接口使用 Operator 的 Pod informer 缓存代理查询 Pod 数据，减少各 DataKit 实例直接访问 API Server 的压力。
 
-Cluster API 默认开启。Operator 启动时会检查 ServiceAccount 的 Pod 读取权限；权限不足或缓存同步失败时，相关路由不会注册，但其他功能可以继续运行。所需最小权限如下：
+Cluster API 默认开启。Operator 启动时会检查 ServiceAccount 的 Pod 读取权限；权限不足时相关路由不会注册，Pod 缓存同步完成前或同步失败时接口返回 `503`，但其他功能可以继续运行。所需最小权限如下：
 
 ```yaml
 - apiGroups: [""]
@@ -153,6 +154,72 @@ Cluster API 默认开启。Operator 启动时会检查 ServiceAccount 的 Pod �
 ```shell
 curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=ebpf-v1"
 ```
+
+## DataKit 中心选举 {#central-election}
+
+从 DataKit Operator v1.9.1 开始，可以替代 DataWay/Kodo 为 DataKit 提供中心选举。该功能只替代选举服务，采集数据仍通过 DataWay 上传。
+
+该功能仅适用于 Kubernetes 环境，DataKit Operator 必须与 DataKit 部署在同一个 Kubernetes 集群中。
+
+使用前需要注意：
+
+1. **版本配套**：DataKit Operator 需要 v1.9.1 及以上版本，DataKit 需要 2.12.0 及以上版本，并手动配置环境变量。
+1. **Lease 与 RBAC 权限**：DataKit Operator 使用 Kubernetes Lease 保存选举状态，需要相应的读写权限。Lease 是 Kubernetes 原生资源，无需安装 CRD，也无需手动创建 Lease 对象，DataKit Operator 会按需创建。
+
+### 开启方式 {#central-election-config}
+
+先升级 DataKit Operator 并补齐权限，再为同组选举的所有 DataKit 统一配置以下环境变量，然后重启 DataKit：
+
+```yaml
+- name: ENV_ENABLE_ELECTION
+  value: "true"
+- name: ENV_ELECTION_OPERATOR_URL
+  value: "https://datakit-operator.datakit.svc:443"
+```
+
+示例使用默认的 Service 和 namespace；自定义部署请相应调整地址。
+
+DataKit 仅在启动时判断是否使用 DataKit Operator。未配置地址、版本不支持、权限不足或暂时不可用时，继续使用原有 DataWay/Kodo 选举。运行期间不会切换；修改配置或恢复 DataKit Operator 后，需要重启 DataKit 才会重新判断。
+
+切换选举方式时，先确认 DataKit Operator 的选举功能可用，再停止同组选举的 DataKit，完成统一配置后再启动。启动后应从日志确认它们均使用同一选举服务，避免普通滚动更新时两种选举服务混用而重复采集。
+
+### 已有部署补充权限 {#central-election-upgrade}
+
+新版默认 YAML 和 Helm Chart 已包含 Lease 的 Role/RoleBinding。已有部署无需替换整份 YAML：升级 DataKit Operator 后，可单独补充以下 RBAC。保存为 `datakit-operator-election-rbac.yaml`；自定义 namespace 或 ServiceAccount 时，请调整 `metadata.namespace`、`subjects.namespace` 和 `subjects.name`。Lease 会创建在 DataKit Operator 所在的 Kubernetes namespace 中。
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: datakit-operator-election
+subjects:
+- kind: ServiceAccount
+  name: datakit-operator
+  namespace: datakit
+```
+
+```shell
+kubectl apply -f datakit-operator-election-rbac.yaml
+kubectl -n datakit rollout restart deployment/datakit-operator
+kubectl -n datakit rollout status deployment/datakit-operator
+```
+
+补充权限后，按上文配置并重启 DataKit。缺少 Lease 对象不会报错；缺少 Lease 权限会使中心选举不可用，但不影响 DataKit Operator 的其他服务。
 
 ## 注入规则 {#datakit-operator-inject}
 

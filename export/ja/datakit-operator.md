@@ -6,7 +6,7 @@
 
 ---
 
-DataKit Operator は Kubernetes Admission Webhook を介して、新規 Pod にトレース、ログ収集、およびパフォーマンス分析コンポーネントを注入し、クラスター内の Pod を照会するインターフェースも提供します。
+DataKit Operator は Kubernetes Admission Webhook を介して、新規 Pod にトレース、ログ収集、およびパフォーマンス分析コンポーネントを注入し、クラスター内の Pod 照会 API と DataKit 中央選挙調整 API も提供します。
 
 ## 概要 {#overview}
 
@@ -21,6 +21,7 @@ DataKit Operator は次の機能を提供します。
 | Profiler 注入 | 旧方式の async-profiler や py-spy などの注入に対応 |
 | Logging 設定の注入 | `datakit/logs` Annotation と対応するファイルボリュームのマウントを追加 |
 | Cluster API | クラスター内の Pod データをプロキシ経由で照会し、DataKit から API Server への直接アクセスによる負荷を軽減 |
+| 中央選挙の調整 | Kubernetes Lease を使用して、クラスター内の DataKit から Collection Leader を選出 |
 
 注入は Pod の `CREATE` 時に行われ、実行中の Pod は変更されません。Operator の設定、注入イメージ、またはワークロードの Annotation を変更した場合は、Pod を再作成すると反映されます。
 
@@ -95,7 +96,7 @@ Admission は fail-open 方式です。注入に失敗すると Operator はロ�
 
 ???+ attention
 
-    - Operator 本体とデプロイマニフェストは、対応する組み合わせで使用する必要があります。Operator のアップグレード時には、YAML または Helm Chart も同時に更新してください。
+    - Operator 本体とデプロイマニフェストは、対応する組み合わせで使用する必要があります。Operator のアップグレード時には、YAML または Helm Chart も同時に更新してください。中央選挙のみを有効にする場合は、[差分アップグレード手順](#central-election-upgrade)に従って権限を追加することもできます。
     - `InvalidImageName` が表示される場合やイメージの pull に失敗する場合は、イメージアドレス、レジストリ権限、およびノードのネットワークを確認してください。
 <!-- markdownlint-enable MD046 -->
 
@@ -132,7 +133,7 @@ Operator はアプリケーションコンテナの言語を自動検出しま�
 
 DataKit Operator [:octicons-tag-24: v1.8.1](operator-changelog.md#cl-1.8.1) 以降では Cluster API を提供します。この API は Operator の Pod informer キャッシュを使用して Pod データをプロキシ経由で照会し、各 DataKit インスタンスから API Server への直接アクセスによる負荷を軽減します。
 
-Cluster API はデフォルトで有効です。Operator は起動時に ServiceAccount の Pod 読み取り権限を確認します。権限が不足している場合やキャッシュの同期に失敗した場合、関連ルートは登録されませんが、その他の機能は引き続き動作します。必要な最小権限は次のとおりです。
+Cluster API はデフォルトで有効です。Operator は起動時に ServiceAccount の Pod 読み取り権限を確認します。権限が不足している場合、関連ルートは登録されません。Pod キャッシュの同期前、または同期に失敗した場合、API は `503` を返しますが、その他の機能は引き続き動作します。必要な最小権限は次のとおりです。
 
 ```yaml
 - apiGroups: [""]
@@ -153,6 +154,72 @@ Cluster API はデフォルトで有効です。Operator は起動時に Service
 ```shell
 curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=ebpf-v1"
 ```
+
+## DataKit 中央選挙 {#central-election}
+
+DataKit Operator v1.9.1 以降では、DataWay/Kodo に代わって DataKit の中央選挙サービスを提供できます。置き換わるのは選挙サービスのみで、収集したデータは引き続き DataWay 経由でアップロードされます。
+
+この機能は Kubernetes 環境でのみ利用できます。DataKit Operator と DataKit は同じ Kubernetes クラスターにデプロイする必要があります。
+
+利用前に、次の点に注意してください。
+
+1. **対応バージョン**：DataKit Operator v1.9.1 以降と DataKit 2.12.0 以降が必要です。環境変数は手動で設定してください。
+1. **Lease と RBAC 権限**：DataKit Operator は Kubernetes Lease に選挙状態を保存するため、対応する読み書き権限が必要です。Lease は Kubernetes の標準リソースです。CRD のインストールや Lease オブジェクトの手動作成は不要で、DataKit Operator が必要に応じて作成します。
+
+### 有効化 {#central-election-config}
+
+先に DataKit Operator をアップグレードして必要な権限を付与し、同じ選挙グループのすべての DataKit に次の環境変数を統一して設定してから、DataKit を再起動してください。
+
+```yaml
+- name: ENV_ENABLE_ELECTION
+  value: "true"
+- name: ENV_ELECTION_OPERATOR_URL
+  value: "https://datakit-operator.datakit.svc:443"
+```
+
+例ではデフォルトの Service と namespace を使用しています。カスタムデプロイの場合はアドレスを調整してください。
+
+DataKit は起動時にのみ DataKit Operator を使用するか判断します。アドレスが未設定、バージョンが未対応、権限が不足、または一時的に利用できない場合は、従来の DataWay/Kodo による選挙を使用します。実行中にサービスを切り替えることはありません。設定変更や DataKit Operator の復旧後に再判断させるには、DataKit を再起動してください。
+
+選挙サービスを切り替える前に、DataKit Operator の選挙機能が利用可能であることを確認してください。同じ選挙グループのすべての DataKit を停止し、設定を統一してから再起動します。起動ログで全インスタンスが同じ選挙サービスを使用していることを確認し、通常のローリングアップデートでサービスが混在することによる重複収集を避けてください。
+
+### 既存デプロイへの権限追加 {#central-election-upgrade}
+
+新しいデフォルト YAML と Helm Chart には Lease 用の Role/RoleBinding が含まれています。既存デプロイで YAML 全体を置き換える必要はありません。DataKit Operator をアップグレードした後、以下の RBAC を個別に追加できます。`datakit-operator-election-rbac.yaml` として保存してください。カスタム namespace または ServiceAccount を使用する場合は、`metadata.namespace`、`subjects.namespace`、`subjects.name` を調整してください。Lease は DataKit Operator が動作する Kubernetes namespace に作成されます。
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: datakit-operator-election
+subjects:
+- kind: ServiceAccount
+  name: datakit-operator
+  namespace: datakit
+```
+
+```shell
+kubectl apply -f datakit-operator-election-rbac.yaml
+kubectl -n datakit rollout restart deployment/datakit-operator
+kubectl -n datakit rollout status deployment/datakit-operator
+```
+
+権限を付与した後、上記の手順で DataKit を設定して再起動してください。Lease オブジェクトが存在しないこと自体はエラーではありません。Lease 権限が不足すると中央選挙を利用できませんが、DataKit Operator のほかのサービスには影響しません。
 
 ## 注入ルール {#datakit-operator-inject}
 
