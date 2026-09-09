@@ -6,6 +6,7 @@ This Helm chart installs [DataKit Operator]() with configurable TLS, RBAC and mu
 - [Installing](#installing)
 - [Uninstalling](#uninstalling)
 - [Tracing injection](#tracing-injection)
+- [Central election](#central-election)
 - [Configuration](#configuration)
 
 ## Requirements
@@ -34,6 +35,10 @@ $ helm uninstall datakit-operator -n datakit
 The shipped configuration enables one Java DDTrace rule for Pods in the `default` namespace. This preserves the existing default behavior; the Operator does not detect the application language automatically.
 
 DDTrace also supports Python, PHP, and Node.js. OpenTelemetry supports Java, Python, and Node.js, but is disabled by default with `otels: []`. To enable another language or OpenTelemetry, add explicit rules with mutually exclusive language labels. See the [DDTrace injection documentation](https://docs.(@BRAND_DOMAIN)/datakit/operator-ddtrace/) and [OpenTelemetry injection documentation](https://docs.(@BRAND_DOMAIN)/datakit/operator-otel/) for complete configuration examples.
+
+## Central election
+
+DataKit Operator v1.9.1 or later can replace DataWay/Kodo for central election when used with DataKit 2.12.0 or later in the same Kubernetes cluster. The chart includes the required Kubernetes Lease permissions. Configure `ENV_ENABLE_ELECTION=true` and `ENV_ELECTION_OPERATOR_URL=https://datakit-operator.datakit.svc:443` on every DataKit in the election group. DataKit selects the election service at startup and does not switch at runtime. See the [DataKit Operator documentation](https://docs.(@BRAND_DOMAIN)/datakit/datakit-operator/#central-election) for setup and upgrade instructions.
 
 ## Configuration
 

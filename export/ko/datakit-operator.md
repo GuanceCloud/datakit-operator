@@ -6,7 +6,7 @@
 
 ---
 
-DataKit Operator는 Kubernetes Admission Webhook을 통해 새로 생성되는 Pod에 분산 추적, 로그 수집 및 성능 분석 컴포넌트를 주입하고 클러스터 내 Pod 조회 API를 제공합니다.
+DataKit Operator는 Kubernetes Admission Webhook을 통해 새로 생성되는 Pod에 분산 추적, 로그 수집 및 성능 분석 컴포넌트를 주입하고 클러스터 내 Pod 조회 API와 DataKit 중앙 선출 조정 API를 제공합니다.
 
 ## 개요 {#overview}
 
@@ -21,6 +21,7 @@ DataKit Operator는 다음 기능을 제공합니다.
 | Profiler 주입 | 레거시 async-profiler, py-spy 등의 주입 방식과 호환 |
 | Logging 구성 주입 | `datakit/logs` Annotation과 해당 파일 볼륨 마운트 추가 |
 | Cluster API | 클러스터 내 Pod 데이터 조회를 프록시하여 DataKit의 API Server 직접 접근 부하 감소 |
+| 중앙 선출 조정 | Kubernetes Lease를 사용하여 클러스터의 DataKit 중 Collection Leader 선출 |
 
 주입은 Pod `CREATE` 단계에서만 수행되며 이미 실행 중인 Pod는 변경하지 않습니다. Operator 구성, 주입 이미지 또는 워크로드 Annotation을 변경한 후에는 Pod를 다시 생성해야 적용됩니다.
 
@@ -95,7 +96,7 @@ Admission은 fail-open 방식으로 동작합니다. 주입에 실패하면 Oper
 
 ???+ attention
 
-    - Operator 프로그램과 배포 매니페스트는 호환되는 버전을 함께 사용해야 합니다. Operator를 업그레이드할 때 YAML 또는 Helm Chart도 함께 업데이트하십시오.
+    - Operator 프로그램과 배포 매니페스트는 호환되는 버전을 함께 사용해야 합니다. Operator를 업그레이드할 때 YAML 또는 Helm Chart도 함께 업데이트하십시오. 중앙 선출만 활성화하려면 [증분 업그레이드 안내](#central-election-upgrade)에 따라 권한을 추가할 수도 있습니다.
     - `InvalidImageName`이 발생하거나 이미지를 가져오지 못하면 이미지 주소, 레지스트리 권한 및 노드 네트워크를 확인하십시오.
 <!-- markdownlint-enable MD046 -->
 
@@ -132,7 +133,7 @@ Operator는 애플리케이션 컨테이너의 언어를 자동으로 감지하�
 
 DataKit Operator [:octicons-tag-24: v1.8.1](operator-changelog.md#cl-1.8.1) 이상에서는 Cluster API를 제공합니다. 이 API는 Operator의 Pod informer 캐시를 사용하여 Pod 데이터 조회를 프록시하므로 각 DataKit 인스턴스가 API Server에 직접 접근할 때 발생하는 부하를 줄입니다.
 
-Cluster API는 기본적으로 활성화됩니다. Operator는 시작할 때 ServiceAccount의 Pod 읽기 권한을 확인합니다. 권한이 부족하거나 캐시 동기화에 실패하면 관련 경로를 등록하지 않지만 다른 기능은 계속 실행됩니다. 필요한 최소 권한은 다음과 같습니다.
+Cluster API는 기본적으로 활성화됩니다. Operator는 시작할 때 ServiceAccount의 Pod 읽기 권한을 확인합니다. 권한이 부족하면 관련 경로를 등록하지 않습니다. Pod 캐시 동기화 전이거나 동기화에 실패하면 API가 `503`을 반환하지만 다른 기능은 계속 실행됩니다. 필요한 최소 권한은 다음과 같습니다.
 
 ```yaml
 - apiGroups: [""]
@@ -153,6 +154,72 @@ API는 Operator Service를 재사용하며 기본 주소는 `https://datakit-ope
 ```shell
 curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=ebpf-v1"
 ```
+
+## DataKit 중앙 선출 {#central-election}
+
+DataKit Operator v1.9.1부터 DataWay/Kodo를 대신하여 DataKit에 중앙 선출 서비스를 제공할 수 있습니다. 선출 서비스만 대체하며, 수집한 데이터는 계속 DataWay를 통해 업로드됩니다.
+
+이 기능은 Kubernetes 환경에서만 사용할 수 있습니다. DataKit Operator와 DataKit은 동일한 Kubernetes 클러스터에 배포되어야 합니다.
+
+사용 전에 다음 사항을 확인하십시오.
+
+1. **호환 버전**: DataKit Operator v1.9.1 이상과 DataKit 2.12.0 이상이 필요합니다. 환경 변수는 수동으로 설정해야 합니다.
+1. **Lease 및 RBAC 권한**: DataKit Operator는 Kubernetes Lease에 선출 상태를 저장하므로 해당 읽기/쓰기 권한이 필요합니다. Lease는 Kubernetes 기본 리소스입니다. CRD를 설치하거나 Lease 객체를 수동으로 생성할 필요가 없으며, DataKit Operator가 필요할 때 생성합니다.
+
+### 활성화 방법 {#central-election-config}
+
+먼저 DataKit Operator를 업그레이드하고 필요한 권한을 부여한 다음, 같은 선출 그룹의 모든 DataKit에 아래 환경 변수를 동일하게 설정하고 DataKit을 재시작하십시오.
+
+```yaml
+- name: ENV_ENABLE_ELECTION
+  value: "true"
+- name: ENV_ELECTION_OPERATOR_URL
+  value: "https://datakit-operator.datakit.svc:443"
+```
+
+예시는 기본 Service와 namespace를 사용합니다. 사용자 지정 배포라면 주소를 조정하십시오.
+
+DataKit은 시작 시에만 DataKit Operator를 사용할지 판단합니다. 주소 미설정, 버전 미지원, 권한 부족 또는 일시적으로 사용할 수 없는 경우 기존 DataWay/Kodo 선출을 사용합니다. 실행 중에는 서비스를 전환하지 않습니다. 설정을 변경하거나 DataKit Operator가 복구된 후 다시 판단하려면 DataKit을 재시작해야 합니다.
+
+선출 서비스를 전환하기 전에 DataKit Operator의 선출 기능을 사용할 수 있는지 확인하십시오. 같은 선출 그룹의 모든 DataKit을 중지하고 설정을 통일한 후 다시 시작합니다. 시작 로그에서 모든 인스턴스가 동일한 선출 서비스를 사용하는지 확인하여 일반적인 롤링 업데이트 중 서비스 혼용으로 인한 중복 수집을 방지하십시오.
+
+### 기존 배포에 권한 추가 {#central-election-upgrade}
+
+새 기본 YAML과 Helm Chart에는 Lease용 Role/RoleBinding이 포함되어 있습니다. 기존 배포에서 YAML 전체를 교체할 필요는 없습니다. DataKit Operator를 업그레이드한 후 아래 RBAC를 별도로 추가할 수 있습니다. `datakit-operator-election-rbac.yaml`로 저장하십시오. 사용자 지정 namespace 또는 ServiceAccount를 사용한다면 `metadata.namespace`, `subjects.namespace`, `subjects.name`을 조정하십시오. Lease는 DataKit Operator가 실행되는 Kubernetes namespace에 생성됩니다.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: datakit-operator-election
+subjects:
+- kind: ServiceAccount
+  name: datakit-operator
+  namespace: datakit
+```
+
+```shell
+kubectl apply -f datakit-operator-election-rbac.yaml
+kubectl -n datakit rollout restart deployment/datakit-operator
+kubectl -n datakit rollout status deployment/datakit-operator
+```
+
+권한을 부여한 후 위 설명에 따라 DataKit을 설정하고 재시작하십시오. Lease 객체가 없는 것 자체는 오류가 아닙니다. Lease 권한이 부족하면 중앙 선출을 사용할 수 없지만 DataKit Operator의 다른 서비스에는 영향을 주지 않습니다.
 
 ## 주입 규칙 {#datakit-operator-inject}
 

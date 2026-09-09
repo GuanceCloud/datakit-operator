@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/cluster"
+	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/election"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/logging"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/apis/webhook"
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/kubernetes/client"
@@ -38,16 +39,33 @@ func Run(ctx context.Context, addr string) error {
 	webhook.Setup(ctx)
 	logging.Setup(ctx)
 	cluster.Setup(ctx)
+	election.Setup()
+
+	leaseNamespace, err := election.ResolveLeaseNamespace()
+	if err != nil {
+		log.Warnf("failed to resolve election Lease namespace: %v, election will be disabled", err)
+	}
+	electionCoordinator := election.NewCoordinator(
+		k8sClient.Clientset().CoordinationV1().Leases(leaseNamespace),
+		k8sClient.Clientset().AuthorizationV1().SelfSubjectAccessReviews(),
+		leaseNamespace,
+	)
+	electionCoordinator.Start(ctx)
 
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(redactTokenOnPanic())
 	router.Use(ginLogger())
 
 	// 注册路由
 	router.GET("/v1/ping", handlePing)
+	// Optional election readiness must not remove the webhook from Service endpoints.
+	router.GET("/v1/ready", handlePing)
 	log.Info("route registered /v1/ping")
+	electionCoordinator.RegisterRoutes(router)
+	log.Info("DataKit election routes registered under /v1/dk-election")
 
 	router.POST("/v1/webhooks/inject", webhook.HandleInject)
 	log.Info("route registered /v1/webhook/inject")
@@ -64,18 +82,19 @@ func Run(ctx context.Context, addr string) error {
 		log.Warnf("RBAC check failed: %v, cluster API will be disabled", err)
 	} else {
 		clusterHandler := cluster.NewHandler(k8sClient)
-
-		if err := clusterHandler.Start(ctx); err != nil {
-			log.Warnf("failed to start cluster handler: %v, cluster API will be disabled", err)
-		} else {
-			coreV1Group := router.Group("/v1/cluster/api/v1")
-			{
-				coreV1Group.GET("/pods", clusterHandler.ListAllPods)
-				coreV1Group.GET("/namespaces/:namespace/pods", clusterHandler.ListPods)
-				coreV1Group.GET("/namespaces/:namespace/pods/:name", clusterHandler.GetPod)
+		go func() {
+			if err := clusterHandler.Start(ctx); err != nil && ctx.Err() == nil {
+				log.Warnf("failed to start cluster handler: %v, cluster API will remain unavailable", err)
 			}
-			log.Info("route registered /v1/clusters/:path")
+		}()
+
+		coreV1Group := router.Group("/v1/cluster/api/v1")
+		{
+			coreV1Group.GET("/pods", clusterHandler.ListAllPods)
+			coreV1Group.GET("/namespaces/:namespace/pods", clusterHandler.ListPods)
+			coreV1Group.GET("/namespaces/:namespace/pods/:name", clusterHandler.GetPod)
 		}
+		log.Info("routes registered under /v1/cluster/api/v1; Pod cache is syncing in background")
 	}
 
 	server := &http.Server{
@@ -129,8 +148,8 @@ func handlePing(c *gin.Context) {
 func ginLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
+		// Query parameters may contain a workspace token, including malformed encodings.
 		path := c.Request.URL.Path
-		raw := c.Request.URL.RawQuery
 
 		c.Next()
 
@@ -138,10 +157,6 @@ func ginLogger() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		statusCode := c.Writer.Status()
-
-		if raw != "" {
-			path = path + "?" + raw
-		}
 
 		log.Debugf("[%s] %s %s %d %v %s",
 			clientIP,
@@ -151,5 +166,19 @@ func ginLogger() gin.HandlerFunc {
 			latency,
 			c.Request.UserAgent(),
 		)
+	}
+}
+
+func redactTokenOnPanic() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				// Gin Recovery may dump RequestURI as well as URL on a broken connection.
+				c.Request.URL.RawQuery = ""
+				c.Request.RequestURI = c.Request.URL.RequestURI()
+				panic(recovered)
+			}
+		}()
+		c.Next()
 	}
 }

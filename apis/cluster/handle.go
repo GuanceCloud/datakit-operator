@@ -7,6 +7,7 @@ package cluster
 
 import (
 	"context"
+	"sync/atomic"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/datakit-operator/pkg/kubernetes/client"
 	"k8s.io/client-go/informers"
@@ -17,6 +18,7 @@ import (
 type Handler struct {
 	Factory   informers.SharedInformerFactory
 	PodLister corev1.PodLister
+	ready     atomic.Bool
 	// DeploymentLister appsv1.DeploymentLister
 	// other...
 }
@@ -45,5 +47,10 @@ func (h *Handler) Start(ctx context.Context) error {
 	}
 
 	log.Info("cache sync completed")
+	h.ready.Store(true)
 	return nil
+}
+
+func (h *Handler) Ready() bool {
+	return h.ready.Load()
 }

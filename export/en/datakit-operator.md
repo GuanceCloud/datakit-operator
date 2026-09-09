@@ -6,7 +6,7 @@
 
 ---
 
-DataKit Operator uses a Kubernetes Admission Webhook to inject tracing, log collection, and profiling components into newly created Pods. It also provides an in-cluster Pod query API.
+DataKit Operator uses a Kubernetes Admission Webhook to inject tracing, log collection, and profiling components into newly created Pods. It also provides in-cluster Pod query and DataKit central election coordination APIs.
 
 ## Overview {#overview}
 
@@ -21,6 +21,7 @@ DataKit Operator provides the following features:
 | Profiler injection | Supports legacy injection methods such as async-profiler and py-spy |
 | Logging configuration injection | Adds the `datakit/logs` Annotation and corresponding file volume mounts |
 | Cluster API | Proxies queries for Pod data in the cluster, reducing direct access to the API Server from DataKit |
+| Central election coordination | Uses Kubernetes Leases to select the Collection Leader among DataKit instances in the cluster |
 
 Injection occurs during the Pod `CREATE` phase and does not modify running Pods. After changing the Operator configuration, an injection image, or workload Annotations, recreate the Pod for the change to take effect.
 
@@ -95,7 +96,7 @@ Admission is fail-open: if injection fails, the Operator logs the error but does
 
 ???+ attention
 
-    - The Operator binary and deployment manifest must be used together. When upgrading the Operator, update the YAML or Helm Chart at the same time.
+    - The Operator binary and deployment manifest must be used together. When upgrading the Operator, update the YAML or Helm Chart at the same time. To enable only central election, you can also add permissions using the [incremental upgrade instructions](#central-election-upgrade).
     - If `InvalidImageName` occurs or an image cannot be pulled, check the image address, registry permissions, and node network.
 <!-- markdownlint-enable MD046 -->
 
@@ -132,7 +133,7 @@ The legacy `admission_inject` configuration remains supported. A valid `ddtrace`
 
 DataKit Operator [:octicons-tag-24: v1.8.1](operator-changelog.md#cl-1.8.1) and later provide the Cluster API. This API uses the Operator's Pod informer cache to proxy Pod data queries, reducing direct access to the API Server from each DataKit instance.
 
-The Cluster API is enabled by default. At startup, the Operator checks whether its ServiceAccount has permission to read Pods. If permission is insufficient or cache synchronization fails, the related routes are not registered, but other features can continue to run. The minimum required permissions are:
+The Cluster API is enabled by default. At startup, the Operator checks whether its ServiceAccount has permission to read Pods. If permission is insufficient, the related routes are not registered. Before the Pod cache is synchronized, or if synchronization fails, the API returns `503`, while other features continue to run. The minimum required permissions are:
 
 ```yaml
 - apiGroups: [""]
@@ -153,6 +154,72 @@ Starting with [:octicons-tag-24: v1.8.9](operator-changelog.md#cl-1.8.9), use `v
 ```shell
 curl -k "https://datakit-operator.datakit.svc:443/v1/cluster/api/v1/pods?view=ebpf-v1"
 ```
+
+## DataKit Central Election {#central-election}
+
+Starting with DataKit Operator v1.9.1, DataKit Operator can replace DataWay/Kodo as the central election service for DataKit. This replaces only the election service; collected data is still uploaded through DataWay.
+
+This feature is available only in Kubernetes. DataKit Operator and DataKit must run in the same Kubernetes cluster.
+
+Before enabling the feature, note:
+
+1. **Compatible versions**: DataKit Operator v1.9.1 or later and DataKit 2.12.0 or later are required. Configure the environment variables manually.
+1. **Lease and RBAC permissions**: DataKit Operator stores election state in Kubernetes Leases and requires the corresponding read/write permissions. Lease is a native Kubernetes resource. No CRD installation or manual Lease creation is needed; DataKit Operator creates Leases on demand.
+
+### Enable Central Election {#central-election-config}
+
+First upgrade DataKit Operator and grant the required permissions. Then configure the following environment variables consistently on every DataKit in the same election group and restart DataKit:
+
+```yaml
+- name: ENV_ENABLE_ELECTION
+  value: "true"
+- name: ENV_ELECTION_OPERATOR_URL
+  value: "https://datakit-operator.datakit.svc:443"
+```
+
+The example uses the default Service and namespace. Adjust the address for a custom deployment.
+
+DataKit decides whether to use DataKit Operator only at startup. If the address is unset, the version is unsupported, permissions are missing, or the service is temporarily unavailable, DataKit continues to use DataWay/Kodo election. It does not switch services at runtime. Restart DataKit to reassess after changing the configuration or restoring DataKit Operator.
+
+Before switching election services, confirm that DataKit Operator's election feature is available. Stop all DataKits in the same election group, apply the same configuration, and then start them again. Check their startup logs to confirm that they all use the same election service, avoiding duplicate collection caused by mixing services during a normal rolling update.
+
+### Add Permissions to an Existing Deployment {#central-election-upgrade}
+
+The new default YAML and Helm Chart include the Lease Role/RoleBinding. Existing deployments do not need to replace the entire YAML: after upgrading DataKit Operator, apply the following RBAC separately. Save it as `datakit-operator-election-rbac.yaml`. For a custom namespace or ServiceAccount, adjust `metadata.namespace`, `subjects.namespace`, and `subjects.name`. Leases are created in the Kubernetes namespace where DataKit Operator runs.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: datakit-operator-election
+  namespace: datakit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: datakit-operator-election
+subjects:
+- kind: ServiceAccount
+  name: datakit-operator
+  namespace: datakit
+```
+
+```shell
+kubectl apply -f datakit-operator-election-rbac.yaml
+kubectl -n datakit rollout restart deployment/datakit-operator
+kubectl -n datakit rollout status deployment/datakit-operator
+```
+
+After granting the permissions, configure and restart DataKit as described above. A missing Lease object is not an error. Missing Lease permissions make central election unavailable but do not affect other DataKit Operator services.
 
 ## Injection Rules {#datakit-operator-inject}
 
