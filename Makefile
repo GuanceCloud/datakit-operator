@@ -2,7 +2,7 @@ default: local
 
 .PHONY: check_rc_metadata docs_lint pub_rc_image
 
-VERSION=v1.9.0
+VERSION=v1.9.1
 override RC_BASE_VERSION := $(VERSION)
 override RC_DATE := $(shell TZ=Asia/Shanghai date +%Y%m%d)
 override RC_VERSION := $(RC_BASE_VERSION)-rc-$(RC_DATE)

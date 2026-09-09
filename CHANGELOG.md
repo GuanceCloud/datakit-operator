@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1] - 2026-09-09
+
+- 支持基于 Kubernetes Lease 的 DataKit 中心选举，需配合 DataKit 2.12.0 及以上版本使用（#109）
+- 修复 Lease 缓存延迟可能导致新 Leader 续租被误判失败的问题（#109）
+- 将 Pod 缓存同步改为后台执行，未就绪时查询接口返回 503，避免阻塞其他接口启动（#109）
+- 支持从分支 Pipeline 手动发布带有日期和 commit 标签的 RC 镜像（#108）
+
 ## [1.9.0] - 2026-08-26
 
 - 支持为 Java、Python 和 Node.js 应用注入 OpenTelemetry 自动探针（#98、#101、#102）
