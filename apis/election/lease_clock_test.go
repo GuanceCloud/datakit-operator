@@ -133,3 +133,77 @@ func TestElectionStaleCacheDoesNotRestartLeaseObservation(t *testing.T) {
 	got = requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=b", 200)
 	assert.Equal(t, StatusSuccess, got.Status, "the stale holder must not reject the new holder's heartbeat")
 }
+
+func TestElectionDelayedCacheCannotRejectNewHolder(t *testing.T) {
+	c, store, clock, router := newElectionTest(t)
+	requestElection(t, router, "/v1/dk-election?token=secret&id=a", 200)
+	name := leaseName("secret", "")
+	original, err := store.Get(t.Context(), name, metav1.GetOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	stale := newFakeLeaseBackend()
+	stale.leases[name] = original.DeepCopy()
+	c.cache = &fakeLeaseCache{backend: stale, ready: true}
+
+	clock.Step(requestInterval)
+	requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=a", 200)
+	intermediate, err := store.Get(t.Context(), name, metav1.GetOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	clock.Step(requestInterval)
+	requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=a", 200)
+	clock.Step(leaseDuration)
+	acquired := requestElection(t, router, "/v1/dk-election?token=secret&id=b", 200)
+	assert.Equal(t, StatusSuccess, acquired.Status)
+	assert.EqualValues(t, 2, acquired.Epoch)
+
+	// The watch catches up in order, replaying an intermediate version whose
+	// observation was already replaced by later renewals and the takeover.
+	stale.leases[name] = intermediate
+	clock.Step(requestInterval)
+	got := requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=b", 200)
+	assert.Equal(t, StatusSuccess, got.Status)
+	assert.Equal(t, "b", got.IncumbencyID)
+	assert.EqualValues(t, 2, got.Epoch)
+
+	// Replaying the old version must not interfere with the renewed deadline.
+	clock.Step(leaseDuration - time.Second)
+	got = requestElection(t, router, "/v1/dk-election?token=secret&id=c", 200)
+	assert.Equal(t, StatusDefeat, got.Status)
+	clock.Step(time.Second)
+	got = requestElection(t, router, "/v1/dk-election?token=secret&id=c", 200)
+	assert.Equal(t, StatusSuccess, got.Status)
+	assert.EqualValues(t, 3, got.Epoch)
+}
+
+func TestElectionRecreatedLeaseCanRenew(t *testing.T) {
+	c, store, clock, router := newElectionTest(t)
+	requestElection(t, router, "/v1/dk-election?token=secret&id=a", 200)
+	clock.Step(leaseDuration)
+	requestElection(t, router, "/v1/dk-election?token=secret&id=b", 200)
+	name := leaseName("secret", "")
+	previous, err := store.Get(t.Context(), name, metav1.GetOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.EqualValues(t, 2, epoch(previous))
+
+	// An administrator replaces the Lease, resetting its epoch. Its old cache
+	// entry must neither reject the new holder nor inherit the new lifetime.
+	recreated := newLease(c.namespace, name, "c", clock.Now())
+	recreated.UID = "replacement-lease"
+	recreated.ResourceVersion = "replacement-version"
+	store.backend.leases[name] = recreated
+	stale := newFakeLeaseBackend()
+	c.cache = &fakeLeaseCache{backend: stale, ready: true}
+	got := requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=c", 200)
+	assert.Equal(t, StatusSuccess, got.Status)
+
+	stale.leases[name] = previous
+	got = requestElection(t, router, "/v1/dk-election/heartbeat?token=secret&id=c", 200)
+	assert.Equal(t, StatusSuccess, got.Status)
+	assert.Equal(t, "c", got.IncumbencyID)
+	assert.EqualValues(t, 1, got.Epoch)
+}

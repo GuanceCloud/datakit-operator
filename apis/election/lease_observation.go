@@ -10,6 +10,7 @@ import (
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type observationSource int
@@ -21,6 +22,8 @@ const (
 
 type leaseObservation struct {
 	resourceVersion string
+	uid             types.UID
+	epoch           int64
 	observedAt      time.Duration
 	known           bool
 }
@@ -49,12 +52,24 @@ func (o *leaseObservations) remaining(lease *coordinationv1.Lease, source observ
 		o.leases = make(map[string][2]leaseObservation)
 	}
 	observations := o.leases[lease.Name]
+	if stored := observations[fromStore]; stored.known {
+		// A delayed watch or GET must not revive a term superseded by an
+		// authoritative read/write. UID changes allow a recreated Lease to
+		// restart its epoch, while its old cache entry requires a fresh GET.
+		if lease.UID == stored.uid && epoch(lease) < stored.epoch ||
+			source == fromCache && lease.UID != stored.uid {
+			return 0
+		}
+	}
 	current, other := &observations[source], observations[1-source]
-	if !current.known || current.resourceVersion != lease.ResourceVersion {
-		if other.known && other.resourceVersion == lease.ResourceVersion {
+	if !current.known || current.uid != lease.UID || current.resourceVersion != lease.ResourceVersion {
+		if other.known && other.uid == lease.UID && other.resourceVersion == lease.ResourceVersion {
 			*current = other
 		} else {
-			*current = leaseObservation{resourceVersion: lease.ResourceVersion, observedAt: elapsed, known: true}
+			*current = leaseObservation{
+				resourceVersion: lease.ResourceVersion, uid: lease.UID, epoch: epoch(lease),
+				observedAt: elapsed, known: true,
+			}
 		}
 		o.leases[lease.Name] = observations
 	}
