@@ -29,7 +29,9 @@ func servePods(t *testing.T, pod *corev1.Pod, view string) []corev1.Pod {
 	}
 
 	router := gin.New()
-	router.GET("/pods", (&Handler{PodLister: corev1listers.NewPodLister(indexer)}).ListAllPods)
+	handler := &Handler{PodLister: corev1listers.NewPodLister(indexer)}
+	handler.ready.Store(true)
+	router.GET("/pods", handler.ListAllPods)
 
 	url := "/pods"
 	if view != "" {
@@ -51,6 +53,29 @@ func servePods(t *testing.T, pod *corev1.Pod, view string) []corev1.Pod {
 		t.Fatalf("got %d pods, want 1", len(pods))
 	}
 	return pods
+}
+
+func TestPodAPIUnavailableUntilInformerSynced(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+	})
+	handler := &Handler{PodLister: corev1listers.NewPodLister(indexer)}
+	router := gin.New()
+	router.GET("/pods", handler.ListAllPods)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pods", nil))
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unsynced Pod API status = %d, want 503", recorder.Code)
+	}
+
+	handler.ready.Store(true)
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pods", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("synced Pod API status = %d, want 200", recorder.Code)
+	}
 }
 
 func TestListAllPodsEBPFV1ViewTrimsPodFields(t *testing.T) {

@@ -2,9 +2,9 @@
   "version": 1,
   "target_language": "ja",
   "source_hashes": {
-    "datakit-operator.md": "fbf33d6038f2688592baec986b22bc9a3123129c7700247bdfb87c5832594d34",
+    "datakit-operator.md": "8653114be1ea1b9f707a78585dc4bd7ae5a9f21619a97d0545bea17f9421917f",
     "operator-asyncprofile.md": "3bfb35bd4636e69d6f5464a99512f0cb5327f468e9e7f1ed8f4e8817486cbe4d",
-    "operator-changelog.md": "1712c2fa2ea5b8cf5a317efc3316061a31f65766113f0c58c7c905d7900cf986",
+    "operator-changelog.md": "55a25aeaa63eb22c48d9d41d83558851b636679d2e21e1daf400f3bb57062f21",
     "operator-ddtrace.md": "967d2e7eba85b7eadf6e1e185cc2849c96b0a4f51be82ff08fb76cb68d0af625",
     "operator-flameshot.md": "67090d1e32d27e75578da89356cace7c0947d5770bb9fef6e70354b63753ffad",
     "operator-logfwd.md": "da4605d1ef1d43468f8aa7fb59b119bb6ed2c52ee794b24d78cb7d1ef5dcc2aa",

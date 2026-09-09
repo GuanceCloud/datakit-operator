@@ -1,5 +1,12 @@
 # Operator Changelog
 
+## 1.9.1(2026-09-09) {#cl-1.9.1}
+
+- Added Kubernetes Lease-based central election for DataKit, requiring DataKit 2.12.0 or later (#109)
+- Fixed an issue where a delayed Lease cache could incorrectly reject a new Leader's lease renewal (#109)
+- Moved Pod cache synchronization to the background. Query endpoints return 503 until the cache is ready, allowing other endpoints to start without waiting (#109)
+- Added manual RC image releases from branch pipelines with date and commit tags (#108)
+
 ## 1.9.0(2026-08-26) {#cl-1.9.0}
 
 - Added OpenTelemetry automatic instrumentation injection for Java, Python, and Node.js applications (#98, #101, #102)

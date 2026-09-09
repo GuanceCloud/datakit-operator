@@ -1,9 +1,12 @@
 default: local
 
-.PHONY: check_rc_version docs_lint pub_rc_image
+.PHONY: check_rc_metadata docs_lint pub_rc_image
 
-VERSION=v1.9.0
-RC_VERSION ?=
+VERSION=v1.9.1
+override RC_BASE_VERSION := $(VERSION)
+override RC_DATE := $(shell TZ=Asia/Shanghai date +%Y%m%d)
+override RC_VERSION := $(RC_BASE_VERSION)-rc-$(RC_DATE)
+override SHA_VERSION := sha-$(shell git rev-parse HEAD 2>/dev/null | cut -c1-12)
 
 BIN           = datakit-operator
 ENTRY         = ./cmd/main.go
@@ -68,8 +71,11 @@ endef
 define build_rc_image
 	sudo docker buildx build --platform $(IMAGE_ARCHS) \
 		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t registry.jiagouyun.com/datakit-operator/datakit-operator:$(SHA_VERSION) \
 		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/datakit-operator/datakit-operator:$(SHA_VERSION) \
 		-t pubrepo.guance.com/truewatch/datakit-operator:$(RC_VERSION) \
+		-t pubrepo.guance.com/truewatch/datakit-operator:$(SHA_VERSION) \
 		-f $(DOCKERFILE_DIR)/Dockerfile . --push
 endef
 
@@ -136,31 +142,28 @@ pub_testing_image:
 	$(call build_k8s_charts,testing,'datakit-operator-testing')
 	$(call upload,$(LOCAL_OSS_HOST),$(LOCAL_OSS_BUCKET),$(LOCAL_OSS_ACCESS_KEY),$(LOCAL_OSS_SECRET_KEY),$(VERSION))
 
-check_rc_version:
-	@if ! printf '%s\n' "$(RC_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc-[0-9]{8}$$'; then \
-		echo "RC_VERSION must match vX.Y.Z-rc-YYYYMMDD, got $(RC_VERSION)" >&2; \
+check_rc_metadata:
+	@if ! printf '%s\n' "$(RC_BASE_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "VERSION must match vX.Y.Z, got $(RC_BASE_VERSION)" >&2; \
 		exit 1; \
 	fi
-	@rc_base="$(RC_VERSION)"; \
-	rc_base="$${rc_base%-rc-*}"; \
-	if [ "$$rc_base" != "$(VERSION)" ]; then \
-		echo "RC base version must match VERSION $(VERSION), got $$rc_base" >&2; \
+	@if ! printf '%s\n' "$(RC_DATE)" | grep -Eq '^[0-9]{8}$$'; then \
+		echo "failed to generate RC date in YYYYMMDD format, got $(RC_DATE)" >&2; \
 		exit 1; \
 	fi
-	@rc_date="$(RC_VERSION)"; \
-	rc_date="$${rc_date##*-rc-}"; \
-	today="$$(TZ=Asia/Shanghai date +%Y%m%d)"; \
-	if [ "$$rc_date" != "$$today" ]; then \
-		echo "RC date must match current date $$today (Asia/Shanghai), got $$rc_date" >&2; \
+	@if ! printf '%s\n' "$(SHA_VERSION)" | grep -Eq '^sha-[0-9a-f]{12}$$'; then \
+		echo "failed to generate sha-<12 character commit> tag, got $(SHA_VERSION)" >&2; \
 		exit 1; \
 	fi
-	@changelog_version="$(patsubst v%,%,$(VERSION))"; \
+	@changelog_version="$(patsubst v%,%,$(RC_BASE_VERSION))"; \
 	if ! grep -Fq "## [$$changelog_version]" CHANGELOG.md; then \
 		echo "CHANGELOG.md must contain ## [$$changelog_version]" >&2; \
 		exit 1; \
 	fi
 
-pub_rc_image: check_rc_version
+pub_rc_image: override VERSION := $(RC_VERSION)
+pub_rc_image: check_rc_metadata deps
+	$(call build,$(ARCH_ARM64),$(ARCH_AMD64))
 	$(call build_rc_image)
 
 pub_uos_image:

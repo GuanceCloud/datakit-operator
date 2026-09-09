@@ -35,6 +35,9 @@ func CheckPodRBAC(k8sClient client.Client) error {
 
 // ListAllPods 对应 GET /api/v1/pods
 func (h *Handler) ListAllPods(c *gin.Context) {
+	if !h.requireReady(c) {
+		return
+	}
 	pods, err := h.PodLister.Pods("").List(labels.Everything())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -50,6 +53,9 @@ func (h *Handler) ListAllPods(c *gin.Context) {
 
 // ListPods 对应 GET /api/v1/namespaces/:ns/pods
 func (h *Handler) ListPods(c *gin.Context) {
+	if !h.requireReady(c) {
+		return
+	}
 	ns := c.Param("namespace")
 
 	pods, err := h.PodLister.Pods(ns).List(labels.Everything())
@@ -67,6 +73,9 @@ func (h *Handler) ListPods(c *gin.Context) {
 
 // GetPod 对应 GET /api/v1/namespaces/:ns/pods/:name
 func (h *Handler) GetPod(c *gin.Context) {
+	if !h.requireReady(c) {
+		return
+	}
 	ns := c.Param("namespace")
 	name := c.Param("name")
 
@@ -80,6 +89,14 @@ func (h *Handler) GetPod(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, pod)
+}
+
+func (h *Handler) requireReady(c *gin.Context) bool {
+	if h.Ready() {
+		return true
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Pod informer cache is not ready"})
+	return false
 }
 
 func trimPodsForEBPFV1(pods []*corev1.Pod) []corev1.Pod {
