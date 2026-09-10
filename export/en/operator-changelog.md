@@ -1,5 +1,9 @@
 # Operator Changelog
 
+## 1.9.2(2026-09-10) {#cl-1.9.2}
+
+- Added `image_pull_policy` to configure the pull policy of injected images, defaulting to `Always` when missing or invalid (#110)
+
 ## 1.9.1(2026-09-09) {#cl-1.9.1}
 
 - Added Kubernetes Lease-based central election for DataKit, requiring DataKit 2.12.0 or later (#109)
