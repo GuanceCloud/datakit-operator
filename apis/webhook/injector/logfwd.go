@@ -110,7 +110,7 @@ func (r *logfwdResource) process() {
 	r.injectVolume(volumeNames)
 	r.injectVolumeMount(volumeNames, volumeMountPaths)
 
-	r.injectContainer(rule.Image, envs, volumeNames, volumeMountPaths, rule.Resources)
+	r.injectContainer(rule.Image, rule.ImagePullPolicy.Value(), envs, volumeNames, volumeMountPaths, rule.Resources)
 
 	log.Infof("logfwd injection completed: pod=%s, image=%s, rule=%s", r.parent, rule.Image, rule.Name)
 }
@@ -261,11 +261,11 @@ func (r *logfwdResource) injectVolumeMount(volumeNames, volumePaths []string) {
 	}
 }
 
-func (r *logfwdResource) injectContainer(image string, envs []corev1.EnvVar, volumeNames, volumePaths []string, resources config.ResourceRequirements) {
+func (r *logfwdResource) injectContainer(image string, pullPolicy corev1.PullPolicy, envs []corev1.EnvVar, volumeNames, volumePaths []string, resources config.ResourceRequirements) {
 	container := corev1.Container{
 		Name:            logfwdContainerName,
 		Image:           image,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: pullPolicy,
 		Env:             envs,
 	}
 

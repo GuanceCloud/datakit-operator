@@ -293,6 +293,26 @@ The mappings are:
 
 When `check_annotation: true` and the Pod provides the corresponding version Annotation, DDTrace, OTel, and Profiler replace the tag in the rule's `image` without changing the image registry or name. Feature switch Annotations always apply, regardless of `check_annotation`.
 
+### Image Pull Policy {#image-pull-policy}
+
+DDTrace, OTel, logfwd, Flameshot, and Profiler rules under `admission_inject_v2` support `image_pull_policy` alongside `image`. Valid values are `Always`, `IfNotPresent`, and `Never`, with exact casing. Missing, empty, or invalid values (including incorrect JSON value types) fall back to `Always`; invalid values produce a warning.
+
+For example, configure the corresponding rule in `admission_inject_v2.ddtraces` as follows:
+
+```json
+{
+    "name": "ddtrace-java",
+    "language": "java",
+    "namespace_selectors": ["default"],
+    "image": "{{.DDTraceJavaImage}}",
+    "image_pull_policy": "IfNotPresent"
+}
+```
+
+`IfNotPresent` reuses the local image when it is already present on the node; `Never` requires the image to be available on the node in advance. Use fixed versions to avoid reusing an old cached image with a mutable tag. This setting controls newly injected containers only. Helm's `image.pullPolicy` still controls only the Operator's own image.
+
+After changing the configuration, restart the Operator and recreate the application Pods. Existing containers keep their pull policies. The deprecated `admission_inject` retains the default `Always`; to use the new setting, remove any active legacy configuration that overrides the corresponding v2 rules.
+
 ## Supported Injection Features {#supported-operator}
 
 | Feature | Documentation |

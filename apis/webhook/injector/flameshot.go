@@ -95,7 +95,7 @@ func (r *flameshotResource) process() {
 	}
 
 	r.resetSpec()
-	r.injectContainer(rule.Image, envs, port, rule.Resources)
+	r.injectContainer(rule.Image, rule.ImagePullPolicy.Value(), envs, port, rule.Resources)
 	r.injectVolume()
 	r.injectVolumeMount(profilingPath)
 	log.Debugf("flameshot container created: pod=%s, image=%s, port=%d", r.parent, rule.Image, port)
@@ -155,12 +155,12 @@ func (r *flameshotResource) injectVolumeMount(path string) {
 	manager.AddVolumeMount(&profilingDir)
 }
 
-func (r *flameshotResource) injectContainer(image string, envs []corev1.EnvVar, port int32, resources config.ResourceRequirements) {
+func (r *flameshotResource) injectContainer(image string, pullPolicy corev1.PullPolicy, envs []corev1.EnvVar, port int32, resources config.ResourceRequirements) {
 	container := corev1.Container{
 		Name:            flameshotContainerName,
 		Image:           image,
 		Command:         []string{"/flameshot/flameshot"},
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: pullPolicy,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{"SYS_PTRACE"},
