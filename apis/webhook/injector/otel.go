@@ -445,7 +445,7 @@ func (r *otelResource) initContainer(rule *config.OTelRule, image string, librar
 		Name:            otelInitContainerName,
 		Image:           image,
 		Command:         library.command,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: rule.ImagePullPolicy.Value(),
 		VolumeMounts: []corev1.VolumeMount{
 			{Name: otelVolumeName, MountPath: library.mountPath},
 		},

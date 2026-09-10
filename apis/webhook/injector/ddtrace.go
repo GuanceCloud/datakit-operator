@@ -114,7 +114,7 @@ func (r *ddtraceResource) process() bool {
 	mutatedPod := r.pod.DeepCopy()
 	mutatedResource := newDDTraceResource(r.namespace, r.parent, mutatedPod)
 	phpLoaderFlavor := mutatedResource.getPHPLoaderFlavor(rule)
-	mutatedResource.injectInitContainer(image, rule.Resources, lang, phpLoaderFlavor)
+	mutatedResource.injectInitContainer(image, rule.ImagePullPolicy.Value(), rule.Resources, lang, phpLoaderFlavor)
 
 	if err := lib.injectConfig(mutatedPod); err != nil {
 		log.Warnf("ddtrace inject failed: pod=%s, error=%v", r.parent, err)
@@ -223,7 +223,7 @@ func hasDDTraceLibraryMount(container *corev1.Container) bool {
 	return false
 }
 
-func (r *ddtraceResource) injectInitContainer(image string, resources config.ResourceRequirements, lang language, phpLoaderFlavor string) {
+func (r *ddtraceResource) injectInitContainer(image string, pullPolicy corev1.PullPolicy, resources config.ResourceRequirements, lang language, phpLoaderFlavor string) {
 	command := []string{"sh", "copy-lib.sh", ddtraceMountPath}
 	if lang == php {
 		copyCmd := fmt.Sprintf(
@@ -237,7 +237,7 @@ func (r *ddtraceResource) injectInitContainer(image string, resources config.Res
 		Name:            ddtraceInitContainerName,
 		Image:           image,
 		Command:         command,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: pullPolicy,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      ddtraceVolumeName,

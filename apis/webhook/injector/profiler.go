@@ -86,7 +86,7 @@ func (r *profilerResource) process() {
 	envs := envbuilder.BuildEnvs(rule.Envs, enableEnvFieldRef)
 	envs = envbuilder.FilterAndSetResourceFieldRefEnvVars(envs, r.pod)
 	envs = manager.AddOrUpdateEnvVars(nil, envs, manager.ReplaceExistingEnvVar)
-	r.injectContainer(image, rule.Resources, envs)
+	r.injectContainer(image, rule.ImagePullPolicy.Value(), rule.Resources, envs)
 	r.injectVolume()
 	r.injectVolumeMount()
 	log.Infof("profiler injection completed: pod=%s, image=%s, rule=%s", r.parent, image, rule.Name)
@@ -230,12 +230,12 @@ func (r *profilerResource) injectVolumeMount() {
 	}
 }
 
-func (r *profilerResource) injectContainer(image string, resources config.ResourceRequirements, envs []corev1.EnvVar) {
+func (r *profilerResource) injectContainer(image string, pullPolicy corev1.PullPolicy, resources config.ResourceRequirements, envs []corev1.EnvVar) {
 	container := corev1.Container{
 		Name:            profilerContainerName,
 		Image:           image,
 		Command:         []string{"bash", "cmd.sh"},
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: pullPolicy,
 		WorkingDir:      profilerMountPath,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{

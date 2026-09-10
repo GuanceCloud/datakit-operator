@@ -16,10 +16,11 @@ type (
 		Name string `json:"name"`
 		Selector
 
-		Image        string               `json:"image"`
-		Environments mapslice.MapSlice    `json:"envs"`
-		Resources    ResourceRequirements `json:"resources"`
-		Envs         Envs                 `json:"-"`
+		Image           string               `json:"image"`
+		ImagePullPolicy ImagePullPolicy      `json:"image_pull_policy,omitempty"`
+		Environments    mapslice.MapSlice    `json:"envs"`
+		Resources       ResourceRequirements `json:"resources"`
+		Envs            Envs                 `json:"-"`
 	}
 
 	DDTraceRules []*DDTraceRule

@@ -293,6 +293,26 @@ DDTrace、OTel、logfwd、および旧方式の Profiler ルールは `check_ann
 
 `check_annotation: true` で、Pod に対応するバージョン annotation が指定されている場合、DDTrace、OTel、および Profiler はルール内の `image` の tag を置き換えますが、イメージのレジストリと名前は変更しません。機能スイッチ用 Annotation は `check_annotation` に関係なく常に有効です。
 
+### イメージの pull ポリシー {#image-pull-policy}
+
+`admission_inject_v2` 配下の DDTrace、OTel、logfwd、Flameshot、Profiler の各ルールは、`image` と同じ階層で `image_pull_policy` を指定できます。有効な値は `Always`、`IfNotPresent`、`Never` で、大文字と小文字を区別します。未指定、空の値、不正な値（JSON の値の型が誤っている場合を含む）は `Always` にフォールバックし、不正な値については warning を記録します。
+
+例えば、`admission_inject_v2.ddtraces` 内の対象ルールを次のように設定します。
+
+```json
+{
+    "name": "ddtrace-java",
+    "language": "java",
+    "namespace_selectors": ["default"],
+    "image": "{{.DDTraceJavaImage}}",
+    "image_pull_policy": "IfNotPresent"
+}
+```
+
+`IfNotPresent` はノードにイメージが存在する場合にローカルのイメージを再利用します。`Never` はノードに事前にイメージが存在する必要があります。変更可能な同名タグで古いキャッシュを使い続けないよう、固定バージョンの使用を推奨します。この設定は新しく注入するコンテナにのみ適用されます。Helm の `image.pullPolicy` は引き続き Operator 自身のイメージのみを制御します。
+
+設定を変更したら Operator を再起動し、アプリケーション Pod を再作成してください。既存コンテナのポリシーは書き換えません。非推奨の `admission_inject` はデフォルトの `Always` を維持します。新しい設定を使用するには、対応する v2 ルールを上書きする有効な旧設定を削除してください。
+
 ## 対応する注入機能 {#supported-operator}
 
 | 機能 | ドキュメント |

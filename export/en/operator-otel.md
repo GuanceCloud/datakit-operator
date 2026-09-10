@@ -160,6 +160,7 @@ Common fields:
 | `label_selectors` | Array of Pod Label Selectors |
 | `check_annotation` | Whether the Pod must provide a version Annotation for the corresponding language; defaults to `false` |
 | `image` | Required; official OpenTelemetry image or a copy in a private registry |
+| `image_pull_policy` | Optional; `Always`, `IfNotPresent`, or `Never`. Missing or invalid values use `Always`. See [Image Pull Policy](datakit-operator.md#image-pull-policy) |
 | `envs` | Environment variables injected into all regular application containers |
 | `resources` | Resource configuration for the init Container; defaults are used when missing or invalid |
 
@@ -283,6 +284,6 @@ Common issues:
 
 - A running Pod did not change: recreate it; the Operator processes only `CREATE`.
 - Nothing was injected: check the Namespace, Label, `check_annotation`, DDTrace precedence, and Operator warnings.
-- The init Container cannot pull its image: official images use `imagePullPolicy: Always`. Check GHCR connectivity, or synchronize the image to a private registry and update the rule.
+- The init Container cannot pull its image: check GHCR connectivity, or synchronize the image to a private registry and update the rule. The default pull policy is `Always`; adjust it with `image_pull_policy` in the rule. When using `IfNotPresent` or `Never`, check whether the image is available on the node.
 - Injection succeeded but no data appears: confirm that the `opentelemetry` input is enabled in DataKit, the OTLP address is reachable, the application framework is supported by automatic instrumentation, and an actual request has been sent.
 - Rollback is required: remove or disable the OTel rule, then recreate Pods that were already injected.
