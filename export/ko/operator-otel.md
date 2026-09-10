@@ -160,6 +160,7 @@ Operator는 이러한 조건을 자동으로 판단하지 않습니다. 상호 �
 | `label_selectors` | Pod Label Selector 배열 |
 | `check_annotation` | Pod에 해당 언어의 버전 Annotation을 요구할지 여부. 기본값은 `false`입니다. |
 | `image` | 필수. OpenTelemetry 공식 이미지 또는 프라이빗 레지스트리 복사본 |
+| `image_pull_policy` | 선택 사항. `Always`, `IfNotPresent`, `Never`를 지원하며 값이 없거나 잘못되면 `Always`를 사용합니다. [이미지 가져오기 정책](datakit-operator.md#image-pull-policy)을 참조하십시오 |
 | `envs` | 모든 일반 애플리케이션 컨테이너에 주입할 환경 변수 |
 | `resources` | init Container 리소스 구성. 없거나 잘못된 경우 기본값을 사용합니다. |
 
@@ -283,6 +284,6 @@ source:opentelemetry
 
 - 실행 중인 Pod가 변경되지 않음: Pod를 다시 생성하십시오. Operator는 `CREATE`만 처리합니다.
 - 주입되지 않음: Namespace, Label, `check_annotation`, DDTrace 우선순위 및 Operator warning을 확인하십시오.
-- init Container 이미지 가져오기 실패: 공식 이미지는 `imagePullPolicy: Always`를 사용합니다. GHCR 네트워크를 확인하거나 이미지를 프라이빗 레지스트리에 동기화한 후 규칙을 변경하십시오.
+- init Container 이미지 가져오기 실패: GHCR 네트워크를 확인하거나 이미지를 프라이빗 레지스트리에 동기화한 후 규칙을 변경하십시오. 기본 가져오기 정책은 `Always`이며 규칙의 `image_pull_policy`로 변경할 수 있습니다. `IfNotPresent` 또는 `Never`를 사용할 때는 노드에 이미지가 있는지 확인하십시오.
 - 주입되었지만 데이터가 없음: DataKit에서 `opentelemetry` input을 활성화했는지, OTLP 주소에 접근할 수 있는지, 애플리케이션 프레임워크가 자동 계측 에이전트에서 지원되는지 확인하고 실제 요청을 한 번 보내십시오.
 - 롤백 필요: OTel 규칙을 삭제하거나 비활성화한 후 이미 주입된 Pod를 다시 생성하십시오.

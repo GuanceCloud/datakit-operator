@@ -160,6 +160,7 @@ Operator 不会自动判断这些条件。请使用互斥的 Namespace 或 Label
 | `label_selectors` | Pod Label Selector 数组 |
 | `check_annotation` | 是否要求 Pod 提供对应语言的版本注解，默认 `false` |
 | `image` | 必填；OpenTelemetry 官方镜像或其私有仓库副本 |
+| `image_pull_policy` | 可选；`Always`、`IfNotPresent` 或 `Never`，缺失或错误时使用 `Always`。参见[镜像拉取策略](datakit-operator.md#image-pull-policy) |
 | `envs` | 注入所有普通业务容器的环境变量 |
 | `resources` | init Container 的资源配置；缺失或非法时使用默认值 |
 
@@ -283,6 +284,6 @@ source:opentelemetry
 
 - 已运行的 Pod 没有变化：重新创建 Pod；Operator 只处理 `CREATE`。
 - 没有注入：检查 Namespace、Label、`check_annotation`、DDTrace 优先级和 Operator warning。
-- init Container 拉取失败：官方镜像使用 `imagePullPolicy: Always`，检查 GHCR 网络，或将镜像同步到私有仓库后修改规则。
+- init Container 拉取失败：检查 GHCR 网络，或将镜像同步到私有仓库后修改规则。默认拉取策略为 `Always`，可通过规则中的 `image_pull_policy` 调整；使用 `IfNotPresent` 或 `Never` 时需确认节点上的镜像是否可用。
 - 有注入但没有数据：确认 DataKit 已开启 `opentelemetry` input、OTLP 地址可达、业务框架受自动探针支持，并产生一次真实请求。
 - 需要回滚：删除或禁用 OTel 规则，然后重新创建已经注入的 Pod。

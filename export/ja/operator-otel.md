@@ -160,6 +160,7 @@ Operator はこれらの条件を自動判定しません。相互排他的な N
 | `label_selectors` | Pod Label Selector の配列 |
 | `check_annotation` | 対応する言語のバージョン Annotation を Pod に要求するかどうか。デフォルトは `false` |
 | `image` | 必須。OpenTelemetry 公式イメージ、またはプライベートレジストリに複製したイメージ |
+| `image_pull_policy` | 任意。`Always`、`IfNotPresent`、`Never`。未指定または不正な値は `Always` を使用します。[イメージの pull ポリシー](datakit-operator.md#image-pull-policy)を参照してください |
 | `envs` | すべての通常のアプリケーションコンテナに注入する環境変数 |
 | `resources` | init Container のリソース設定。未指定または無効な場合はデフォルト値を使用します |
 
@@ -283,6 +284,6 @@ source:opentelemetry
 
 - 実行中の Pod が変わらない：Pod を再作成してください。Operator が処理するのは `CREATE` だけです。
 - 注入されない：Namespace、Label、`check_annotation`、DDTrace の優先順位、および Operator の warning を確認してください。
-- init Container の pull に失敗する：公式イメージでは `imagePullPolicy: Always` を使用します。GHCR へのネットワーク接続を確認するか、イメージをプライベートレジストリへ同期してルールを変更してください。
+- init Container の pull に失敗する：GHCR へのネットワーク接続を確認するか、イメージをプライベートレジストリへ同期してルールを変更してください。デフォルトの pull ポリシーは `Always` で、ルールの `image_pull_policy` で変更できます。`IfNotPresent` または `Never` を使う場合は、ノード上のイメージの有無を確認してください。
 - 注入されているがデータがない：DataKit で `opentelemetry` input が有効であること、OTLP アドレスへ接続できること、アプリケーションフレームワークが自動計装に対応していることを確認し、実際のリクエストを送信してください。
 - ロールバックする：OTel ルールを削除または無効にしてから、注入済みの Pod を再作成してください。

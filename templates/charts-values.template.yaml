@@ -46,6 +46,7 @@ configmap:
                     "label_selectors":     [],
                     "check_annotation":    false,
                     "image":    "(@BRAND_REPO_DATAKIT_OPERATOR)/dd-lib-java-init:v1.60.4-ext",
+                    "image_pull_policy": "Always",
                     "envs": {
                         "DD_AGENT_HOST":           "datakit-service.datakit.svc.cluster.local",
                         "DD_TRACE_AGENT_PORT":     "9529",
@@ -65,6 +66,7 @@ configmap:
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "image": "(@BRAND_REPO_DATAKIT)/logfwd:1.93.0",
+                    "image_pull_policy": "Always",
                     "envs": {
                         "LOGFWD_DATAKIT_HOST":              "{fieldRef:status.hostIP}",
                         "LOGFWD_DATAKIT_PORT":              "9533",
@@ -93,6 +95,7 @@ configmap:
                     "namespace_selectors": ["default"],
                     "label_selectors":     [],
                     "image": "(@BRAND_REPO_DATAKIT)/flameshot:0.2.4",
+                    "image_pull_policy": "Always",
                     "envs": {
                         "FLAMESHOT_DATAKIT_ADDR":     "http://datakit-service.datakit:9529/profiling/v1/input",
                         "FLAMESHOT_MONITOR_INTERVAL": "10s",

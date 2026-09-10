@@ -293,6 +293,26 @@ DDTrace、OTel、logfwd 和旧版 Profiler 规则支持 `check_annotation`：
 
 当 `check_annotation: true` 且 Pod 提供对应版本 annotation 时，DDTrace、OTel 和 Profiler 会替换规则中 `image` 的 tag，但不会改变镜像仓库和镜像名称。功能开关注解始终生效，不受 `check_annotation` 影响。
 
+### 镜像拉取策略 {#image-pull-policy}
+
+`admission_inject_v2` 下的 DDTrace、OTel、logfwd、Flameshot 和 Profiler 规则支持 `image_pull_policy`，与 `image` 同级。合法值为 `Always`、`IfNotPresent` 和 `Never`，区分大小写；缺失、空值或错误值（包括错误的 JSON 值类型）均使用 `Always`，错误值会记录 warning。
+
+例如，将 `admission_inject_v2.ddtraces` 中对应的规则配置为：
+
+```json
+{
+    "name": "ddtrace-java",
+    "language": "java",
+    "namespace_selectors": ["default"],
+    "image": "{{.DDTraceJavaImage}}",
+    "image_pull_policy": "IfNotPresent"
+}
+```
+
+`IfNotPresent` 在节点已有镜像时复用本地镜像；`Never` 要求节点预先拥有镜像。建议使用固定版本，避免同名可变标签继续使用缓存中的旧镜像。该配置仅控制新注入的容器，Helm 的 `image.pullPolicy` 仍只控制 Operator 自身的镜像。
+
+修改配置后重启 Operator，再重建业务 Pod。已有容器的策略不会被改写。废弃的 `admission_inject` 保持默认 `Always`；使用新配置时，需要移除会覆盖对应 v2 规则的有效旧配置。
+
 ## 支持的注入功能列表 {#supported-operator}
 
 | 功能 | 文档 |
